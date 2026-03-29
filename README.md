@@ -7,8 +7,8 @@ This project was developed by our team during the spring semester of our second 
 - [Mouxiang Yan](https://github.com/consid-yan)
 - [Dongrui Gu](https://github.com/ordinaryman-dev)
 - [Yiming Liu](https://github.com/24372325)
-- TBA
-- TBA
+- [Tian Gao](https://github.com/sp3981)
+- [Yilong Ma](https://github.com/MaYilongNick)
 
 ## Tech Stack
 
@@ -16,7 +16,7 @@ This project was developed by our team during the spring semester of our second 
 - JavaFX
 - Maven
 - TCP/IP and Sockets
-- JUnit
+- JUnit 5
 - GitHub
 
 ## Installation and Running
