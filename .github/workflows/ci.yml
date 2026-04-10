@@ -6,12 +6,17 @@ on:
   pull_request:
     branches: [ "main", "develop" ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
+    name: Build and Test (JDK 25)
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up JDK 25
@@ -19,13 +24,10 @@ jobs:
         with:
           distribution: "temurin"
           java-version: "25"
+          cache: "maven"
 
-      - name: Cache Maven packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository
-          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
-          restore-keys: maven-${{ runner.os }}-
+      - name: Verify Environment
+        run: mvn -version
 
       - name: Build and Test
-        run: mvn -B clean test
+        run: mvn -B clean test -V
