@@ -1,9 +1,10 @@
-package ie.ucd.bdic.group6.controller.model;
+package ie.ucd.bdic.group6.controller.mapper;
 
 import ie.ucd.bdic.group6.command.EndTurnCommand;
 import ie.ucd.bdic.group6.command.PlayCardCommand;
 import ie.ucd.bdic.group6.command.StartGameCommand;
 import ie.ucd.bdic.group6.command.TradeCommand;
+import ie.ucd.bdic.group6.controller.dto.ControllerRequest;
 
 import java.util.Map;
 

@@ -1,4 +1,4 @@
-package ie.ucd.bdic.group6.controller.model;
+package ie.ucd.bdic.group6.controller.dto;
 
 import java.util.Map;
 
