@@ -1,6 +1,7 @@
 package ie.ucd.bdic.group6.facade.handler;
 
 import ie.ucd.bdic.group6.command.PlayCardCommand;
+import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 
 public class PlayCardHandler implements CommandHandler<PlayCardCommand> {
@@ -21,10 +22,6 @@ public class PlayCardHandler implements CommandHandler<PlayCardCommand> {
 
     @Override
     public GameResult handle(PlayCardCommand command) {
-        ActionResult result = actionExecutor.executePlayCard(command.payload());
-        if (result.success()) {
-            return GameResult.success(result.message());
-        }
-        return GameResult.failure(result.message());
+        return GameResult.notImplemented("PLAY_CARD");
     }
 }
