@@ -1,7 +1,7 @@
 package ie.ucd.bdic.group6.controller;
 
-import ie.ucd.bdic.group6.controller.model.ControllerRequest;
-import ie.ucd.bdic.group6.controller.model.RequestMapper;
+import ie.ucd.bdic.group6.controller.dto.ControllerRequest;
+import ie.ucd.bdic.group6.controller.mapper.RequestMapper;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 import ie.ucd.bdic.group6.facade.Facade;
 

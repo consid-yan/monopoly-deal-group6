@@ -4,9 +4,9 @@ public class GameResult {
     private final boolean success;
     private final String message;
 
-    public GameResult(boolean success, String message) {
+    public GameResult(boolean success, String msg) {
         this.success = success;
-        this.message = message;
+        message = msg;
     }
 
     public static GameResult empty() {

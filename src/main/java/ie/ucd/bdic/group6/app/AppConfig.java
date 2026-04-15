@@ -1,7 +1,7 @@
 package ie.ucd.bdic.group6.app;
 
 import ie.ucd.bdic.group6.controller.GameController;
-import ie.ucd.bdic.group6.controller.model.RequestMapper;
+import ie.ucd.bdic.group6.controller.mapper.RequestMapper;
 import ie.ucd.bdic.group6.facade.GameFacade;
 
 public class AppConfig {
