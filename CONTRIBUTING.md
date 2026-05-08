@@ -15,14 +15,14 @@ Thank you for contributing to the Monopoly Deal Group 6 project.
 
 Use the following branch naming format:
 
-- `feature/<issue-id>-<short-name>`
+- `feat/<issue-id>-<short-name>`
 - `fix/<issue-id>-<short-name>`
 - `docs/<topic>`
 - `refactor/<topic>`
 - `test/<topic>`
 
 Examples:
-- `feature/12-card-factory`
+- `feat/12-card-factory`
 - `fix/24-network-sync`
 - `docs/readme-update`
 
