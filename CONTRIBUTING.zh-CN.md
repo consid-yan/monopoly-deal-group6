@@ -15,14 +15,14 @@
 
 建议使用下面这些格式：
 
-- `feature/<issue-id>-<short-name>`
+- `feat/<issue-id>-<short-name>`
 - `fix/<issue-id>-<short-name>`
 - `docs/<topic>`
 - `refactor/<topic>`
 - `test/<topic>`
 
 示例：
-- `feature/12-card-factory`
+- `feat/12-card-factory`
 - `fix/24-network-sync`
 - `docs/readme-update`
 

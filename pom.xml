@@ -6,13 +6,13 @@
 
     <groupId>ie.ucd.bdic.group6</groupId>
     <artifactId>monopoly-deal-group6</artifactId>
-    <version>0.1.0</version>
+    <version>0.0.1</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
-        <javafx.version>25-ea+5</javafx.version>
+        <javafx.version>25.0.2</javafx.version>
     </properties>
 
     <dependencies>
@@ -30,13 +30,13 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>5.14.0</version>
+            <version>5.14.3</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.14.0</version>
+            <version>5.14.3</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
