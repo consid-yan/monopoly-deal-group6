@@ -1,10 +1,15 @@
+// EndTurnCommand.java
 package ie.ucd.bdic.group6.command;
 
 import java.util.Map;
 
-public record EndTurnCommand(Map<String, Object> payload) implements Command {
-    public EndTurnCommand {
-        payload = payload == null ? Map.of() : Map.copyOf(payload);
+public class EndTurnCommand extends AbstractCommand {
+    public EndTurnCommand(Map<String, Object> payload) {
+        super(payload);
+    }
+
+    @Override
+    public CommandType getCommandType() {
+        return CommandType.END_TURN;
     }
 }
-
