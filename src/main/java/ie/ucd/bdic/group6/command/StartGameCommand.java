@@ -1,10 +1,15 @@
+// StartGameCommand.java
 package ie.ucd.bdic.group6.command;
 
 import java.util.Map;
 
-public record StartGameCommand(Map<String, Object> payload) implements Command {
-    public StartGameCommand {
-        payload = payload == null ? Map.of() : Map.copyOf(payload);
+public class StartGameCommand extends AbstractCommand {
+    public StartGameCommand(Map<String, Object> payload) {
+        super(payload);
+    }
+
+    @Override
+    public CommandType getCommandType() {
+        return CommandType.START_GAME;
     }
 }
-

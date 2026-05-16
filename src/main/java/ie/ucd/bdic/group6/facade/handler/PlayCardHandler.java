@@ -1,18 +1,17 @@
+// PlayCardHandler.java
 package ie.ucd.bdic.group6.facade.handler;
 
 import ie.ucd.bdic.group6.command.PlayCardCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 
-public class PlayCardHandler implements CommandHandler<PlayCardCommand> {
-    private final ActionExecutor actionExecutor;
-
+public class PlayCardHandler extends AbstractCommandHandler<PlayCardCommand> {
     public PlayCardHandler() {
-        this(new ActionExecutor());
+        super();
     }
 
     public PlayCardHandler(ActionExecutor actionExecutor) {
-        this.actionExecutor = actionExecutor;
+        super(actionExecutor);
     }
 
     @Override
@@ -21,7 +20,7 @@ public class PlayCardHandler implements CommandHandler<PlayCardCommand> {
     }
 
     @Override
-    public GameResult handle(PlayCardCommand command) {
-        return GameResult.notImplemented("PLAY_CARD");
+    protected GameResult execute(PlayCardCommand command) {
+        return GameResult.success(actionExecutor.executePlayCard(command));
     }
 }

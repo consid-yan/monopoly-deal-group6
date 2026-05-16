@@ -1,4 +1,11 @@
 package ie.ucd.bdic.group6.exception;
 
-public class InvalidGameStateException {
+public class InvalidGameStateException extends GameException {
+    public InvalidGameStateException(String message) {
+        super("INVALID_GAME_STATE", message);
+    }
+
+    public InvalidGameStateException(String message, Throwable cause) {
+        super("INVALID_GAME_STATE", message, cause);
+    }
 }
