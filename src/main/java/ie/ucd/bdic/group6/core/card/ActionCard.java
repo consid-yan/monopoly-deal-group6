@@ -1,5 +1,7 @@
 package ie.ucd.bdic.group6.core.card;
 
+import ie.ucd.bdic.group6.core.property.PropertyColor;
+
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.OptionalInt;
