@@ -164,8 +164,14 @@ public final class PropertySet {
 
     /**
      * Snapshot restore helper: reapplies house/hotel flags after cards are restored.
+     * Clearing improvements ({@code houseFlag == false && hotelFlag == false}) is allowed on incomplete sets.
      */
     public void applyImprovementFlagsForSnapshot(boolean houseFlag, boolean hotelFlag) {
+        if (!houseFlag && !hotelFlag) {
+            this.house = false;
+            this.hotel = false;
+            return;
+        }
         if (!isComplete()) {
             throw new IllegalStateException("cannot apply improvements on incomplete set");
         }

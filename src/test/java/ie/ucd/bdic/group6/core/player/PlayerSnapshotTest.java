@@ -33,4 +33,23 @@ class PlayerSnapshotTest {
         assertEquals(1, p2.propertyBoard().rowsView().size());
         assertEquals(1, p2.propertyBoard().rowsView().getFirst().size());
     }
+
+    @Test
+    void snapshotRoundTripPreservesCompleteSetWithHouse() {
+        Player p = new Player("p1", "A");
+        PropertyCard b1 = new PropertyCard("b1", "B1", PropertyColor.BROWN, 2);
+        PropertyCard b2 = new PropertyCard("b2", "B2", PropertyColor.BROWN, 2);
+        PropertySet row = new PropertySet(PropertyColor.BROWN);
+        assertTrue(row.tryAdd(b1, Optional.empty()));
+        assertTrue(row.tryAdd(b2, Optional.empty()));
+        assertTrue(row.tryPlaceHouseStructuralOnly());
+        p.propertyBoard().addRow(row);
+
+        Player p2 = new Player("p1", "B");
+        p2.restore(p.snapshot());
+
+        PropertySet restored = p2.propertyBoard().rowsView().getFirst();
+        assertTrue(restored.isComplete());
+        assertTrue(restored.hasHouse());
+    }
 }
