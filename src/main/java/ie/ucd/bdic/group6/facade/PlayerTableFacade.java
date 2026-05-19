@@ -1,4 +1,4 @@
-package ie.ucd.bdic.group6.core.api;
+package ie.ucd.bdic.group6.facade;
 
 import ie.ucd.bdic.group6.core.card.ActionCard;
 import ie.ucd.bdic.group6.core.card.Card;
@@ -15,7 +15,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Thin façade over {@link Player} for other modules: stable entry points and JavaDoc-oriented API surface.
+ * Facade over {@link Player} table zones (hand, bank, property board) for engine/UI integration.
+ * Command-level orchestration remains in {@link GameFacade}; this class exposes stable player-table operations.
  */
 public final class PlayerTableFacade {
 
