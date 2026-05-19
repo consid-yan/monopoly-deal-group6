@@ -20,7 +20,6 @@ public final class CardBankSupport {
             case ActionCard action -> action.bankValueM().isPresent();
             case PropertyWildCard wild -> wild.bankValueM().isPresent();
             case PropertyCard property -> false;
-            default -> false;
         };
     }
 

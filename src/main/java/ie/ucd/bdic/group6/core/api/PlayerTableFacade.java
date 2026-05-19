@@ -1,9 +1,12 @@
-package ie.ucd.bdic.group6.core.player;
+package ie.ucd.bdic.group6.core.api;
 
 import ie.ucd.bdic.group6.core.card.ActionCard;
 import ie.ucd.bdic.group6.core.card.Card;
 import ie.ucd.bdic.group6.core.card.Deck;
 import ie.ucd.bdic.group6.core.common.OperationResult;
+import ie.ucd.bdic.group6.core.player.BankPaymentSolver;
+import ie.ucd.bdic.group6.core.player.Player;
+import ie.ucd.bdic.group6.core.player.PlayerSnapshot;
 import ie.ucd.bdic.group6.core.property.PropertyColor;
 import ie.ucd.bdic.group6.core.property.PropertySet;
 
