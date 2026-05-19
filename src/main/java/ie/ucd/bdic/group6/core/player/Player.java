@@ -20,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * Aggregates {@link Hand}, {@link Bank}, and {@link PropertyBoard}. Multi-step transactions should be composed
  * by the engine using {@link PlayerSnapshot} plus atomic helpers such as {@link PlayerPropertyTransfers}.
+ * For a stable integration surface, prefer {@link ie.ucd.bdic.group6.facade.PlayerTableFacade}.
  */
 public final class Player {
 
