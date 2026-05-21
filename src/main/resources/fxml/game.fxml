@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.TitledPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane prefHeight="640.0" prefWidth="960.0"
+            styleClass="menu-root root-screen game-screen"
+            stylesheets="@../css/style.css"
+            xmlns="http://javafx.com/javafx/25.0.2"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="ie.ucd.bdic.group6.ui.GameUI">
+    <top>
+        <VBox spacing="12.0" BorderPane.alignment="CENTER">
+            <padding>
+                <Insets bottom="14.0" left="36.0" right="36.0" top="24.0"/>
+            </padding>
+            <Label styleClass="menu-title title-banner" text="Monopoly Deal">
+                <font>
+                    <Font name="System Bold" size="30.0"/>
+                </font>
+            </Label>
+            <GridPane hgap="16.0" vgap="8.0">
+                <columnConstraints>
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="170.0"/>
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="170.0"/>
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="170.0"/>
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="170.0"/>
+                </columnConstraints>
+                <Label text="Active Player" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                <TextField editable="false" promptText="Active Player" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                <Label text="Turn Status" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+                <TextField editable="false" promptText="Turn/status indicator" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+                <Label text="You" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
+                <TextField editable="false" promptText="Current user/player identity" GridPane.columnIndex="2" GridPane.rowIndex="1"/>
+                <Label text="Connection" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
+                <TextField editable="false" promptText="Connected / reconnect countdown" GridPane.columnIndex="3" GridPane.rowIndex="1"/>
+            </GridPane>
+        </VBox>
+    </top>
+    <left>
+        <VBox prefWidth="240.0" spacing="12.0" BorderPane.alignment="CENTER">
+            <padding>
+                <Insets bottom="12.0" left="24.0" right="12.0" top="8.0"/>
+            </padding>
+            <Label styleClass="status-label" text="Private Player Area">
+                <font>
+                    <Font name="System Bold" size="18.0"/>
+                </font>
+            </Label>
+            <TitledPane animated="false" collapsible="false" styleClass="money-panel" text="Your Bank">
+                <ListView prefHeight="120.0">
+                    <placeholder>
+                        <Label text="Your Bank"/>
+                    </placeholder>
+                </ListView>
+            </TitledPane>
+            <TitledPane animated="false" collapsible="false" styleClass="property-set-panel" text="Your Properties">
+                <ListView prefHeight="210.0" VBox.vgrow="ALWAYS">
+                    <placeholder>
+                        <Label text="Your Properties"/>
+                    </placeholder>
+                </ListView>
+            </TitledPane>
+            <Label styleClass="menu-note" text="Only your own hand is shown in this area." wrapText="true">
+                <font>
+                    <Font size="12.0"/>
+                </font>
+            </Label>
+        </VBox>
+    </left>
+    <center>
+        <VBox spacing="12.0" BorderPane.alignment="CENTER">
+            <padding>
+                <Insets bottom="12.0" left="12.0" right="12.0" top="8.0"/>
+            </padding>
+            <TitledPane animated="false" collapsible="false" styleClass="card-panel" text="Your Hand">
+                <ListView prefHeight="150.0">
+                    <placeholder>
+                        <Label text="Your Hand"/>
+                    </placeholder>
+                </ListView>
+            </TitledPane>
+            <GridPane hgap="12.0" vgap="12.0" VBox.vgrow="ALWAYS">
+                <columnConstraints>
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="220.0"/>
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="220.0"/>
+                </columnConstraints>
+                <rowConstraints>
+                    <RowConstraints vgrow="ALWAYS"/>
+                </rowConstraints>
+                <TitledPane animated="false" collapsible="false" styleClass="player-panel" text="Other Players" GridPane.columnIndex="0"
+                            GridPane.rowIndex="0">
+                    <ListView prefHeight="250.0">
+                        <placeholder>
+                            <Label text="Other Players"/>
+                        </placeholder>
+                    </ListView>
+                </TitledPane>
+                <TitledPane animated="false" collapsible="false" styleClass="section-panel" text="Public Table State" GridPane.columnIndex="1"
+                            GridPane.rowIndex="0">
+                    <ListView prefHeight="250.0">
+                        <placeholder>
+                            <Label text="Public bank, properties, and winner status"/>
+                        </placeholder>
+                    </ListView>
+                </TitledPane>
+            </GridPane>
+        </VBox>
+    </center>
+    <right>
+        <VBox prefWidth="280.0" spacing="12.0" BorderPane.alignment="CENTER">
+            <padding>
+                <Insets bottom="12.0" left="12.0" right="24.0" top="8.0"/>
+            </padding>
+            <Label text="Actions">
+                <font>
+                    <Font name="System Bold" size="18.0"/>
+                </font>
+            </Label>
+            <Button mnemonicParsing="false" prefHeight="38.0" prefWidth="240.0" styleClass="primary-button" text="Play Selected Card"/>
+            <Button mnemonicParsing="false" prefHeight="38.0" prefWidth="240.0" styleClass="danger-button" text="Discard Selected"/>
+            <Button mnemonicParsing="false" prefHeight="38.0" prefWidth="240.0" styleClass="gold-button" text="End Turn"/>
+            <Separator prefWidth="240.0"/>
+            <TitledPane animated="false" collapsible="false" styleClass="money-panel" text="Payment">
+                <VBox spacing="8.0">
+                    <ListView prefHeight="90.0">
+                        <placeholder>
+                            <Label text="Selected payment cards"/>
+                        </placeholder>
+                    </ListView>
+                    <Button mnemonicParsing="false" prefWidth="220.0" styleClass="secondary-button" text="Pay Debt"/>
+                </VBox>
+            </TitledPane>
+            <TitledPane animated="false" collapsible="false" styleClass="action-panel" text="Simplified Trade">
+                <VBox spacing="8.0">
+                    <TextField promptText="Target player"/>
+                    <ListView prefHeight="74.0">
+                        <placeholder>
+                            <Label text="Offered card"/>
+                        </placeholder>
+                    </ListView>
+                    <ListView prefHeight="74.0">
+                        <placeholder>
+                            <Label text="Requested card"/>
+                        </placeholder>
+                    </ListView>
+                    <Label text="Property for Money | Money for Property | Property for Property" wrapText="true">
+                        <font>
+                            <Font size="11.0"/>
+                        </font>
+                    </Label>
+                    <HBox alignment="CENTER" spacing="8.0">
+                        <Button mnemonicParsing="false" prefWidth="104.0" styleClass="primary-button" text="Propose"/>
+                        <Button mnemonicParsing="false" prefWidth="104.0" styleClass="gold-button" text="Accept"/>
+                    </HBox>
+                    <Button mnemonicParsing="false" prefWidth="220.0" styleClass="danger-button" text="Reject Trade"/>
+                </VBox>
+            </TitledPane>
+        </VBox>
+    </right>
+    <bottom>
+        <VBox spacing="8.0" BorderPane.alignment="CENTER">
+            <padding>
+                <Insets bottom="20.0" left="36.0" right="36.0" top="8.0"/>
+            </padding>
+            <GridPane hgap="16.0" vgap="8.0">
+                <columnConstraints>
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="360.0"/>
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="360.0"/>
+                </columnConstraints>
+                <Label text="Game Log" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                    <font>
+                        <Font name="System Bold" size="14.0"/>
+                    </font>
+                </Label>
+                <Label text="Error / Feedback" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                    <font>
+                        <Font name="System Bold" size="14.0"/>
+                    </font>
+                </Label>
+                <TextArea editable="false"
+                          focusTraversable="false"
+                          prefHeight="88.0"
+                          promptText="Game Log"
+                          styleClass="status-area"
+                          wrapText="true"
+                          GridPane.columnIndex="0"
+                          GridPane.rowIndex="1"/>
+                <TextArea editable="false"
+                          focusTraversable="false"
+                          prefHeight="88.0"
+                          promptText="Invalid action message"
+                          styleClass="error-area"
+                          wrapText="true"
+                          GridPane.columnIndex="1"
+                          GridPane.rowIndex="1"/>
+            </GridPane>
+        </VBox>
+    </bottom>
+</BorderPane>

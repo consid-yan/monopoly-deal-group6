@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane prefHeight="640.0" prefWidth="960.0"
+            styleClass="menu-root root-screen menu-screen"
+            stylesheets="@../css/style.css"
+            xmlns="http://javafx.com/javafx/25.0.2"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="ie.ucd.bdic.group6.ui.MenuUI">
+    <center>
+        <VBox alignment="CENTER" spacing="22.0" BorderPane.alignment="CENTER">
+            <padding>
+                <Insets bottom="48.0" left="48.0" right="48.0" top="48.0"/>
+            </padding>
+            <Label styleClass="menu-title title-banner" text="Monopoly Deal">
+                <font>
+                    <Font name="System Bold" size="42.0"/>
+                </font>
+            </Label>
+            <Label styleClass="menu-subtitle" text="Group 6 Multiplayer Card Game">
+                <font>
+                    <Font size="16.0"/>
+                </font>
+            </Label>
+            <VBox alignment="CENTER" spacing="12.0" styleClass="menu-actions">
+                <Button mnemonicParsing="false" prefHeight="44.0" prefWidth="280.0" styleClass="primary-button" text="New Game"/>
+                <Button mnemonicParsing="false" prefHeight="44.0" prefWidth="280.0" styleClass="secondary-button" text="Join Game"/>
+                <Button mnemonicParsing="false" prefHeight="44.0" prefWidth="280.0" styleClass="gold-button" text="Rejoin Session"/>
+                <Button mnemonicParsing="false" prefHeight="44.0" prefWidth="280.0" styleClass="secondary-button" text="How to Play"/>
+                <Button mnemonicParsing="false" prefHeight="44.0" prefWidth="280.0" styleClass="danger-button" text="Exit"/>
+            </VBox>
+            <Label styleClass="menu-note" text="2-5 players | Create, join, or rejoin a session">
+                <font>
+                    <Font size="13.0"/>
+                </font>
+            </Label>
+        </VBox>
+    </center>
+</BorderPane>
