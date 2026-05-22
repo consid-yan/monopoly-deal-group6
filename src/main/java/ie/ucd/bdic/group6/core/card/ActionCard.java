@@ -8,8 +8,7 @@ import java.util.OptionalInt;
 import java.util.Set;
 
 /**
- * Action / rent cards. Bank value is the amount printed on the card corner (when any); some rent-only
- * combinations still carry a bank value in the physical game — factory assigns values.
+ * Action / rent cards. Bank value is the amount printed on the card corner when present.
  */
 public final class ActionCard extends Card {
 

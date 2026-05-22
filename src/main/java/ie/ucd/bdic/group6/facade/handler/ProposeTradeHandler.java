@@ -6,10 +6,6 @@ import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 
 public class ProposeTradeHandler extends AbstractCommandHandler<ProposeTradeCommand> {
-    public ProposeTradeHandler() {
-        super();
-    }
-
     public ProposeTradeHandler(ActionExecutor actionExecutor) {
         super(actionExecutor);
     }

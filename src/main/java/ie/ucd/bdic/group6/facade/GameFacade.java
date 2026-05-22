@@ -1,7 +1,19 @@
 package ie.ucd.bdic.group6.facade;
 
 import ie.ucd.bdic.group6.command.Command;
-import ie.ucd.bdic.group6.facade.handler.*;
+import ie.ucd.bdic.group6.core.engine.ActionExecutor;
+import ie.ucd.bdic.group6.core.engine.GameEngine;
+import ie.ucd.bdic.group6.facade.handler.CommandHandler;
+import ie.ucd.bdic.group6.facade.handler.CreateSessionHandler;
+import ie.ucd.bdic.group6.facade.handler.DiscardCardsHandler;
+import ie.ucd.bdic.group6.facade.handler.EndTurnHandler;
+import ie.ucd.bdic.group6.facade.handler.JoinSessionHandler;
+import ie.ucd.bdic.group6.facade.handler.PayDebtHandler;
+import ie.ucd.bdic.group6.facade.handler.PlayCardHandler;
+import ie.ucd.bdic.group6.facade.handler.ProposeTradeHandler;
+import ie.ucd.bdic.group6.facade.handler.RejoinSessionHandler;
+import ie.ucd.bdic.group6.facade.handler.RespondTradeHandler;
+import ie.ucd.bdic.group6.facade.handler.StartGameHandler;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 
 import java.util.List;
@@ -12,23 +24,25 @@ import java.util.stream.Collectors;
 public class GameFacade implements Facade {
     private final Map<Class<? extends Command>, CommandHandler<? extends Command>> handlers;
 
-    // 默认构造器：自动注册所有Handler
     public GameFacade() {
+        this(new GameEngine());
+    }
+
+    public GameFacade(ActionExecutor actionExecutor) {
         this(List.of(
-                new CreateSessionHandler(),
-                new JoinSessionHandler(),
-                new StartGameHandler(),
-                new PlayCardHandler(),
-                new PayDebtHandler(),
-                new ProposeTradeHandler(),
-                new RespondTradeHandler(),
-                new DiscardCardsHandler(),
-                new EndTurnHandler(),
-                new RejoinSessionHandler()
+                new CreateSessionHandler(actionExecutor),
+                new JoinSessionHandler(actionExecutor),
+                new StartGameHandler(actionExecutor),
+                new PlayCardHandler(actionExecutor),
+                new PayDebtHandler(actionExecutor),
+                new ProposeTradeHandler(actionExecutor),
+                new RespondTradeHandler(actionExecutor),
+                new DiscardCardsHandler(actionExecutor),
+                new EndTurnHandler(actionExecutor),
+                new RejoinSessionHandler(actionExecutor)
         ));
     }
 
-    // 测试用构造器：支持注入Mock Handler
     public GameFacade(List<CommandHandler<? extends Command>> handlers) {
         this.handlers = handlers.stream()
                 .collect(Collectors.toUnmodifiableMap(

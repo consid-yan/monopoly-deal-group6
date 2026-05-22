@@ -18,17 +18,7 @@ import java.util.Optional;
  * Facade over {@link Player} table zones (hand, bank, property board) for engine/UI integration.
  * Command-level orchestration remains in {@link GameFacade}; this class exposes stable player-table operations.
  */
-public final class PlayerTableFacade {
-
-    private final Player player;
-
-    public PlayerTableFacade(Player player) {
-        this.player = player;
-    }
-
-    public Player player() {
-        return player;
-    }
+public record PlayerTableFacade(Player player) {
 
     public OperationResult<Void> bankFromHand(Card card) {
         return player.tryBankFromHand(card);

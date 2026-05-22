@@ -6,10 +6,6 @@ import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 
 public class StartGameHandler extends AbstractCommandHandler<StartGameCommand> {
-    public StartGameHandler() {
-        super();
-    }
-
     public StartGameHandler(ActionExecutor actionExecutor) {
         super(actionExecutor);
     }

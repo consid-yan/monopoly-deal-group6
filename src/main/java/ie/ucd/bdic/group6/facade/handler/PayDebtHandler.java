@@ -6,10 +6,6 @@ import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 
 public class PayDebtHandler extends AbstractCommandHandler<PayDebtCommand> {
-    public PayDebtHandler() {
-        super();
-    }
-
     public PayDebtHandler(ActionExecutor actionExecutor) {
         super(actionExecutor);
     }

@@ -6,10 +6,6 @@ import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 
 public class CreateSessionHandler extends AbstractCommandHandler<CreateSessionCommand> {
-    public CreateSessionHandler() {
-        super();
-    }
-
     public CreateSessionHandler(ActionExecutor actionExecutor) {
         super(actionExecutor);
     }
