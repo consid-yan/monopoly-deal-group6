@@ -1,0 +1,451 @@
+/*
+ * Palette:
+ * Table green: #0B3D24
+ * Panel green: #176B3A
+ * Card cream: #FFF6D6
+ * Card edge: #2B1A10
+ * Banner red: #B91F1F
+ * Deep red: #7C1414
+ * Gold accent: #E0AD2F
+ * Ink black: #17110B
+ */
+
+/* 1. Global theme comments */
+
+.root-screen,
+.menu-root {
+    -fx-font-family: "System";
+    -fx-background-color: #0B3D24;
+}
+
+/* 2. Root/background styles */
+
+.menu-screen,
+.lobby-screen,
+.game-screen,
+.help-screen,
+.result-screen {
+    -fx-background-color: #0B3D24;
+}
+
+.menu-screen {
+    -fx-background-color: #0B3D24;
+}
+
+.lobby-screen,
+.game-screen,
+.help-screen,
+.result-screen {
+    -fx-background-color: #0B3D24;
+}
+
+/* 3. Typography */
+
+.root-screen .label,
+.menu-root .label {
+    -fx-text-fill: #17110B;
+}
+
+.menu-title,
+.title-banner {
+    -fx-text-fill: #FFF6D6;
+    -fx-font-weight: bold;
+    -fx-background-color: #B91F1F;
+    -fx-background-radius: 8;
+    -fx-border-color: #E0AD2F #7C1414 #7C1414 #E0AD2F;
+    -fx-border-radius: 8;
+    -fx-border-width: 3;
+    -fx-padding: 10 24 10 24;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 14, 0.25, 0, 4);
+}
+
+.menu-subtitle {
+    -fx-text-fill: #FFF6D6;
+    -fx-font-weight: bold;
+    -fx-padding: 2 0 4 0;
+}
+
+.menu-note {
+    -fx-text-fill: #FFF6D6;
+    -fx-background-color: #176B3A;
+    -fx-background-radius: 8;
+    -fx-border-color: #E0AD2F;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-padding: 8 12 8 12;
+}
+
+.status-label {
+    -fx-text-fill: #FFF6D6;
+    -fx-font-weight: bold;
+    -fx-background-color: #176B3A;
+    -fx-background-radius: 6;
+    -fx-padding: 7 10 7 10;
+}
+
+.winner-label {
+    -fx-text-fill: #B91F1F;
+    -fx-font-weight: bold;
+}
+
+/* 4. Common panels/cards */
+
+.titled-pane,
+.section-panel,
+.card-panel,
+.player-panel,
+.property-set-panel,
+.money-panel,
+.action-panel {
+    -fx-text-fill: #FFF6D6;
+}
+
+.titled-pane > .title,
+.section-panel > .title,
+.card-panel > .title,
+.player-panel > .title,
+.property-set-panel > .title,
+.money-panel > .title,
+.action-panel > .title {
+    -fx-background-color: #B91F1F;
+    -fx-background-radius: 8 8 0 0;
+    -fx-border-color: #E0AD2F;
+    -fx-border-width: 2 2 1 2;
+    -fx-border-radius: 8 8 0 0;
+    -fx-padding: 8 12 8 12;
+}
+
+.titled-pane > .title > .text,
+.section-panel > .title > .text,
+.card-panel > .title > .text,
+.player-panel > .title > .text,
+.property-set-panel > .title > .text,
+.money-panel > .title > .text,
+.action-panel > .title > .text {
+    -fx-fill: #FFF6D6;
+    -fx-font-weight: bold;
+}
+
+.titled-pane > .content,
+.section-panel > .content,
+.card-panel > .content,
+.player-panel > .content,
+.property-set-panel > .content,
+.money-panel > .content,
+.action-panel > .content {
+    -fx-background-color: #FFF6D6;
+    -fx-background-radius: 0 0 8 8;
+    -fx-border-color: #2B1A10;
+    -fx-border-width: 0 2 2 2;
+    -fx-border-radius: 0 0 8 8;
+    -fx-padding: 10;
+}
+
+.card-panel > .content {
+    -fx-background-color: #FFF9E8;
+}
+
+.property-set-panel > .title {
+    -fx-background-color: #0F5F35;
+}
+
+.money-panel > .title {
+    -fx-background-color: #146D3C;
+}
+
+.player-panel > .title {
+    -fx-background-color: #7C1414;
+}
+
+.action-panel > .title {
+    -fx-background-color: #B91F1F;
+}
+
+.separator .line {
+    -fx-border-color: #E0AD2F;
+    -fx-border-width: 1;
+}
+
+/* 5. Buttons */
+
+.button,
+.primary-button,
+.secondary-button,
+.danger-button,
+.gold-button {
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-width: 2;
+    -fx-padding: 8 14 8 14;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.22), 8, 0.2, 0, 2);
+}
+
+.button {
+    -fx-background-color: #FFF6D6;
+    -fx-border-color: #2B1A10;
+    -fx-text-fill: #17110B;
+}
+
+.primary-button {
+    -fx-background-color: #B91F1F;
+    -fx-border-color: #E0AD2F;
+    -fx-text-fill: #FFF6D6;
+}
+
+.secondary-button {
+    -fx-background-color: #FFF6D6;
+    -fx-border-color: #2B1A10;
+    -fx-text-fill: #17110B;
+}
+
+.gold-button {
+    -fx-background-color: #E0AD2F;
+    -fx-border-color: #7C1414;
+    -fx-text-fill: #17110B;
+}
+
+.danger-button {
+    -fx-background-color: #7C1414;
+    -fx-border-color: #E0AD2F;
+    -fx-text-fill: #FFF6D6;
+}
+
+.button:hover,
+.primary-button:hover,
+.secondary-button:hover,
+.danger-button:hover,
+.gold-button:hover {
+    -fx-background-color: #F6C84D;
+    -fx-border-color: #FFF6D6;
+    -fx-text-fill: #17110B;
+}
+
+.button:pressed,
+.primary-button:pressed,
+.secondary-button:pressed,
+.danger-button:pressed,
+.gold-button:pressed {
+    -fx-translate-y: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 4, 0.2, 0, 1);
+}
+
+.button:focused,
+.primary-button:focused,
+.secondary-button:focused,
+.danger-button:focused,
+.gold-button:focused {
+    -fx-border-color: #FFF6D6;
+    -fx-border-width: 3;
+}
+
+.button:disabled,
+.primary-button:disabled,
+.secondary-button:disabled,
+.danger-button:disabled,
+.gold-button:disabled {
+    -fx-opacity: 0.55;
+    -fx-cursor: default;
+}
+
+/* 6. Menu screen */
+
+.menu-screen .menu-title {
+    -fx-font-size: 42px;
+}
+
+.menu-actions {
+    -fx-background-color: #176B3A;
+    -fx-background-radius: 12;
+    -fx-border-color: #E0AD2F;
+    -fx-border-radius: 12;
+    -fx-border-width: 2;
+    -fx-padding: 18;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.28), 12, 0.25, 0, 3);
+}
+
+.menu-actions .button,
+.menu-actions .primary-button,
+.menu-actions .secondary-button,
+.menu-actions .danger-button,
+.menu-actions .gold-button {
+    -fx-font-size: 15px;
+}
+
+/* 7. Lobby screen */
+
+.lobby-screen .text-field {
+    -fx-font-weight: bold;
+}
+
+.lobby-screen .list-view {
+    -fx-min-height: 180;
+}
+
+/* 8. Game screen */
+
+.game-screen .text-field {
+    -fx-font-size: 12px;
+}
+
+.game-screen .card-panel .list-view,
+.game-screen .money-panel .list-view,
+.game-screen .property-set-panel .list-view {
+    -fx-background-color: #FFF9E8;
+}
+
+.game-screen .action-panel .label {
+    -fx-text-fill: #17110B;
+}
+
+/* 9. How-to-play screen */
+
+.help-screen .scroll-pane {
+    -fx-background-color: transparent;
+}
+
+.help-screen .titled-pane > .content .label {
+    -fx-text-fill: #17110B;
+    -fx-line-spacing: 3;
+}
+
+/* 10. Result screen */
+
+.result-screen .menu-title {
+    -fx-font-size: 38px;
+}
+
+.winner-field {
+    -fx-background-color: #FFF6D6;
+    -fx-border-color: #E0AD2F;
+    -fx-border-width: 3;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #B91F1F;
+}
+
+.result-screen .text-field {
+    -fx-font-weight: bold;
+}
+
+/* 11. Lists, tables, scroll panes, text areas */
+
+.list-view,
+.table-view,
+.text-area,
+.text-field {
+    -fx-background-color: #FFF6D6;
+    -fx-background-radius: 8;
+    -fx-border-color: #2B1A10;
+    -fx-border-radius: 8;
+    -fx-border-width: 1.5;
+    -fx-text-fill: #17110B;
+    -fx-prompt-text-fill: #6B5A3A;
+}
+
+.text-field {
+    -fx-padding: 7 9 7 9;
+}
+
+.text-area {
+    -fx-padding: 2;
+}
+
+.text-area .content {
+    -fx-background-color: #FFF6D6;
+    -fx-background-radius: 7;
+}
+
+.list-view {
+    -fx-padding: 4;
+}
+
+.list-view .list-cell,
+.table-view .table-row-cell {
+    -fx-background-color: #FFF6D6;
+    -fx-text-fill: #17110B;
+    -fx-padding: 7 9 7 9;
+}
+
+.list-view .list-cell:filled:selected,
+.table-view .table-row-cell:filled:selected {
+    -fx-background-color: #E0AD2F;
+    -fx-text-fill: #17110B;
+}
+
+.list-view .placeholder .label {
+    -fx-text-fill: #6B5A3A;
+    -fx-font-style: italic;
+}
+
+.table-view .column-header,
+.table-view .column-header-background {
+    -fx-background-color: #B91F1F;
+}
+
+.table-view .column-header .label {
+    -fx-text-fill: #FFF6D6;
+    -fx-font-weight: bold;
+}
+
+.scroll-pane,
+.scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar:vertical,
+.scroll-bar:horizontal {
+    -fx-background-color: #0B3D24;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #E0AD2F;
+    -fx-background-radius: 8;
+}
+
+/* 12. Status, warning, and error messages */
+
+.status-area,
+.status-area .content {
+    -fx-background-color: #E7F4DC;
+    -fx-text-fill: #173F1C;
+    -fx-border-color: #2E7D32;
+}
+
+.error-area,
+.error-area .content {
+    -fx-background-color: #F9D9D6;
+    -fx-text-fill: #5C1111;
+    -fx-border-color: #B91F1F;
+}
+
+.error-label {
+    -fx-text-fill: #FFF6D6;
+    -fx-background-color: #7C1414;
+    -fx-background-radius: 6;
+    -fx-padding: 7 10 7 10;
+}
+
+/* 13. Utility style classes */
+
+.root-screen .section-panel,
+.root-screen .card-panel,
+.root-screen .player-panel,
+.root-screen .property-set-panel,
+.root-screen .money-panel,
+.root-screen .action-panel {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 8, 0.2, 0, 2);
+}
+
+.hand-card {
+    -fx-background-color: #FFF6D6;
+    -fx-background-radius: 8;
+    -fx-border-color: #17110B;
+    -fx-border-radius: 8;
+    -fx-border-width: 2;
+    -fx-padding: 8;
+}
