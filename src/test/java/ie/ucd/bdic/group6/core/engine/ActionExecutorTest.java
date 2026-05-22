@@ -1,6 +1,420 @@
 package ie.ucd.bdic.group6.core.engine;
 
+import ie.ucd.bdic.group6.command.CreateSessionCommand;
+import ie.ucd.bdic.group6.command.DiscardCardsCommand;
+import ie.ucd.bdic.group6.command.EndTurnCommand;
+import ie.ucd.bdic.group6.command.JoinSessionCommand;
+import ie.ucd.bdic.group6.command.PlayCardCommand;
+import ie.ucd.bdic.group6.command.StartGameCommand;
+import ie.ucd.bdic.group6.core.card.ActionCard;
+import ie.ucd.bdic.group6.core.card.ActionType;
+import ie.ucd.bdic.group6.core.card.Card;
+import ie.ucd.bdic.group6.core.card.Deck;
+import ie.ucd.bdic.group6.core.card.MoneyCard;
+import ie.ucd.bdic.group6.core.card.PropertyCard;
+import ie.ucd.bdic.group6.core.property.PropertyColor;
+import ie.ucd.bdic.group6.exception.GameException;
+import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 class ActionExecutorTest {
 
-}
+    @Test
+    void createJoinStartHappyPath() {
+        GameEngine engine = engineWithDrawOrder(moneyCards("c", 20));
+        Map<String, Object> created = createSession(engine, "host", 5);
+        String sessionId = text(created, "sessionId");
+        String sessionCode = text(created, "sessionCode");
 
+        engine.executeJoinSession(new JoinSessionCommand(Map.of(
+                "sessionCode", sessionCode,
+                "playerId", "player2"
+        )));
+        Map<String, Object> started = startGame(engine, sessionId, "host");
+
+        assertEquals("ACTIVE", started.get("status"));
+        assertEquals("host", started.get("activePlayerId"));
+        assertEquals(3, started.get("actionsRemaining"));
+        assertEquals(7, currentPlayerHand(started).size());
+        assertEquals(7, playerSummary(started, "host").get("handCount"));
+        assertEquals(5, playerSummary(started, "player2").get("handCount"));
+    }
+
+    @Test
+    void startGameRejectsInvalidLobbyStates() {
+        GameEngine tooFewPlayers = new GameEngine();
+        String loneSessionId = text(createSession(tooFewPlayers, "host", 5), "sessionId");
+        GameException tooFew = assertThrows(GameException.class,
+                () -> startGame(tooFewPlayers, loneSessionId, "host"));
+        assertEquals("INVALID_PLAYER_COUNT", tooFew.getErrorCode());
+
+        GameEngine nonHostEngine = new GameEngine();
+        Map<String, Object> created = createSession(nonHostEngine, "host", 5);
+        nonHostEngine.executeJoinSession(new JoinSessionCommand(Map.of(
+                "sessionCode", text(created, "sessionCode"),
+                "playerId", "player2"
+        )));
+        GameException nonHost = assertThrows(GameException.class,
+                () -> startGame(nonHostEngine, text(created, "sessionId"), "player2"));
+        assertEquals("HOST_REQUIRED", nonHost.getErrorCode());
+    }
+
+    @Test
+    void joinSessionRejectsDuplicateAndFullLobby() {
+        GameEngine engine = new GameEngine();
+        Map<String, Object> created = createSession(engine, "host", 2);
+        String sessionCode = text(created, "sessionCode");
+
+        GameException duplicate = assertThrows(GameException.class,
+                () -> engine.executeJoinSession(new JoinSessionCommand(Map.of(
+                        "sessionCode", sessionCode,
+                        "playerId", "host"
+                ))));
+        assertEquals("PLAYER_ALREADY_JOINED", duplicate.getErrorCode());
+
+        engine.executeJoinSession(new JoinSessionCommand(Map.of(
+                "sessionCode", sessionCode,
+                "playerId", "player2"
+        )));
+        GameException full = assertThrows(GameException.class,
+                () -> engine.executeJoinSession(new JoinSessionCommand(Map.of(
+                        "sessionCode", sessionCode,
+                        "playerId", "player3"
+                ))));
+        assertEquals("SESSION_FULL", full.getErrorCode());
+    }
+
+    @Test
+    void turnOrderCyclesByListIndex() {
+        GameEngine engine = engineWithDrawOrder(moneyCards("c", 40));
+        Map<String, Object> created = createSession(engine, "host", 5);
+        String sessionId = text(created, "sessionId");
+        String sessionCode = text(created, "sessionCode");
+        join(engine, sessionCode, "player2");
+        join(engine, sessionCode, "player3");
+        startGame(engine, sessionId, "host");
+
+        Map<String, Object> afterHost = endTurn(engine, sessionId, "host");
+        assertEquals("player2", afterHost.get("activePlayerId"));
+        Map<String, Object> afterPlayer2 = endTurn(engine, sessionId, "player2");
+        assertEquals("player3", afterPlayer2.get("activePlayerId"));
+        Map<String, Object> afterPlayer3 = endTurn(engine, sessionId, "player3");
+        assertEquals("host", afterPlayer3.get("activePlayerId"));
+    }
+
+    @Test
+    void bankingMoneyMovesCardAndConsumesAction() {
+        MoneyCard banked = money("bank-me", 5);
+        StartedGame game = startedGameWithHostCards(List.of(banked), moneyCards("fill", 20));
+
+        Map<String, Object> afterPlay = game.engine().executePlayCard(new PlayCardCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "host",
+                "cardId", banked.id(),
+                "playMode", "BANK"
+        )));
+
+        Map<String, Object> host = playerSummary(afterPlay, "host");
+        assertEquals(1, afterPlay.get("actionsUsed"));
+        assertEquals(6, host.get("handCount"));
+        assertEquals(5, host.get("bankTotalValueM"));
+        assertEquals(banked.id(), cardIds(bankCards(host)).getFirst());
+    }
+
+    @Test
+    void placingPropertyCreatesRowAndConsumesAction() {
+        PropertyCard red = property("red-1", PropertyColor.RED);
+        StartedGame game = startedGameWithHostCards(List.of(red), moneyCards("fill", 20));
+
+        Map<String, Object> afterPlay = game.engine().executePlayCard(new PlayCardCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "host",
+                "cardId", red.id()
+        )));
+
+        Map<String, Object> host = playerSummary(afterPlay, "host");
+        Map<String, Object> row = propertyRows(host).getFirst();
+        assertEquals(1, afterPlay.get("actionsUsed"));
+        assertEquals("RED", row.get("anchorColor"));
+        assertEquals(List.of(red.id()), cardIds(rowCards(row)));
+    }
+
+    @Test
+    void passGoDrawsTwoCardsAndConsumesAction() {
+        ActionCard passGo = passGo("pass-go");
+        MoneyCard drawnOne = money("draw-1", 1);
+        MoneyCard drawnTwo = money("draw-2", 2);
+        StartedGame game = startedGameWithHostCards(List.of(passGo), List.of(drawnOne, drawnTwo));
+
+        Map<String, Object> afterPlay = game.engine().executePlayCard(new PlayCardCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "host",
+                "cardId", passGo.id()
+        )));
+
+        assertEquals(1, afterPlay.get("actionsUsed"));
+        assertEquals(1, afterPlay.get("discardSize"));
+        assertEquals(8, playerSummary(afterPlay, "host").get("handCount"));
+        assertFalse(cardIds(currentPlayerHand(afterPlay)).contains(passGo.id()));
+        assertTrue(cardIds(currentPlayerHand(afterPlay)).containsAll(List.of(drawnOne.id(), drawnTwo.id())));
+    }
+
+    @Test
+    void selectedPropertyRowRejectsIncompatibleCardWithoutAutoCreatingRow() {
+        PropertyCard red = property("red", PropertyColor.RED);
+        PropertyCard blue = property("blue", PropertyColor.LIGHT_BLUE);
+        StartedGame game = startedGameWithHostCards(List.of(red, blue), moneyCards("fill", 20));
+
+        play(game.engine(), game.sessionId(), red.id());
+        GameException error = assertThrows(GameException.class,
+                () -> game.engine().executePlayCard(new PlayCardCommand(Map.of(
+                        "sessionId", game.sessionId(),
+                        "playerId", "host",
+                        "cardId", blue.id(),
+                        "propertyRowIndex", 0
+                ))));
+
+        assertEquals("RECEIVER_ROW_REJECTS_CARD", error.getErrorCode());
+        Map<String, Object> snapshot = game.engine().executeRejoinSession(new ie.ucd.bdic.group6.command.RejoinSessionCommand(Map.of(
+                "sessionIdentity", game.sessionId(),
+                "playerId", "host"
+        )));
+        assertEquals(1, propertyRows(playerSummary(snapshot, "host")).size());
+        assertTrue(cardIds(currentPlayerHand(snapshot)).contains(blue.id()));
+    }
+
+    @Test
+    void fourthPlayInTurnIsRejectedWithoutMutation() {
+        List<Card> hostCards = List.of(
+                money("m1", 1),
+                money("m2", 1),
+                money("m3", 1),
+                money("m4", 1)
+        );
+        StartedGame game = startedGameWithHostCards(hostCards, moneyCards("fill", 20));
+
+        for (int i = 1; i <= 3; i++) {
+            game.engine().executePlayCard(new PlayCardCommand(Map.of(
+                    "sessionId", game.sessionId(),
+                    "playerId", "host",
+                    "cardId", "m" + i
+            )));
+        }
+        GameException error = assertThrows(GameException.class,
+                () -> game.engine().executePlayCard(new PlayCardCommand(Map.of(
+                        "sessionId", game.sessionId(),
+                        "playerId", "host",
+                        "cardId", "m4"
+                ))));
+
+        assertEquals("ACTION_LIMIT_REACHED", error.getErrorCode());
+        Map<String, Object> snapshot = game.engine().executeRejoinSession(new ie.ucd.bdic.group6.command.RejoinSessionCommand(Map.of(
+                "sessionIdentity", game.sessionId(),
+                "playerId", "host"
+        )));
+        assertTrue(cardIds(currentPlayerHand(snapshot)).contains("m4"));
+        assertEquals(3, bankCards(playerSummary(snapshot, "host")).size());
+    }
+
+    @Test
+    void endTurnRejectsLargeHandThenSucceedsAfterDiscard() {
+        ActionCard passGo = passGo("pass-go");
+        MoneyCard discard = money("discard-me", 1);
+        StartedGame game = startedGameWithHostCards(List.of(passGo, discard), moneyCards("draw", 20));
+        game.engine().executePlayCard(new PlayCardCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "host",
+                "cardId", passGo.id()
+        )));
+
+        GameException handLimit = assertThrows(GameException.class,
+                () -> endTurn(game.engine(), game.sessionId(), "host"));
+        assertEquals("HAND_LIMIT_EXCEEDED", handLimit.getErrorCode());
+
+        game.engine().executeDiscardCards(new DiscardCardsCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "host",
+                "discardedCardIds", List.of(discard.id())
+        )));
+        Map<String, Object> afterEnd = endTurn(game.engine(), game.sessionId(), "host");
+        assertEquals(2, afterEnd.get("discardSize"));
+        assertEquals("player2", afterEnd.get("activePlayerId"));
+    }
+
+    @Test
+    void endTurnAdvancesActivePlayerAndAppliesDrawRule() {
+        GameEngine engine = engineWithDrawOrder(moneyCards("c", 30));
+        Map<String, Object> created = createSession(engine, "host", 5);
+        String sessionId = text(created, "sessionId");
+        join(engine, text(created, "sessionCode"), "player2");
+        startGame(engine, sessionId, "host");
+
+        Map<String, Object> afterEnd = endTurn(engine, sessionId, "host");
+
+        assertEquals("player2", afterEnd.get("activePlayerId"));
+        assertEquals(7, playerSummary(afterEnd, "player2").get("handCount"));
+    }
+
+    @Test
+    void completingThreePropertySetsFinishesGame() {
+        List<Card> hostCards = List.of(
+                property("brown-1", PropertyColor.BROWN),
+                property("dark-blue-1", PropertyColor.DARK_BLUE),
+                property("utility-1", PropertyColor.UTILITY),
+                property("brown-2", PropertyColor.BROWN),
+                property("dark-blue-2", PropertyColor.DARK_BLUE),
+                property("utility-2", PropertyColor.UTILITY)
+        );
+        StartedGame game = startedGameWithHostCards(hostCards, moneyCards("fill", 30));
+
+        play(game.engine(), game.sessionId(), "brown-1");
+        play(game.engine(), game.sessionId(), "dark-blue-1");
+        play(game.engine(), game.sessionId(), "utility-1");
+        endTurn(game.engine(), game.sessionId(), "host");
+        endTurn(game.engine(), game.sessionId(), "player2");
+        play(game.engine(), game.sessionId(), "brown-2");
+        play(game.engine(), game.sessionId(), "dark-blue-2");
+        Map<String, Object> afterWin = play(game.engine(), game.sessionId(), "utility-2");
+
+        assertEquals("FINISHED", afterWin.get("status"));
+        assertEquals("host", afterWin.get("winnerPlayerId"));
+    }
+
+    private StartedGame startedGameWithHostCards(List<Card> hostCards, List<Card> extraTopCards) {
+        List<Card> drawOrder = new ArrayList<>();
+        List<Card> hostInitialCards = hostCards.subList(0, Math.min(5, hostCards.size()));
+        List<Card> hostStartCards = hostCards.subList(Math.min(5, hostCards.size()), hostCards.size());
+        drawOrder.addAll(hostInitialCards);
+        drawOrder.addAll(moneyCards("host-fill", Math.max(0, 5 - hostInitialCards.size())));
+        drawOrder.addAll(moneyCards("player2", 5));
+        drawOrder.addAll(hostStartCards);
+        drawOrder.addAll(moneyCards("host-start", Math.max(0, 2 - hostStartCards.size())));
+        drawOrder.addAll(extraTopCards);
+        drawOrder.addAll(moneyCards("extra", 20));
+        GameEngine engine = engineWithDrawOrder(drawOrder);
+        Map<String, Object> created = createSession(engine, "host", 5);
+        join(engine, text(created, "sessionCode"), "player2");
+        startGame(engine, text(created, "sessionId"), "host");
+        return new StartedGame(engine, text(created, "sessionId"));
+    }
+
+    private Map<String, Object> play(GameEngine engine, String sessionId, String cardId) {
+        return engine.executePlayCard(new PlayCardCommand(Map.of(
+                "sessionId", sessionId,
+                "playerId", "host",
+                "cardId", cardId
+        )));
+    }
+
+    private Map<String, Object> createSession(GameEngine engine, String hostPlayerId, int maxPlayers) {
+        return engine.executeCreateSession(new CreateSessionCommand(Map.of(
+                "hostPlayerId", hostPlayerId,
+                "playerName", hostPlayerId,
+                "maxPlayers", maxPlayers
+        )));
+    }
+
+    private void join(GameEngine engine, String sessionCode, String playerId) {
+        engine.executeJoinSession(new JoinSessionCommand(Map.of(
+                "sessionCode", sessionCode,
+                "playerId", playerId,
+                "playerName", playerId
+        )));
+    }
+
+    private Map<String, Object> startGame(GameEngine engine, String sessionId, String playerId) {
+        return engine.executeStartGame(new StartGameCommand(Map.of(
+                "sessionId", sessionId,
+                "playerId", playerId
+        )));
+    }
+
+    private Map<String, Object> endTurn(GameEngine engine, String sessionId, String playerId) {
+        return engine.executeEndTurn(new EndTurnCommand(Map.of(
+                "sessionId", sessionId,
+                "playerId", playerId
+        )));
+    }
+
+    private GameEngine engineWithDrawOrder(List<Card> drawOrder) {
+        return engineWithDrawOrder(drawOrder.toArray(Card[]::new));
+    }
+
+    private GameEngine engineWithDrawOrder(Card... drawOrder) {
+        return new GameEngine(() -> deckFromDrawOrder(drawOrder));
+    }
+
+    private Deck deckFromDrawOrder(Card... drawOrder) {
+        List<Card> bottomToTop = new ArrayList<>(List.of(drawOrder));
+        Collections.reverse(bottomToTop);
+        return new Deck(bottomToTop);
+    }
+
+    private List<Card> moneyCards(String prefix, int count) {
+        List<Card> cards = new ArrayList<>();
+        for (int i = 1; i <= count; i++) {
+            cards.add(money(prefix + "-" + i, 1));
+        }
+        return cards;
+    }
+
+    private MoneyCard money(String id, int value) {
+        return new MoneyCard(id, value + "M", value);
+    }
+
+    private PropertyCard property(String id, PropertyColor color) {
+        return new PropertyCard(id, color.name(), color, PropertyColor.fullSetSize(color));
+    }
+
+    private ActionCard passGo(String id) {
+        return new ActionCard(id, "Pass Go", ActionType.PASS_GO, 1, null);
+    }
+
+    private String text(Map<String, Object> data, String key) {
+        return (String) data.get(key);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> currentPlayerHand(Map<String, Object> snapshot) {
+        return (List<Map<String, Object>>) snapshot.get("currentPlayerHand");
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> bankCards(Map<String, Object> player) {
+        return (List<Map<String, Object>>) player.get("bankCards");
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> propertyRows(Map<String, Object> player) {
+        return (List<Map<String, Object>>) player.get("propertyRows");
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> rowCards(Map<String, Object> row) {
+        return (List<Map<String, Object>>) row.get("cards");
+    }
+
+    private List<String> cardIds(List<Map<String, Object>> cards) {
+        return cards.stream().map(card -> (String) card.get("id")).toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> playerSummary(Map<String, Object> snapshot, String playerId) {
+        return ((List<Map<String, Object>>) snapshot.get("players")).stream()
+                .filter(player -> playerId.equals(player.get("playerId")))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private record StartedGame(GameEngine engine, String sessionId) {
+    }
+}

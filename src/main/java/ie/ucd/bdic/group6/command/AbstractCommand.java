@@ -15,7 +15,7 @@ public abstract class AbstractCommand implements Command {
         return payload;
     }
 
-    // 通用参数获取方法
+    // Common parameter accessors.
     public String getSessionId() {
         return (String) payload.get("sessionId");
     }

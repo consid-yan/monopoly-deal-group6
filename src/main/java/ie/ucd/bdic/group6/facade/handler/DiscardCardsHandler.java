@@ -6,10 +6,6 @@ import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 
 public class DiscardCardsHandler extends AbstractCommandHandler<DiscardCardsCommand> {
-    public DiscardCardsHandler() {
-        super();
-    }
-
     public DiscardCardsHandler(ActionExecutor actionExecutor) {
         super(actionExecutor);
     }

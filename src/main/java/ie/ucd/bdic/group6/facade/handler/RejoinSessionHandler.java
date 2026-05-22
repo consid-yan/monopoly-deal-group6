@@ -6,10 +6,6 @@ import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 
 public class RejoinSessionHandler extends AbstractCommandHandler<RejoinSessionCommand> {
-    public RejoinSessionHandler() {
-        super();
-    }
-
     public RejoinSessionHandler(ActionExecutor actionExecutor) {
         super(actionExecutor);
     }

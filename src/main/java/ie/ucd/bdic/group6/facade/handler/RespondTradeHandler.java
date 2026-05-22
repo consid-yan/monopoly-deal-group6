@@ -6,10 +6,6 @@ import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 
 public class RespondTradeHandler extends AbstractCommandHandler<RespondTradeCommand> {
-    public RespondTradeHandler() {
-        super();
-    }
-
     public RespondTradeHandler(ActionExecutor actionExecutor) {
         super(actionExecutor);
     }

@@ -6,10 +6,6 @@ import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 
 public class JoinSessionHandler extends AbstractCommandHandler<JoinSessionCommand> {
-    public JoinSessionHandler() {
-        super();
-    }
-
     public JoinSessionHandler(ActionExecutor actionExecutor) {
         super(actionExecutor);
     }

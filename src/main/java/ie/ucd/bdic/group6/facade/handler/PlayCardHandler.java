@@ -6,10 +6,6 @@ import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 
 public class PlayCardHandler extends AbstractCommandHandler<PlayCardCommand> {
-    public PlayCardHandler() {
-        super();
-    }
-
     public PlayCardHandler(ActionExecutor actionExecutor) {
         super(actionExecutor);
     }
