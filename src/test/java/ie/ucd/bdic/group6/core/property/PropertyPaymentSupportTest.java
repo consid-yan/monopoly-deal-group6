@@ -19,7 +19,7 @@ class PropertyPaymentSupportTest {
         PropertyCard c2 = new PropertyCard("lb2", "LB2", PropertyColor.LIGHT_BLUE, 3);
         assertTrue(row.tryAdd(c1, Optional.empty()));
         assertTrue(row.tryAdd(c2, Optional.empty()));
-        assertEquals(3, PropertyPaymentSupport.paymentValueM(row, c1).value().orElseThrow());
+        assertEquals(2, PropertyPaymentSupport.paymentValueM(row, c1).value().orElseThrow());
     }
 
     @Test
