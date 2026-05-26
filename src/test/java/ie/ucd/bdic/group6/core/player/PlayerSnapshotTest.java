@@ -20,9 +20,9 @@ class PlayerSnapshotTest {
         PropertyCard prop = new PropertyCard("pr-1", "Brown 1", PropertyColor.BROWN, 2);
         p.hand().add(m);
         p.bank().forceAddForTestsOrMigration(new MoneyCard("m-2", "2M", 2));
-        var row = new PropertySet(PropertyColor.BROWN);
+        PropertySet row = p.propertyBoard().startNewRow(PropertyColor.BROWN);
+        String rowId = row.rowId();
         assertTrue(row.tryAdd(prop, Optional.empty()));
-        p.propertyBoard().addRow(row);
 
         PlayerSnapshot snap = p.snapshot();
         Player p2 = new Player("p1", "B");
@@ -32,6 +32,7 @@ class PlayerSnapshotTest {
         assertEquals(1, p2.bank().size());
         assertEquals(1, p2.propertyBoard().rowsView().size());
         assertEquals(1, p2.propertyBoard().rowsView().getFirst().size());
+        assertEquals(rowId, p2.propertyBoard().rowsView().getFirst().rowId());
     }
 
     @Test

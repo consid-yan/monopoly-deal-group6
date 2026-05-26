@@ -5,13 +5,14 @@ import ie.ucd.bdic.group6.core.card.PropertyWildCard;
 import ie.ucd.bdic.group6.core.common.OperationError;
 import ie.ucd.bdic.group6.core.common.OperationResult;
 import ie.ucd.bdic.group6.core.property.PropertyColor;
+import ie.ucd.bdic.group6.core.property.PropertyPaymentSupport;
 import ie.ucd.bdic.group6.core.property.PropertySet;
 
 import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Engine-level composition for moving a property / wild between players' boards (atomic with rollback).
+ * Engine-level composition for moving property / wild cards between players' boards (atomic with rollback).
  */
 public final class PlayerPropertyTransfers {
 
@@ -59,6 +60,138 @@ public final class PlayerPropertyTransfers {
             return OperationResult.fail(
                     OperationError.RECEIVER_ROW_REJECTS_CARD, "receiver row refused card after sender removal");
         }
+        sender.propertyBoard().compactEmptyRows();
         return OperationResult.ok();
+    }
+
+    public static OperationResult<PropertySet> transferPropertyCardToNewRow(
+            Player sender,
+            Player receiver,
+            Card card,
+            PropertyColor anchorColor,
+            Optional<PropertyColor> wildChoice) {
+        Objects.requireNonNull(anchorColor, "anchorColor");
+        PropertySet receiverRow = receiver.propertyBoard().startNewRow(anchorColor);
+        OperationResult<Void> moved = transferPropertyCardToRow(sender, receiver, card, receiverRow, wildChoice);
+        if (!moved.isSuccess()) {
+            receiver.propertyBoard().removeRow(receiverRow);
+            receiver.propertyBoard().compactEmptyRows();
+            return OperationResult.fail(
+                    moved.errorCode().orElse(OperationError.GENERIC),
+                    moved.errorMessage().orElse(""));
+        }
+        return OperationResult.ok(receiverRow);
+    }
+
+    public static OperationResult<Integer> payPropertyCardToCreditor(
+            Player payer,
+            Player creditor,
+            Card card,
+            PropertySet creditorRow,
+            Optional<PropertyColor> wildChoice) {
+        if (!payer.propertyBoard().canPayWithPropertyCard(card)) {
+            return OperationResult.fail(
+                    OperationError.PROPERTY_CANNOT_PAY_DEBT, "card cannot be paid from payer property board: " + card.id());
+        }
+        Optional<PropertySet> payerRow = payer.propertyBoard().findRowContaining(card);
+        if (payerRow.isEmpty()) {
+            return OperationResult.fail(OperationError.CARD_NOT_ON_PROPERTY_BOARD, "card not on payer board");
+        }
+        OperationResult<Integer> value = PropertyPaymentSupport.paymentValueM(payerRow.get(), card);
+        if (!value.isSuccess()) {
+            return value;
+        }
+        OperationResult<Void> moved = transferPropertyCardToRow(payer, creditor, card, creditorRow, wildChoice);
+        if (!moved.isSuccess()) {
+            return OperationResult.fail(
+                    moved.errorCode().orElse(OperationError.GENERIC),
+                    moved.errorMessage().orElse(""));
+        }
+        return OperationResult.ok(value.value().orElseThrow());
+    }
+
+    public static OperationResult<Integer> payPropertyCardToCreditorNewRow(
+            Player payer,
+            Player creditor,
+            Card card,
+            PropertyColor anchorColor,
+            Optional<PropertyColor> wildChoice) {
+        if (!payer.propertyBoard().canPayWithPropertyCard(card)) {
+            return OperationResult.fail(
+                    OperationError.PROPERTY_CANNOT_PAY_DEBT, "card cannot be paid from payer property board: " + card.id());
+        }
+        Optional<PropertySet> payerRow = payer.propertyBoard().findRowContaining(card);
+        if (payerRow.isEmpty()) {
+            return OperationResult.fail(OperationError.CARD_NOT_ON_PROPERTY_BOARD, "card not on payer board");
+        }
+        OperationResult<Integer> value = PropertyPaymentSupport.paymentValueM(payerRow.get(), card);
+        if (!value.isSuccess()) {
+            return value;
+        }
+        PropertySet creditorRow = creditor.propertyBoard().startNewRow(anchorColor);
+        OperationResult<Void> moved = transferPropertyCardToRow(payer, creditor, card, creditorRow, wildChoice);
+        if (!moved.isSuccess()) {
+            creditor.propertyBoard().removeRow(creditorRow);
+            creditor.propertyBoard().compactEmptyRows();
+            return OperationResult.fail(
+                    moved.errorCode().orElse(OperationError.GENERIC),
+                    moved.errorMessage().orElse(""));
+        }
+        return OperationResult.ok(value.value().orElseThrow());
+    }
+
+    /**
+     * Moves an entire property row to the receiver, preserving {@link PropertySet#rowId()} and house/hotel flags.
+     */
+    public static OperationResult<PropertySet> transferEntireRow(Player sender, Player receiver, PropertySet sourceRow) {
+        Objects.requireNonNull(sourceRow, "sourceRow");
+        if (!sender.propertyBoard().ownsRow(sourceRow)) {
+            return OperationResult.fail(OperationError.ROW_NOT_OWNED_BY_PLAYER, "source row not on sender board");
+        }
+        PlayerSnapshot.PropertyRowSnapshot snap = PlayerSnapshot.PropertyRowSnapshot.from(sourceRow);
+        if (!sender.propertyBoard().removeRow(sourceRow)) {
+            return OperationResult.fail(OperationError.CARD_NOT_ON_PROPERTY_BOARD, "could not remove source row");
+        }
+        PropertySet target = new PropertySet(snap.anchorColor(), snap.rowId());
+        for (Card c : snap.cardsInOrder()) {
+            Optional<PropertyColor> wild = Optional.empty();
+            if (c instanceof PropertyWildCard wc) {
+                PropertyColor choice = snap.wildAssignments().get(wc.id());
+                if (choice == null) {
+                    rollbackEntireRowRestore(sender, receiver, snap, target);
+                    return OperationResult.fail(
+                            OperationError.WILD_COLOR_INVALID, "missing wild assignment for " + wc.id());
+                }
+                wild = Optional.of(choice);
+            }
+            if (!target.tryAdd(c, wild)) {
+                rollbackEntireRowRestore(sender, receiver, snap, target);
+                return OperationResult.fail(
+                        OperationError.RECEIVER_ROW_REJECTS_CARD, "cannot rebuild row on receiver for card " + c.id());
+            }
+        }
+        target.applyImprovementFlagsForSnapshot(snap.house(), snap.hotel());
+        receiver.propertyBoard().addRow(target);
+        sender.propertyBoard().compactEmptyRows();
+        return OperationResult.ok(target);
+    }
+
+    private static void rollbackEntireRowRestore(
+            Player sender,
+            Player receiver,
+            PlayerSnapshot.PropertyRowSnapshot snap,
+            PropertySet partialTarget) {
+        receiver.propertyBoard().removeRow(partialTarget);
+        receiver.propertyBoard().compactEmptyRows();
+        PropertySet restored = new PropertySet(snap.anchorColor(), snap.rowId());
+        for (Card c : snap.cardsInOrder()) {
+            Optional<PropertyColor> wild = Optional.empty();
+            if (c instanceof PropertyWildCard wc) {
+                wild = Optional.of(snap.wildAssignments().get(wc.id()));
+            }
+            restored.tryAdd(c, wild);
+        }
+        restored.applyImprovementFlagsForSnapshot(snap.house(), snap.hotel());
+        sender.propertyBoard().addRow(restored);
     }
 }
