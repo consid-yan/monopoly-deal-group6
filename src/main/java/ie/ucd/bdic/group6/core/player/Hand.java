@@ -1,7 +1,6 @@
 package ie.ucd.bdic.group6.core.player;
 
 import ie.ucd.bdic.group6.core.card.Card;
-import ie.ucd.bdic.group6.core.card.Deck;
 import ie.ucd.bdic.group6.core.common.OperationError;
 import ie.ucd.bdic.group6.core.common.OperationResult;
 
@@ -64,12 +63,12 @@ public final class Hand {
     }
 
     /**
-     * If hand exceeds {@code maxHandSize}, discards exactly {@code cards.size() - maxHandSize} cards from
-     * {@code selectionOrder} (in list order) to the bottom of {@code drawPile}.
+     * If hand exceeds {@code maxHandSize}, discards exactly {@code size - maxHandSize} cards from
+     * {@code selectionOrder} (in list order) into {@code discardSink} (central discard / play pile).
      */
-    public OperationResult<Void> discardDownTo(int maxHandSize, List<Card> selectionOrder, Deck drawPile) {
+    public OperationResult<Void> discardDownTo(int maxHandSize, List<Card> selectionOrder, CardDiscardSink discardSink) {
         Objects.requireNonNull(selectionOrder, "selectionOrder");
-        Objects.requireNonNull(drawPile, "drawPile");
+        Objects.requireNonNull(discardSink, "discardSink");
         if (maxHandSize < 0) {
             return OperationResult.fail(OperationError.GENERIC, "maxHandSize must be non-negative");
         }
@@ -99,7 +98,7 @@ public final class Hand {
             if (!remove(c)) {
                 return OperationResult.fail(OperationError.GENERIC, "failed removing card during discard: " + c.id());
             }
-            drawPile.discardToBottom(c);
+            discardSink.discard(c);
         }
         return OperationResult.ok();
     }
