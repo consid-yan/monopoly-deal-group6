@@ -3,7 +3,6 @@ package ie.ucd.bdic.group6.core.player;
 import ie.ucd.bdic.group6.core.card.ActionCard;
 import ie.ucd.bdic.group6.core.card.ActionType;
 import ie.ucd.bdic.group6.core.card.Card;
-import ie.ucd.bdic.group6.core.card.Deck;
 import ie.ucd.bdic.group6.core.common.OperationError;
 import ie.ucd.bdic.group6.core.common.OperationResult;
 import ie.ucd.bdic.group6.core.property.PropertyBoard;
@@ -182,8 +181,8 @@ public final class Player {
         return OperationResult.ok(actionFromHand);
     }
 
-    public OperationResult<Void> tryDiscardHandDownTo(int maxHandSize, List<Card> selectionOrder, Deck drawPile) {
-        return hand.discardDownTo(maxHandSize, selectionOrder, drawPile);
+    public OperationResult<Void> tryDiscardHandDownTo(int maxHandSize, List<Card> selectionOrder, CardDiscardSink discardSink) {
+        return hand.discardDownTo(maxHandSize, selectionOrder, discardSink);
     }
 
     /**
