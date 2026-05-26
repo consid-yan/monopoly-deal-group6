@@ -15,8 +15,8 @@ class PropertyPaymentSupportTest {
     @Test
     void paymentValueUsesRowRentBeforeCardLeaves() {
         PropertySet row = new PropertySet(PropertyColor.LIGHT_BLUE);
-        PropertyCard c1 = new PropertyCard("lb1", "LB1", PropertyColor.LIGHT_BLUE, 1);
-        PropertyCard c2 = new PropertyCard("lb2", "LB2", PropertyColor.LIGHT_BLUE, 1);
+        PropertyCard c1 = new PropertyCard("lb1", "LB1", PropertyColor.LIGHT_BLUE, 3);
+        PropertyCard c2 = new PropertyCard("lb2", "LB2", PropertyColor.LIGHT_BLUE, 3);
         assertTrue(row.tryAdd(c1, Optional.empty()));
         assertTrue(row.tryAdd(c2, Optional.empty()));
         assertEquals(3, PropertyPaymentSupport.paymentValueM(row, c1).value().orElseThrow());
