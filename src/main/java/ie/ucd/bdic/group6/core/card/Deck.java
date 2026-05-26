@@ -19,7 +19,6 @@ import java.util.Random;
  *   <li>{@link #Deck(List)} expects {@code bottomToTop.get(0)} to be the deck bottom and the last list element
  *       to be the deck top.</li>
  *   <li>{@link #draw()} removes from the deque tail (top).</li>
- *   <li>{@link #discardToBottom(Card)} inserts at the deque head (bottom).</li>
  * </ul>
  */
 public final class Deck {

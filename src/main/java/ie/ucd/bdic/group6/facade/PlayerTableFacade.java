@@ -2,9 +2,9 @@ package ie.ucd.bdic.group6.facade;
 
 import ie.ucd.bdic.group6.core.card.ActionCard;
 import ie.ucd.bdic.group6.core.card.Card;
-import ie.ucd.bdic.group6.core.card.Deck;
 import ie.ucd.bdic.group6.core.common.OperationResult;
 import ie.ucd.bdic.group6.core.player.BankPaymentSolver;
+import ie.ucd.bdic.group6.core.player.CardDiscardSink;
 import ie.ucd.bdic.group6.core.player.Player;
 import ie.ucd.bdic.group6.core.player.PlayerSnapshot;
 import ie.ucd.bdic.group6.core.property.PropertyColor;
@@ -40,8 +40,8 @@ public record PlayerTableFacade(Player player) {
         return player.trySpendHotelCardOnRow(hotelFromHand, row);
     }
 
-    public OperationResult<Void> discardHandDownToSeven(List<Card> discardSelection, Deck drawPile) {
-        return player.tryDiscardHandDownTo(7, discardSelection, drawPile);
+    public OperationResult<Void> discardHandDownToSeven(List<Card> discardSelection, CardDiscardSink discardSink) {
+        return player.tryDiscardHandDownTo(7, discardSelection, discardSink);
     }
 
     public OperationResult<Void> payBankMoneyTo(Player receiver, Collection<Card> bankCards) {
