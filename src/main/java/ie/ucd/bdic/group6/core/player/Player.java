@@ -68,6 +68,10 @@ public final class Player {
         return propertyBoard;
     }
 
+    public Optional<PropertySet> findPropertyRow(String rowId) {
+        return propertyBoard.findRowById(rowId);
+    }
+
     public List<Card> handView() {
         return hand.view();
     }
@@ -134,15 +138,17 @@ public final class Player {
         if (!hand.contains(card)) {
             return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "card not in hand: " + card.id());
         }
-        PropertySet row = new PropertySet(anchorColor);
-        if (!row.tryAdd(card, wildChoice)) {
-            return OperationResult.fail(
-                    OperationError.PROPERTY_TYPE_MISMATCH, "card cannot start a row for anchor " + anchorColor);
-        }
         if (!hand.remove(card)) {
             return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "card not in hand: " + card.id());
         }
-        propertyBoard.addRow(row);
+        PropertySet row = propertyBoard.startNewRow(anchorColor);
+        OperationResult<Void> placed = propertyBoard.tryAddCardToRow(row, card, wildChoice);
+        if (!placed.isSuccess()) {
+            hand.add(card);
+            propertyBoard.removeRow(row);
+            propertyBoard.compactEmptyRows();
+            return placed;
+        }
         return OperationResult.ok();
     }
 
@@ -179,6 +185,20 @@ public final class Player {
                     OperationError.NOT_COMPLETE_SET, "row cannot accept " + expected + " improvement right now");
         }
         return OperationResult.ok(actionFromHand);
+    }
+
+    public OperationResult<ActionCard> trySpendHouseCardOnRowById(ActionCard houseFromHand, String rowId) {
+        return findPropertyRow(rowId)
+                .map(row -> trySpendHouseCardOnRow(houseFromHand, row))
+                .orElseGet(() -> OperationResult.fail(
+                        OperationError.PROPERTY_ROW_NOT_FOUND, "no property row with id " + rowId));
+    }
+
+    public OperationResult<ActionCard> trySpendHotelCardOnRowById(ActionCard hotelFromHand, String rowId) {
+        return findPropertyRow(rowId)
+                .map(row -> trySpendHotelCardOnRow(hotelFromHand, row))
+                .orElseGet(() -> OperationResult.fail(
+                        OperationError.PROPERTY_ROW_NOT_FOUND, "no property row with id " + rowId));
     }
 
     public OperationResult<Void> tryDiscardHandDownTo(int maxHandSize, List<Card> selectionOrder, CardDiscardSink discardSink) {

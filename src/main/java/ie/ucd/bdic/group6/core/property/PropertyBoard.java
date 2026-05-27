@@ -35,6 +35,13 @@ public final class PropertyBoard {
         return rows.contains(row);
     }
 
+    public Optional<PropertySet> findRowById(String rowId) {
+        if (rowId == null || rowId.isBlank()) {
+            return Optional.empty();
+        }
+        return rows.stream().filter(r -> r.rowId().equals(rowId)).findFirst();
+    }
+
     public PropertySet startNewRow(PropertyColor anchorColor) {
         PropertySet row = new PropertySet(anchorColor);
         rows.add(row);
@@ -88,6 +95,27 @@ public final class PropertyBoard {
             }
         }
         return false;
+    }
+
+    public boolean removeRow(PropertySet row) {
+        if (rows.remove(row)) {
+            fireChanged();
+            return true;
+        }
+        return false;
+    }
+
+    public boolean canPayWithPropertyCard(Card card) {
+        return findRowContaining(card)
+                .filter(row -> PropertyPaymentSupport.canUseAsPropertyPayment(card, row))
+                .isPresent();
+    }
+
+    /**
+     * Sly Deal and similar effects cannot remove a card from a complete set.
+     */
+    public boolean canRemoveCardForSteal(Card card) {
+        return findRowContaining(card).map(row -> !row.isComplete()).orElse(false);
     }
 
     public void compactEmptyRows() {

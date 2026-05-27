@@ -44,7 +44,7 @@ public record PlayerSnapshot(
         player.bank().replaceAll(new ArrayList<>(snap.bank()));
         player.propertyBoard().clearAllRows();
         for (PropertyRowSnapshot rowSnap : snap.propertyRows()) {
-            PropertySet row = new PropertySet(rowSnap.anchorColor());
+            PropertySet row = new PropertySet(rowSnap.anchorColor(), rowSnap.rowId());
             for (Card c : rowSnap.cardsInOrder()) {
                 Optional<PropertyColor> wild = Optional.empty();
                 if (c instanceof PropertyWildCard wc) {
@@ -64,6 +64,7 @@ public record PlayerSnapshot(
     }
 
     public record PropertyRowSnapshot(
+            String rowId,
             PropertyColor anchorColor,
             List<Card> cardsInOrder,
             Map<String, PropertyColor> wildAssignments,
@@ -71,6 +72,7 @@ public record PlayerSnapshot(
             boolean hotel) {
 
         public PropertyRowSnapshot {
+            rowId = Objects.requireNonNull(rowId, "rowId");
             anchorColor = Objects.requireNonNull(anchorColor, "anchorColor");
             cardsInOrder = List.copyOf(cardsInOrder);
             wildAssignments = Map.copyOf(wildAssignments);
@@ -78,6 +80,7 @@ public record PlayerSnapshot(
 
         public static PropertyRowSnapshot from(PropertySet row) {
             return new PropertyRowSnapshot(
+                    row.rowId(),
                     row.anchorColor(),
                     new ArrayList<>(row.cardsView()),
                     new HashMap<>(row.wildAssignmentsView()),

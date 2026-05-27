@@ -11,12 +11,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * One property row (one pile building toward a single anchor color).
+ * Each row has a stable {@link #rowId()} for commands and snapshots (independent of board list index).
  */
 public final class PropertySet {
 
+    private final String rowId;
     private final PropertyColor anchorColor;
     private final List<Card> cards = new ArrayList<>();
     private final Map<String, PropertyColor> wildAssignments = new HashMap<>();
@@ -24,7 +27,22 @@ public final class PropertySet {
     private boolean hotel;
 
     public PropertySet(PropertyColor anchorColor) {
+        this(anchorColor, UUID.randomUUID().toString());
+    }
+
+    /**
+     * Restores or transfers a row while preserving {@code rowId} (snapshots, Deal Breaker, etc.).
+     */
+    public PropertySet(PropertyColor anchorColor, String rowId) {
         this.anchorColor = Objects.requireNonNull(anchorColor, "anchorColor");
+        this.rowId = Objects.requireNonNull(rowId, "rowId");
+        if (rowId.isBlank()) {
+            throw new IllegalArgumentException("rowId must not be blank");
+        }
+    }
+
+    public String rowId() {
+        return rowId;
     }
 
     public PropertyColor anchorColor() {

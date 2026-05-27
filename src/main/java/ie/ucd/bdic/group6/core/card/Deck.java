@@ -110,4 +110,21 @@ public final class Deck {
     public void shuffle() {
         shuffle(new Random());
     }
+
+    /**
+     * Rebuilds an empty draw pile from {@code source}, shuffled. Used when the draw pile is exhausted and the
+     * session discard pile is reshuffled into a new draw pile (see {@link DrawPileRules}).
+     */
+    public void refillFromShuffled(Collection<Card> source, Random random) {
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(random, "random");
+        if (!cards.isEmpty()) {
+            throw new IllegalStateException("refill only allowed when draw pile is empty");
+        }
+        List<Card> copy = new ArrayList<>(source);
+        Collections.shuffle(copy, random);
+        for (Card c : copy) {
+            cards.addLast(c);
+        }
+    }
 }
