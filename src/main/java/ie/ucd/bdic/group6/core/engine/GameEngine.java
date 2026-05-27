@@ -584,7 +584,7 @@ public class GameEngine implements ActionExecutor {
         switch (actionCard.actionType()) {
             case PASS_GO -> {
                 discardActionFromHand(player, actionCard, activeGame);
-                drawCards(player, activeGame.drawPile(), 2);
+                drawCards(player, activeGame, 2);
             }
             case DEBT_COLLECTOR -> executeDebtCollector(command, session, player, actionCard, activeGame);
             case ITS_MY_BIRTHDAY -> executeItsMyBirthday(session, player, actionCard, activeGame);
