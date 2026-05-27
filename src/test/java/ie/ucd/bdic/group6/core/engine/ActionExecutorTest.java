@@ -4,7 +4,10 @@ import ie.ucd.bdic.group6.command.CreateSessionCommand;
 import ie.ucd.bdic.group6.command.DiscardCardsCommand;
 import ie.ucd.bdic.group6.command.EndTurnCommand;
 import ie.ucd.bdic.group6.command.JoinSessionCommand;
+import ie.ucd.bdic.group6.command.PayDebtCommand;
 import ie.ucd.bdic.group6.command.PlayCardCommand;
+import ie.ucd.bdic.group6.command.ProposeTradeCommand;
+import ie.ucd.bdic.group6.command.RespondTradeCommand;
 import ie.ucd.bdic.group6.command.StartGameCommand;
 import ie.ucd.bdic.group6.core.card.ActionCard;
 import ie.ucd.bdic.group6.core.card.ActionType;
@@ -169,6 +172,116 @@ class ActionExecutorTest {
     }
 
     @Test
+    void debtCollectorCreatesPendingDebtAndPayDebtMovesBankCards() {
+        ActionCard debtCollector = debtCollector("debt-collector");
+        MoneyCard payment = money("pay-5", 5);
+        GameEngine engine = engineWithDrawOrder(List.of(
+                debtCollector,
+                money("host-1", 1),
+                money("host-2", 1),
+                money("host-3", 1),
+                money("host-4", 1),
+                payment,
+                money("player2-1", 1),
+                money("player2-2", 1),
+                money("player2-3", 1),
+                money("player2-4", 1),
+                money("host-start-1", 1),
+                money("host-start-2", 1),
+                money("extra-1", 1),
+                money("extra-2", 1),
+                money("extra-3", 1),
+                money("extra-4", 1)
+        ));
+        Map<String, Object> created = createSession(engine, "host", 5);
+        String sessionId = text(created, "sessionId");
+        join(engine, text(created, "sessionCode"), "player2");
+        startGame(engine, sessionId, "host");
+
+        endTurn(engine, sessionId, "host");
+        playAs(engine, sessionId, "player2", payment.id());
+        endTurn(engine, sessionId, "player2");
+        Map<String, Object> afterDebt = engine.executePlayCard(new PlayCardCommand(Map.of(
+                "sessionId", sessionId,
+                "playerId", "host",
+                "cardId", debtCollector.id(),
+                "targetPlayerId", "player2"
+        )));
+
+        Map<String, Object> debt = pendingDebts(afterDebt).getFirst();
+        assertEquals("host", debt.get("creditorPlayerId"));
+        assertEquals("player2", debt.get("debtorPlayerId"));
+        assertEquals(5, debt.get("amountM"));
+
+        Map<String, Object> afterPay = engine.executePayDebt(new PayDebtCommand(Map.of(
+                "sessionId", sessionId,
+                "playerId", "player2",
+                "debtId", debt.get("debtId"),
+                "paymentCardIds", List.of(payment.id())
+        )));
+
+        assertTrue(pendingDebts(afterPay).isEmpty());
+        assertEquals(5, playerSummary(afterPay, "host").get("bankTotalValueM"));
+        assertEquals(0, playerSummary(afterPay, "player2").get("bankTotalValueM"));
+    }
+
+    @Test
+    void acceptedTradeMovesMoneyAndPropertyAtomically() {
+        PropertyCard red = property("red-trade", PropertyColor.RED);
+        MoneyCard payment = money("trade-money", 3);
+        GameEngine engine = engineWithDrawOrder(List.of(
+                red,
+                money("host-1", 1),
+                money("host-2", 1),
+                money("host-3", 1),
+                money("host-4", 1),
+                payment,
+                money("player2-1", 1),
+                money("player2-2", 1),
+                money("player2-3", 1),
+                money("player2-4", 1),
+                money("host-start-1", 1),
+                money("host-start-2", 1),
+                money("host-next-1", 1),
+                money("host-next-2", 1),
+                money("extra-1", 1),
+                money("extra-2", 1)
+        ));
+        Map<String, Object> created = createSession(engine, "host", 5);
+        String sessionId = text(created, "sessionId");
+        join(engine, text(created, "sessionCode"), "player2");
+        startGame(engine, sessionId, "host");
+
+        endTurn(engine, sessionId, "host");
+        playAs(engine, sessionId, "player2", payment.id());
+        endTurn(engine, sessionId, "player2");
+        playAs(engine, sessionId, "host", red.id());
+        playAs(engine, sessionId, "host", "host-1");
+        playAs(engine, sessionId, "host", "host-2");
+        Map<String, Object> proposed = engine.executeProposeTrade(new ProposeTradeCommand(Map.of(
+                "sessionId", sessionId,
+                "playerId", "host",
+                "targetPlayerId", "player2",
+                "offeredCardIds", List.of(red.id()),
+                "requestedCardIds", List.of(payment.id())
+        )));
+        String tradeId = (String) pendingTrades(proposed).getFirst().get("tradeId");
+
+        endTurn(engine, sessionId, "host");
+        Map<String, Object> accepted = engine.executeRespondTrade(new RespondTradeCommand(Map.of(
+                "sessionId", sessionId,
+                "playerId", "player2",
+                "tradeId", tradeId,
+                "accepted", true
+        )));
+
+        assertTrue(pendingTrades(accepted).isEmpty());
+        assertEquals(5, playerSummary(accepted, "host").get("bankTotalValueM"));
+        assertTrue(propertyRows(playerSummary(accepted, "host")).isEmpty());
+        assertEquals(List.of(red.id()), cardIds(rowCards(propertyRows(playerSummary(accepted, "player2")).getFirst())));
+    }
+
+    @Test
     void selectedPropertyRowRejectsIncompatibleCardWithoutAutoCreatingRow() {
         PropertyCard red = property("red", PropertyColor.RED);
         PropertyCard blue = property("blue", PropertyColor.LIGHT_BLUE);
@@ -315,6 +428,14 @@ class ActionExecutorTest {
         )));
     }
 
+    private Map<String, Object> playAs(GameEngine engine, String sessionId, String playerId, String cardId) {
+        return engine.executePlayCard(new PlayCardCommand(Map.of(
+                "sessionId", sessionId,
+                "playerId", playerId,
+                "cardId", cardId
+        )));
+    }
+
     private Map<String, Object> createSession(GameEngine engine, String hostPlayerId, int maxPlayers) {
         return engine.executeCreateSession(new CreateSessionCommand(Map.of(
                 "hostPlayerId", hostPlayerId,
@@ -379,6 +500,10 @@ class ActionExecutorTest {
         return new ActionCard(id, "Pass Go", ActionType.PASS_GO, 1, null);
     }
 
+    private ActionCard debtCollector(String id) {
+        return new ActionCard(id, "Debt Collector", ActionType.DEBT_COLLECTOR, 5, null);
+    }
+
     private String text(Map<String, Object> data, String key) {
         return (String) data.get(key);
     }
@@ -401,6 +526,16 @@ class ActionExecutorTest {
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> rowCards(Map<String, Object> row) {
         return (List<Map<String, Object>>) row.get("cards");
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> pendingDebts(Map<String, Object> snapshot) {
+        return (List<Map<String, Object>>) snapshot.get("pendingDebts");
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> pendingTrades(Map<String, Object> snapshot) {
+        return (List<Map<String, Object>>) snapshot.get("pendingTrades");
     }
 
     private List<String> cardIds(List<Map<String, Object>> cards) {

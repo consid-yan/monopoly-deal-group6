@@ -22,6 +22,10 @@ public class PayDebtCommand extends AbstractCommand {
         return (String) payload().get("creditorId");
     }
 
+    public String getDebtId() {
+        return (String) payload().get("debtId");
+    }
+
     @SuppressWarnings("unchecked")
     public List<String> getPaymentCardIds() {
         return (List<String>) payload().get("paymentCardIds");

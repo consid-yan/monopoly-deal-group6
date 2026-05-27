@@ -2,11 +2,17 @@ package ie.ucd.bdic.group6.core.engine;
 
 import ie.ucd.bdic.group6.command.*;
 import ie.ucd.bdic.group6.core.card.*;
+import ie.ucd.bdic.group6.core.common.OperationError;
 import ie.ucd.bdic.group6.core.common.OperationResult;
 import ie.ucd.bdic.group6.core.player.Player;
+import ie.ucd.bdic.group6.core.player.PlayerPropertyTransfers;
+import ie.ucd.bdic.group6.core.player.PlayerSnapshot;
 import ie.ucd.bdic.group6.core.property.PropertyColor;
+import ie.ucd.bdic.group6.core.property.PropertyPaymentSupport;
+import ie.ucd.bdic.group6.core.property.PropertyRentSupport;
 import ie.ucd.bdic.group6.core.property.PropertySet;
 import ie.ucd.bdic.group6.core.rules.ActionRule;
+import ie.ucd.bdic.group6.core.rules.PaymentRule;
 import ie.ucd.bdic.group6.core.rules.WinRule;
 import ie.ucd.bdic.group6.exception.GameException;
 
@@ -24,6 +30,7 @@ public class GameEngine implements ActionExecutor {
     private final Supplier<Deck> deckSupplier;
     private final ActionRule actionRule = new ActionRule();
     private final WinRule winRule = new WinRule();
+    private final PaymentRule paymentRule = new PaymentRule();
 
     public GameEngine() {
         this(() -> Deck.shuffled(StandardDeckFactory.createUnshuffledDeck()));
@@ -103,7 +110,7 @@ public class GameEngine implements ActionExecutor {
         switch (playMode) {
             case BANK -> playBankCard(player, card);
             case PROPERTY -> playPropertyCard(command, player, card);
-            case ACTION -> playActionCard(player, card, activeGame);
+            case ACTION -> playActionCard(command, session, player, card, activeGame);
         }
 
         turnManager.recordAction();
@@ -113,26 +120,93 @@ public class GameEngine implements ActionExecutor {
 
     @Override
     public synchronized Map<String, Object> executePayDebt(PayDebtCommand command) {
-        // TODO(engine-payment): Add PendingDebt, payment validation, and money/property transfer.
-        throw new GameException(
-                "UNSUPPORTED_COMMAND_FOR_MVP",
-                "Pay debt is not implemented in the Core MVP engine");
+        GameSession session = requireActiveSession(command.getSessionId());
+        ActiveGameState activeGame = requireActiveGame(session);
+        PendingDebt debt = resolvePendingDebt(activeGame, command);
+        Player debtor = requirePlayer(session, debt.debtorPlayerId());
+        Player creditor = requirePlayer(session, debt.creditorPlayerId());
+        List<String> paymentCardIds = readStringList(command.getPaymentCardIds());
+
+        int paymentValueM = paymentValueBeforeTransfer(debtor, paymentCardIds);
+        if (paymentValueM < debt.amountM()) {
+            throw new GameException(
+                    "INSUFFICIENT_PAYMENT",
+                    "Selected cards total " + paymentValueM + "M but debt requires " + debt.amountM() + "M");
+        }
+
+        PlayerSnapshot debtorSnapshot = debtor.snapshot();
+        PlayerSnapshot creditorSnapshot = creditor.snapshot();
+        try {
+            applyDebtPayment(debtor, creditor, paymentCardIds);
+        } catch (RuntimeException e) {
+            debtor.restore(debtorSnapshot);
+            creditor.restore(creditorSnapshot);
+            throw e;
+        }
+
+        debt.markAsPaid();
+        activeGame.removePendingDebt(debt);
+        return snapshot(session, debtor.id());
     }
 
     @Override
     public synchronized Map<String, Object> executeProposeTrade(ProposeTradeCommand command) {
-        // TODO(engine-trade): Add the simplified trade state machine and validate supported exchange types.
-        throw new GameException(
-                "UNSUPPORTED_COMMAND_FOR_MVP",
-                "Trade proposals are not implemented in the Core MVP engine");
+        GameSession session = requireActiveSession(command.getSessionId());
+        ActiveGameState activeGame = requireActiveGame(session);
+        String proposerId = requireText(command.getPlayerId(), "playerId");
+        String targetId = requireText(command.getTargetPlayerId(), "targetPlayerId");
+        actionRule.requireActivePlayer(activeGame.turnManager(), proposerId);
+        if (proposerId.equals(targetId)) {
+            throw new GameException("TRADE_WITH_SELF", "Cannot propose a trade with yourself");
+        }
+
+        Player proposer = requirePlayer(session, proposerId);
+        Player target = requirePlayer(session, targetId);
+        List<String> offeredCardIds = readStringList(command.getOfferedCardIds());
+        List<String> requestedCardIds = readStringList(command.getRequestedCardIds());
+        if (offeredCardIds.isEmpty() || requestedCardIds.isEmpty()) {
+            throw new GameException("EMPTY_TRADE", "Trade must include offered and requested cards");
+        }
+        if (activeGame.hasPendingTradeInvolving(proposerId) || activeGame.hasPendingTradeInvolving(targetId)) {
+            throw new GameException("PENDING_TRADE_EXISTS", "A player in this trade already has a pending trade");
+        }
+
+        validateSupportedTrade(resolveTradeCards(proposer, offeredCardIds), resolveTradeCards(target, requestedCardIds));
+        PendingTrade trade = PendingTrade.builder()
+                .proposerPlayerId(proposerId)
+                .targetPlayerId(targetId)
+                .offeredCardIds(offeredCardIds)
+                .requestedCardIds(requestedCardIds)
+                .build();
+        activeGame.addPendingTrade(trade);
+        return snapshot(session, proposerId);
     }
 
     @Override
     public synchronized Map<String, Object> executeRespondTrade(RespondTradeCommand command) {
-        // TODO(engine-trade): Complete accepted trades with atomic two-player card transfers.
-        throw new GameException(
-                "UNSUPPORTED_COMMAND_FOR_MVP",
-                "Trade responses are not implemented in the Core MVP engine");
+        GameSession session = requireActiveSession(command.getSessionId());
+        ActiveGameState activeGame = requireActiveGame(session);
+        String responderId = requireText(command.getPlayerId(), "playerId");
+        actionRule.requireActivePlayer(activeGame.turnManager(), responderId);
+
+        PendingTrade trade = activeGame.findPendingTrade(requireText(command.getTradeId(), "tradeId"))
+                .orElseThrow(() -> new GameException("TRADE_NOT_FOUND", "No pending trade exists with that id"));
+        if (!trade.targetPlayerId().equals(responderId)) {
+            throw new GameException("NOT_TRADE_TARGET", "Only the trade target can respond");
+        }
+        if (!trade.isPending()) {
+            throw new GameException("TRADE_NOT_PENDING", "Trade is no longer pending");
+        }
+
+        if (command.isAccepted()) {
+            Player proposer = requirePlayer(session, trade.proposerPlayerId());
+            Player responder = requirePlayer(session, responderId);
+            acceptTrade(trade, proposer, responder);
+        } else {
+            trade.reject();
+        }
+        activeGame.removePendingTrade(trade);
+        return snapshot(session, responderId);
     }
 
     @Override
@@ -177,6 +251,242 @@ public class GameEngine implements ActionExecutor {
             throw new GameException("SESSION_NOT_FOUND", "No session exists for the given identity");
         }
         return snapshot(session, command.getPlayerId());
+    }
+
+    private PendingDebt resolvePendingDebt(ActiveGameState activeGame, PayDebtCommand command) {
+        String debtId = command.getDebtId();
+        String debtorId = firstNonBlank(command.getDebtorId(), command.getPlayerId());
+        String creditorId = command.getCreditorId();
+        if (debtId != null && !debtId.isBlank()) {
+            PendingDebt debt = activeGame.findPendingDebt(debtId)
+                    .orElseThrow(() -> new GameException("DEBT_NOT_FOUND", "No pending debt exists with that id"));
+            if (debtorId != null && !debt.debtorPlayerId().equals(debtorId)) {
+                throw new GameException("DEBTOR_MISMATCH", "Debt belongs to a different debtor");
+            }
+            if (creditorId != null && !creditorId.isBlank() && !debt.creditorPlayerId().equals(creditorId)) {
+                throw new GameException("CREDITOR_MISMATCH", "Debt belongs to a different creditor");
+            }
+            return debt;
+        }
+
+        String requiredDebtorId = requireText(debtorId, "debtorId");
+        String requiredCreditorId = requireText(creditorId, "creditorId");
+        List<PendingDebt> matches = activeGame.pendingDebtsForDebtor(requiredDebtorId).stream()
+                .filter(debt -> debt.creditorPlayerId().equals(requiredCreditorId))
+                .toList();
+        if (matches.isEmpty()) {
+            throw new GameException("NO_PENDING_DEBT", "No pending debt matches the requested players");
+        }
+        if (matches.size() > 1) {
+            throw new GameException("MULTIPLE_PENDING_DEBTS", "Specify debtId when multiple debts match");
+        }
+        return matches.getFirst();
+    }
+
+    private int paymentValueBeforeTransfer(Player debtor, List<String> paymentCardIds) {
+        return resolveDebtPayment(debtor, paymentCardIds).totalValueM();
+    }
+
+    private void applyDebtPayment(Player debtor, Player creditor, List<String> paymentCardIds) {
+        DebtPaymentSelection payment = resolveDebtPayment(debtor, paymentCardIds);
+        if (!payment.bankCards().isEmpty() && payment.propertyCards().isEmpty()) {
+            requireSuccess(paymentRule.validateSelectedBankPayment(debtor.bank(), payment.bankCards(), payment.totalValueM()));
+        }
+        if (!payment.bankCards().isEmpty()) {
+            requireSuccess(debtor.tryPayBankCardsTo(creditor, payment.bankCards()));
+        }
+        for (PropertyPaymentCard propertyCard : payment.propertyCards()) {
+            requireSuccess(movePropertyCardToBestRow(
+                    debtor,
+                    creditor,
+                    propertyCard.card(),
+                    propertyCard.sourceRow()));
+        }
+    }
+
+    private DebtPaymentSelection resolveDebtPayment(Player debtor, List<String> paymentCardIds) {
+        if (paymentCardIds.isEmpty()) {
+            throw new GameException("PAYMENT_REQUIRED", "At least one payment card is required");
+        }
+        Set<String> seen = new HashSet<>();
+        List<Card> bankCards = new ArrayList<>();
+        List<PropertyPaymentCard> propertyCards = new ArrayList<>();
+        int totalValueM = 0;
+
+        for (String cardId : paymentCardIds) {
+            if (!seen.add(cardId)) {
+                throw new GameException("DUPLICATE_CARD_SELECTION", "Card selected more than once: " + cardId);
+            }
+            Optional<Card> bankCard = findBankCard(debtor, cardId);
+            if (bankCard.isPresent()) {
+                Card card = bankCard.get();
+                if (card.bankValueM().isEmpty()) {
+                    throw new GameException("NON_BANKABLE_CARD", "Bank card has no payment value: " + card.id());
+                }
+                bankCards.add(card);
+                totalValueM += CardBankSupport.bankPaymentValueM(card);
+                continue;
+            }
+
+            PropertyCardLocation propertyCard = findPropertyCardLocation(debtor, cardId)
+                    .orElseThrow(() -> new GameException(
+                            "CARD_NOT_AVAILABLE_FOR_PAYMENT",
+                            "Card is not in debtor bank or property board: " + cardId));
+            OperationResult<Integer> value = PropertyPaymentSupport.paymentValueM(
+                    propertyCard.row(),
+                    propertyCard.card());
+            requireSuccess(value);
+            propertyCards.add(new PropertyPaymentCard(propertyCard.card(), propertyCard.row()));
+            totalValueM += value.value().orElseThrow();
+        }
+        return new DebtPaymentSelection(List.copyOf(bankCards), List.copyOf(propertyCards), totalValueM);
+    }
+
+    private void acceptTrade(PendingTrade trade, Player proposer, Player responder) {
+        List<TradeCardSelection> offeredCards = resolveTradeCards(proposer, trade.offeredCardIds());
+        List<TradeCardSelection> requestedCards = resolveTradeCards(responder, trade.requestedCardIds());
+        validateSupportedTrade(offeredCards, requestedCards);
+
+        PlayerSnapshot proposerSnapshot = proposer.snapshot();
+        PlayerSnapshot responderSnapshot = responder.snapshot();
+        try {
+            transferTradeCards(proposer, responder, offeredCards);
+            transferTradeCards(responder, proposer, requestedCards);
+            trade.accept();
+        } catch (RuntimeException e) {
+            proposer.restore(proposerSnapshot);
+            responder.restore(responderSnapshot);
+            throw e;
+        }
+    }
+
+    private void transferTradeCards(Player sender, Player receiver, List<TradeCardSelection> selections) {
+        List<Card> bankCards = selections.stream()
+                .filter(selection -> selection.kind() == TradeCardKind.MONEY)
+                .map(TradeCardSelection::card)
+                .toList();
+        if (!bankCards.isEmpty()) {
+            requireSuccess(sender.tryPayBankCardsTo(receiver, bankCards));
+        }
+        for (TradeCardSelection selection : selections) {
+            if (selection.kind() == TradeCardKind.PROPERTY) {
+                requireSuccess(movePropertyCardToBestRow(sender, receiver, selection.card(), selection.sourceRow()));
+            }
+        }
+    }
+
+    private List<TradeCardSelection> resolveTradeCards(Player player, List<String> cardIds) {
+        if (cardIds.isEmpty()) {
+            throw new GameException("EMPTY_TRADE_SIDE", "Each side of a trade must contain at least one card");
+        }
+        Set<String> seen = new HashSet<>();
+        List<TradeCardSelection> selections = new ArrayList<>();
+        for (String cardId : cardIds) {
+            if (!seen.add(cardId)) {
+                throw new GameException("DUPLICATE_CARD_SELECTION", "Card selected more than once: " + cardId);
+            }
+            Optional<Card> bankCard = findBankCard(player, cardId);
+            if (bankCard.isPresent()) {
+                selections.add(new TradeCardSelection(bankCard.get(), TradeCardKind.MONEY, null));
+                continue;
+            }
+            PropertyCardLocation propertyCard = findPropertyCardLocation(player, cardId)
+                    .orElseThrow(() -> new GameException(
+                            "CARD_NOT_TRADEABLE",
+                            "Trade card must be in the player's bank or property board: " + cardId));
+            selections.add(new TradeCardSelection(
+                    propertyCard.card(),
+                    TradeCardKind.PROPERTY,
+                    propertyCard.row()));
+        }
+        return List.copyOf(selections);
+    }
+
+    private void validateSupportedTrade(
+            List<TradeCardSelection> offeredCards,
+            List<TradeCardSelection> requestedCards) {
+        Set<TradeCardKind> offeredKinds = tradeKinds(offeredCards);
+        Set<TradeCardKind> requestedKinds = tradeKinds(requestedCards);
+        if (offeredKinds.size() != 1 || requestedKinds.size() != 1) {
+            throw new GameException("UNSUPPORTED_TRADE_TYPE", "Each trade side must use one card category");
+        }
+        TradeCardKind offeredKind = offeredKinds.iterator().next();
+        TradeCardKind requestedKind = requestedKinds.iterator().next();
+        if (offeredKind == TradeCardKind.MONEY && requestedKind == TradeCardKind.MONEY) {
+            throw new GameException(
+                    "UNSUPPORTED_TRADE_TYPE",
+                    "Supported trades are property-money, money-property, or property-property");
+        }
+    }
+
+    private Set<TradeCardKind> tradeKinds(List<TradeCardSelection> selections) {
+        EnumSet<TradeCardKind> kinds = EnumSet.noneOf(TradeCardKind.class);
+        for (TradeCardSelection selection : selections) {
+            kinds.add(selection.kind());
+        }
+        return kinds;
+    }
+
+    private OperationResult<Void> movePropertyCardToBestRow(
+            Player sender,
+            Player receiver,
+            Card card,
+            PropertySet sourceRow) {
+        PropertyPlacement placement = placementForTransferredProperty(card, sourceRow);
+        Optional<PropertySet> receiverRow = receiver.propertyBoard().rowsView().stream()
+                .filter(row -> row.anchorColor() == placement.anchorColor())
+                .filter(row -> row.canAdd(card, placement.wildChoice()))
+                .findFirst();
+        if (receiverRow.isPresent()) {
+            return PlayerPropertyTransfers.transferPropertyCardToRow(
+                    sender,
+                    receiver,
+                    card,
+                    receiverRow.get(),
+                    placement.wildChoice());
+        }
+        OperationResult<PropertySet> moved = PlayerPropertyTransfers.transferPropertyCardToNewRow(
+                sender,
+                receiver,
+                card,
+                placement.anchorColor(),
+                placement.wildChoice());
+        if (!moved.isSuccess()) {
+            return OperationResult.fail(
+                    moved.errorCode().orElse(OperationError.GENERIC),
+                    moved.errorMessage().orElse(""));
+        }
+        return OperationResult.ok();
+    }
+
+    private PropertyPlacement placementForTransferredProperty(Card card, PropertySet sourceRow) {
+        if (card instanceof PropertyCard propertyCard) {
+            return new PropertyPlacement(propertyCard.color(), Optional.empty());
+        }
+        if (card instanceof PropertyWildCard wildCard) {
+            PropertyColor choice = sourceRow.wildAssignmentFor(wildCard.id())
+                    .orElse(sourceRow.anchorColor());
+            return new PropertyPlacement(choice, Optional.of(choice));
+        }
+        throw new GameException("PROPERTY_CANNOT_PAY_DEBT", "Only property cards can be transferred as properties");
+    }
+
+    private Optional<Card> findBankCard(Player player, String cardId) {
+        return player.bankView().stream()
+                .filter(card -> card.id().equals(cardId))
+                .findFirst();
+    }
+
+    private Optional<PropertyCardLocation> findPropertyCardLocation(Player player, String cardId) {
+        for (PropertySet row : player.propertyBoard().rowsView()) {
+            Optional<Card> card = row.cardsView().stream()
+                    .filter(candidate -> candidate.id().equals(cardId))
+                    .findFirst();
+            if (card.isPresent()) {
+                return Optional.of(new PropertyCardLocation(card.get(), row));
+            }
+        }
+        return Optional.empty();
     }
 
     private GameSession requireActiveSession(String sessionId) {
@@ -259,21 +569,191 @@ public class GameEngine implements ActionExecutor {
         requireSuccess(result);
     }
 
-    private void playActionCard(Player player, Card card, ActiveGameState activeGame) {
+    private void playActionCard(
+            PlayCardCommand command,
+            GameSession session,
+            Player player,
+            Card card,
+            ActiveGameState activeGame) {
         if (!(card instanceof ActionCard actionCard)) {
             throw new GameException("INVALID_PLAY_MODE", "Only action cards can be played as actions");
         }
-        // TODO(engine-action): Move action behavior into effect handlers and implement all non-PASS_GO cards.
-        if (actionCard.actionType() != ActionType.PASS_GO) {
-            throw new GameException(
+
+        switch (actionCard.actionType()) {
+            case PASS_GO -> {
+                discardActionFromHand(player, actionCard, activeGame);
+                drawCards(player, activeGame.drawPile(), 2);
+            }
+            case DEBT_COLLECTOR -> executeDebtCollector(command, session, player, actionCard, activeGame);
+            case ITS_MY_BIRTHDAY -> executeItsMyBirthday(session, player, actionCard, activeGame);
+            case RENT_BROWN_OR_LIGHT_BLUE,
+                    RENT_PINK_OR_ORANGE,
+                    RENT_RED_OR_YELLOW,
+                    RENT_DARK_BLUE_OR_GREEN,
+                    RENT_RAILROAD_OR_UTILITY,
+                    WILD_RENT -> executeRentCard(command, session, player, actionCard, activeGame);
+            case HOUSE, HOTEL -> executeImprovementCard(command, player, actionCard, activeGame);
+            case DOUBLE_THE_RENT -> throw new GameException(
+                    "UNSUPPORTED_ACTION",
+                    "Double The Rent must be paired with a rent card and is not supported yet");
+            default -> throw new GameException(
                     "UNSUPPORTED_ACTION",
                     actionCard.actionType() + " is not implemented in the Core MVP engine");
         }
+    }
+
+    private void executeDebtCollector(
+            PlayCardCommand command,
+            GameSession session,
+            Player player,
+            ActionCard actionCard,
+            ActiveGameState activeGame) {
+        String targetPlayerId = requireText(command.getTargetPlayerId(), "targetPlayerId");
+        if (player.id().equals(targetPlayerId)) {
+            throw new GameException("INVALID_TARGET_PLAYER", "Debt Collector cannot target yourself");
+        }
+        requirePlayer(session, targetPlayerId);
+        discardActionFromHand(player, actionCard, activeGame);
+        activeGame.addPendingDebt(PendingDebt.builder()
+                .creditorPlayerId(player.id())
+                .debtorPlayerId(targetPlayerId)
+                .amountM(5)
+                .sourceAction(actionCard.actionType())
+                .sourceCardId(actionCard.id())
+                .build());
+    }
+
+    private void executeItsMyBirthday(
+            GameSession session,
+            Player player,
+            ActionCard actionCard,
+            ActiveGameState activeGame) {
+        List<String> debtorIds = activeGame.turnManager().turnOrder().stream()
+                .filter(playerId -> !playerId.equals(player.id()))
+                .toList();
+        debtorIds.forEach(playerId -> requirePlayer(session, playerId));
+        discardActionFromHand(player, actionCard, activeGame);
+        for (String debtorId : debtorIds) {
+            activeGame.addPendingDebt(PendingDebt.builder()
+                    .creditorPlayerId(player.id())
+                    .debtorPlayerId(debtorId)
+                    .amountM(2)
+                    .sourceAction(actionCard.actionType())
+                    .sourceCardId(actionCard.id())
+                    .build());
+        }
+    }
+
+    private void executeRentCard(
+            PlayCardCommand command,
+            GameSession session,
+            Player player,
+            ActionCard actionCard,
+            ActiveGameState activeGame) {
+        PropertyColor rentColor = resolveRentColor(command, player, actionCard);
+        int rentM = PropertyRentSupport.maxCompleteRowRentForAnchor(player.propertyBoard(), rentColor);
+        if (rentM <= 0) {
+            throw new GameException("NO_RENTABLE_PROPERTY", "No complete rentable set for " + rentColor);
+        }
+        List<Player> targets = resolveRentTargets(command, session, player, activeGame);
+        discardActionFromHand(player, actionCard, activeGame);
+        for (Player target : targets) {
+            activeGame.addPendingDebt(PendingDebt.builder()
+                    .creditorPlayerId(player.id())
+                    .debtorPlayerId(target.id())
+                    .amountM(rentM)
+                    .sourceAction(actionCard.actionType())
+                    .sourceCardId(actionCard.id())
+                    .build());
+        }
+    }
+
+    private void executeImprovementCard(
+            PlayCardCommand command,
+            Player player,
+            ActionCard actionCard,
+            ActiveGameState activeGame) {
+        PropertySet targetRow = resolveImprovementRow(command, player);
+        OperationResult<ActionCard> spent = actionCard.actionType() == ActionType.HOUSE
+                ? player.trySpendHouseCardOnRow(actionCard, targetRow)
+                : player.trySpendHotelCardOnRow(actionCard, targetRow);
+        requireSuccess(spent);
+        activeGame.discard(spent.value().orElse(actionCard));
+    }
+
+    private PropertyColor resolveRentColor(PlayCardCommand command, Player player, ActionCard actionCard) {
+        String rawColor = command.getPropertyColor();
+        if (rawColor != null && !rawColor.isBlank()) {
+            PropertyColor color = parsePropertyColor(rawColor);
+            if (actionCard.actionType() != ActionType.WILD_RENT && !actionCard.rentColorOptions().contains(color)) {
+                throw new GameException("INVALID_RENT_COLOR", "Rent card cannot charge " + color);
+            }
+            return color;
+        }
+
+        List<PropertyColor> availableColors = player.propertyBoard().rowsView().stream()
+                .filter(PropertySet::isComplete)
+                .map(PropertySet::anchorColor)
+                .filter(color -> actionCard.actionType() == ActionType.WILD_RENT
+                        || actionCard.rentColorOptions().contains(color))
+                .distinct()
+                .toList();
+        if (availableColors.isEmpty()) {
+            throw new GameException("NO_RENTABLE_PROPERTY", "No complete set matches this rent card");
+        }
+        if (availableColors.size() > 1) {
+            throw new GameException("PROPERTY_COLOR_REQUIRED", "propertyColor is required when multiple rents apply");
+        }
+        return availableColors.getFirst();
+    }
+
+    private List<Player> resolveRentTargets(
+            PlayCardCommand command,
+            GameSession session,
+            Player player,
+            ActiveGameState activeGame) {
+        String targetPlayerId = command.getTargetPlayerId();
+        if (targetPlayerId != null && !targetPlayerId.isBlank()) {
+            if (targetPlayerId.equals(player.id())) {
+                throw new GameException("INVALID_TARGET_PLAYER", "Rent cannot target yourself");
+            }
+            return List.of(requirePlayer(session, targetPlayerId));
+        }
+        return activeGame.turnManager().turnOrder().stream()
+                .filter(playerId -> !playerId.equals(player.id()))
+                .map(playerId -> requirePlayer(session, playerId))
+                .toList();
+    }
+
+    private PropertySet resolveImprovementRow(PlayCardCommand command, Player player) {
+        Optional<Integer> rowIndex = resolvePropertyRowIndex(command);
+        if (rowIndex.isPresent()) {
+            List<PropertySet> rows = player.propertyBoard().rowsView();
+            int index = rowIndex.get();
+            if (index < 0 || index >= rows.size()) {
+                throw new GameException("PROPERTY_ROW_NOT_FOUND", "No property row exists at index " + index);
+            }
+            return rows.get(index);
+        }
+
+        String rawColor = command.getPropertyColor();
+        if (rawColor == null || rawColor.isBlank()) {
+            throw new GameException("PROPERTY_ROW_REQUIRED", "propertyRowIndex or propertyColor is required");
+        }
+        PropertyColor color = parsePropertyColor(rawColor);
+        return player.propertyBoard().rowsView().stream()
+                .filter(row -> row.anchorColor() == color && row.isComplete())
+                .findFirst()
+                .orElseThrow(() -> new GameException(
+                        "NO_COMPLETE_SET",
+                        "No complete property set exists for " + color));
+    }
+
+    private void discardActionFromHand(Player player, ActionCard actionCard, ActiveGameState activeGame) {
         if (!player.hand().remove(actionCard)) {
             throw new GameException("CARD_NOT_IN_HAND", "Action card is not in hand: " + actionCard.id());
         }
         activeGame.discard(actionCard);
-        drawCards(player, activeGame.drawPile(), 2);
     }
 
     private PlayMode resolvePlayMode(PlayCardCommand command, Card card) {
@@ -300,15 +780,11 @@ public class GameEngine implements ActionExecutor {
         if (rawColor == null || rawColor.isBlank()) {
             throw new GameException("PROPERTY_COLOR_REQUIRED", "propertyColor is required for wild property cards");
         }
-        try {
-            PropertyColor color = PropertyColor.valueOf(normalizeEnumToken(rawColor));
-            if (card instanceof PropertyCard propertyCard && propertyCard.color() != color) {
-                throw new GameException("PROPERTY_COLOR_MISMATCH", "Property card cannot be played to " + color);
-            }
-            return color;
-        } catch (IllegalArgumentException e) {
-            throw new GameException("INVALID_PROPERTY_COLOR", "Unsupported property color: " + rawColor, e);
+        PropertyColor color = parsePropertyColor(rawColor);
+        if (card instanceof PropertyCard propertyCard && propertyCard.color() != color) {
+            throw new GameException("PROPERTY_COLOR_MISMATCH", "Property card cannot be played to " + color);
         }
+        return color;
     }
 
     private Optional<Integer> resolvePropertyRowIndex(PlayCardCommand command) {
@@ -392,12 +868,42 @@ public class GameEngine implements ActionExecutor {
         data.put("winnerPlayerId", activeGame.flatMap(ActiveGameState::winnerPlayerId).orElse(""));
         data.put("deckSize", activeGame.map(game -> game.drawPile().size()).orElse(0));
         data.put("discardSize", activeGame.map(ActiveGameState::discardPileSize).orElse(0));
+        data.put("pendingDebts", activeGame
+                .map(game -> game.pendingDebtsView().stream().map(this::pendingDebtSummary).toList())
+                .orElse(List.of()));
+        data.put("pendingTrades", activeGame
+                .map(game -> game.pendingTradesView().stream().map(this::pendingTradeSummary).toList())
+                .orElse(List.of()));
         data.put("players", session.players().stream().map(this::playerSummary).toList());
 
         List<Map<String, Object>> currentPlayerHand = session.findPlayer(blankToEmpty(requesterPlayerId))
                 .map(player -> player.handView().stream().map(this::cardSummary).toList())
                 .orElse(List.of());
         data.put("currentPlayerHand", currentPlayerHand);
+        return Map.copyOf(data);
+    }
+
+    private Map<String, Object> pendingDebtSummary(PendingDebt debt) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("debtId", debt.debtId());
+        data.put("creditorPlayerId", debt.creditorPlayerId());
+        data.put("debtorPlayerId", debt.debtorPlayerId());
+        data.put("amountM", debt.amountM());
+        data.put("sourceAction", debt.sourceAction() == null ? "" : debt.sourceAction().name());
+        data.put("sourceCardId", debt.sourceCardId() == null ? "" : debt.sourceCardId());
+        return Map.copyOf(data);
+    }
+
+    private Map<String, Object> pendingTradeSummary(PendingTrade trade) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("tradeId", trade.tradeId());
+        data.put("proposerPlayerId", trade.proposerPlayerId());
+        data.put("targetPlayerId", trade.targetPlayerId());
+        data.put("offeredCardIds", trade.offeredCardIds());
+        data.put("requestedCardIds", trade.requestedCardIds());
+        data.put("status", trade.status().name());
+        data.put("createdAt", trade.createdAt().toString());
+        data.put("respondedAt", trade.respondedAt() == null ? "" : trade.respondedAt().toString());
         return Map.copyOf(data);
     }
 
@@ -494,6 +1000,14 @@ public class GameEngine implements ActionExecutor {
         return name.isEmpty() ? playerId : name;
     }
 
+    private PropertyColor parsePropertyColor(String rawColor) {
+        try {
+            return PropertyColor.valueOf(normalizeEnumToken(rawColor));
+        } catch (IllegalArgumentException e) {
+            throw new GameException("INVALID_PROPERTY_COLOR", "Unsupported property color: " + rawColor, e);
+        }
+    }
+
     private String normalizeEnumToken(String value) {
         return value.trim().replace(' ', '_').replace('-', '_')
                 .toUpperCase(Locale.ROOT);
@@ -508,6 +1022,39 @@ public class GameEngine implements ActionExecutor {
 
     private String blankToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
+    }
+
+    private record PropertyCardLocation(Card card, PropertySet row) {
+    }
+
+    private record PropertyPaymentCard(Card card, PropertySet sourceRow) {
+    }
+
+    private record DebtPaymentSelection(
+            List<Card> bankCards,
+            List<PropertyPaymentCard> propertyCards,
+            int totalValueM) {
+    }
+
+    private record PropertyPlacement(PropertyColor anchorColor, Optional<PropertyColor> wildChoice) {
+    }
+
+    private enum TradeCardKind {
+        MONEY,
+        PROPERTY
+    }
+
+    private record TradeCardSelection(Card card, TradeCardKind kind, PropertySet sourceRow) {
     }
 
     private enum PlayMode {
