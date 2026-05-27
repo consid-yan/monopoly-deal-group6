@@ -12,7 +12,8 @@ public final class ActiveGameState {
     private final Deck drawPile;
     private final List<Card> discardPile = new ArrayList<>();
     private final TurnManager turnManager;
-    // TODO(engine-state): Add PendingDebt, PendingTrade, and reconnect/disconnect state for full gameplay.
+    private final List<PendingDebt> pendingDebts = new ArrayList<>();
+    private final List<PendingTrade> pendingTrades = new ArrayList<>();
     private String winnerPlayerId;
 
     public ActiveGameState(Deck drawPile, TurnManager turnManager) {
@@ -48,5 +49,96 @@ public final class ActiveGameState {
 
     void setWinnerPlayerId(String winnerPlayerId) {
         this.winnerPlayerId = Objects.requireNonNull(winnerPlayerId, "winnerPlayerId");
+    }
+
+    public void addPendingDebt(PendingDebt debt) {
+        pendingDebts.add(Objects.requireNonNull(debt, "debt"));
+    }
+
+    public void removePendingDebt(PendingDebt debt) {
+        pendingDebts.remove(debt);
+    }
+
+    public List<PendingDebt> pendingDebtsView() {
+        return List.copyOf(pendingDebts);
+    }
+
+    public Optional<PendingDebt> findPendingDebt(String debtId) {
+        if (debtId == null || debtId.isBlank()) {
+            return Optional.empty();
+        }
+        return pendingDebts.stream()
+                .filter(debt -> debt.debtId().equals(debtId))
+                .findFirst();
+    }
+
+    public List<PendingDebt> pendingDebtsForDebtor(String debtorPlayerId) {
+        return pendingDebts.stream()
+                .filter(debt -> debt.isPending() && debt.debtorPlayerId().equals(debtorPlayerId))
+                .toList();
+    }
+
+    public List<PendingDebt> pendingDebtsForCreditor(String creditorPlayerId) {
+        return pendingDebts.stream()
+                .filter(debt -> debt.isPending() && debt.creditorPlayerId().equals(creditorPlayerId))
+                .toList();
+    }
+
+    public boolean hasPendingDebtForPlayer(String playerId) {
+        return pendingDebts.stream()
+                .anyMatch(debt -> debt.isPending() && debt.debtorPlayerId().equals(playerId));
+    }
+
+    public void clearAllDebtsForPlayer(String playerId) {
+        pendingDebts.removeIf(debt -> debt.debtorPlayerId().equals(playerId)
+                || debt.creditorPlayerId().equals(playerId));
+    }
+
+    public void addPendingTrade(PendingTrade trade) {
+        pendingTrades.add(Objects.requireNonNull(trade, "trade"));
+    }
+
+    public void removePendingTrade(PendingTrade trade) {
+        pendingTrades.remove(trade);
+    }
+
+    public List<PendingTrade> pendingTradesView() {
+        return List.copyOf(pendingTrades);
+    }
+
+    public Optional<PendingTrade> findPendingTrade(String tradeId) {
+        if (tradeId == null || tradeId.isBlank()) {
+            return Optional.empty();
+        }
+        return pendingTrades.stream()
+                .filter(trade -> trade.tradeId().equals(tradeId))
+                .findFirst();
+    }
+
+    public List<PendingTrade> pendingTradesForProposer(String proposerPlayerId) {
+        return pendingTrades.stream()
+                .filter(trade -> trade.isPending() && trade.proposerPlayerId().equals(proposerPlayerId))
+                .toList();
+    }
+
+    public List<PendingTrade> pendingTradesForTarget(String targetPlayerId) {
+        return pendingTrades.stream()
+                .filter(trade -> trade.isPending() && trade.targetPlayerId().equals(targetPlayerId))
+                .toList();
+    }
+
+    public List<PendingTrade> pendingTradesInvolving(String playerId) {
+        return pendingTrades.stream()
+                .filter(trade -> trade.isPending() && trade.involvesPlayer(playerId))
+                .toList();
+    }
+
+    public boolean hasPendingTradeInvolving(String playerId) {
+        return pendingTrades.stream()
+                .anyMatch(trade -> trade.isPending() && trade.involvesPlayer(playerId));
+    }
+
+    public void clearAllTradesForPlayer(String playerId) {
+        pendingTrades.removeIf(trade -> trade.involvesPlayer(playerId));
     }
 }
