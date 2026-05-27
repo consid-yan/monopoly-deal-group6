@@ -100,6 +100,9 @@ public final class GameSession {
     }
 
     public void finish(String winnerPlayerId) {
+        if (status == SessionStatus.FINISHED) {
+            return;
+        }
         if (activeGame == null) {
             throw new IllegalStateException("active game is not initialized");
         }

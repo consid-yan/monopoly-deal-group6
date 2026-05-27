@@ -2,22 +2,23 @@ package ie.ucd.bdic.group6.app;
 
 import ie.ucd.bdic.group6.controller.GameController;
 import ie.ucd.bdic.group6.controller.mapper.RequestMapper;
-import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.core.engine.GameEngine;
 import ie.ucd.bdic.group6.facade.GameFacade;
 
 public class AppConfig {
-    private final ActionExecutor gameEngine = new GameEngine();
+    private final GameEngine gameEngine = new GameEngine();
+    private final GameFacade gameFacade = new GameFacade(gameEngine);
+    private final RequestMapper requestMapper = new RequestMapper();
 
     public GameFacade gameFacade() {
-        return new GameFacade(gameEngine);
+        return gameFacade;
     }
 
     public RequestMapper requestMapper() {
-        return new RequestMapper();
+        return requestMapper;
     }
 
     public GameController gameController() {
-        return new GameController(gameFacade(), requestMapper());
+        return new GameController(gameFacade, requestMapper);
     }
 }

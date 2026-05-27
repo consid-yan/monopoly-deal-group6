@@ -87,17 +87,6 @@ public final class Deck {
         }
     }
 
-    /**
-     * Inserts a batch so that {@code bottomFirst.get(0)} ends up deepest and the last element sits closest
-     * to the current draw top among the inserted batch.
-     */
-    public void addAllToBottomInOrderBottomFirst(List<Card> bottomFirst) {
-        Objects.requireNonNull(bottomFirst, "bottomFirst");
-        for (int i = bottomFirst.size() - 1; i >= 0; i--) {
-            discardToBottom(bottomFirst.get(i));
-        }
-    }
-
     public void shuffle(Random random) {
         List<Card> tmp = new ArrayList<>(cards);
         Collections.shuffle(tmp, random);

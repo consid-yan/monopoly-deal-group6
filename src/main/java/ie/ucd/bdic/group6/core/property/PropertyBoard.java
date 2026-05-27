@@ -43,6 +43,11 @@ public final class PropertyBoard {
     }
 
     public PropertySet startNewRow(PropertyColor anchorColor) {
+        for (PropertySet existing : rows) {
+            if (existing.anchorColor() == anchorColor && !existing.isComplete()) {
+                return existing;
+            }
+        }
         PropertySet row = new PropertySet(anchorColor);
         rows.add(row);
         fireChanged();

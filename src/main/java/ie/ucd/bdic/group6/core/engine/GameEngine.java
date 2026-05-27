@@ -17,7 +17,6 @@ import ie.ucd.bdic.group6.core.rules.WinRule;
 import ie.ucd.bdic.group6.exception.GameException;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 public class GameEngine implements ActionExecutor {
@@ -25,8 +24,8 @@ public class GameEngine implements ActionExecutor {
     private static final int INITIAL_HAND_SIZE = 5;
     private static final int NORMAL_TURN_DRAW = 2;
 
-    private final Map<String, GameSession> sessionsById = new ConcurrentHashMap<>();
-    private final Map<String, GameSession> sessionsByCode = new ConcurrentHashMap<>();
+    private final Map<String, GameSession> sessionsById = new HashMap<>();
+    private final Map<String, GameSession> sessionsByCode = new HashMap<>();
     private final Supplier<Deck> deckSupplier;
     private final ActionRule actionRule = new ActionRule();
     private final WinRule winRule = new WinRule();
@@ -86,7 +85,7 @@ public class GameEngine implements ActionExecutor {
 
         Deck deck = deckSupplier.get();
         for (String joinedPlayerId : session.playerJoinOrder()) {
-            drawCards(requirePlayer(session, joinedPlayerId), deck, INITIAL_HAND_SIZE);
+            drawCardsFromDeck(requirePlayer(session, joinedPlayerId), deck, INITIAL_HAND_SIZE);
         }
         ActiveGameState activeGame = new ActiveGameState(deck, new TurnManager(session.playerJoinOrder()));
         session.start(activeGame);
@@ -114,7 +113,7 @@ public class GameEngine implements ActionExecutor {
         }
 
         turnManager.recordAction();
-        checkWin(session, player);
+        checkWin(session, player, activeGame.turnManager());
         return snapshot(session, playerId);
     }
 
@@ -217,7 +216,8 @@ public class GameEngine implements ActionExecutor {
         actionRule.requireActivePlayer(activeGame.turnManager(), playerId);
 
         Player player = requirePlayer(session, playerId);
-        discardHandDownToSeven(player, readStringList(command.payload().get("discardedCardIds")), activeGame);
+        List<String> cardIds = command.getDiscardedCardIds();
+        discardHandDownToSeven(player, cardIds != null ? cardIds : List.of(), activeGame);
         return snapshot(session, playerId);
     }
 
@@ -243,6 +243,7 @@ public class GameEngine implements ActionExecutor {
     public synchronized Map<String, Object> executeRejoinSession(RejoinSessionCommand command) {
         // TODO(engine-rejoin): Replace snapshot lookup with identity validation, timers, skip-turn, and forfeit.
         String sessionIdentity = requireText(command.getSessionIdentity(), "sessionIdentity");
+        String playerId = requireText(command.getPlayerId(), "playerId");
         GameSession session = sessionsById.get(sessionIdentity);
         if (session == null) {
             session = sessionsByCode.get(sessionIdentity);
@@ -250,7 +251,8 @@ public class GameEngine implements ActionExecutor {
         if (session == null) {
             throw new GameException("SESSION_NOT_FOUND", "No session exists for the given identity");
         }
-        return snapshot(session, command.getPlayerId());
+        requirePlayer(session, playerId);
+        return snapshot(session, playerId);
     }
 
     private PendingDebt resolvePendingDebt(ActiveGameState activeGame, PayDebtCommand command) {
@@ -832,17 +834,27 @@ public class GameEngine implements ActionExecutor {
         ActiveGameState activeGame = requireActiveGame(session);
         Player player = requirePlayer(session, playerId);
         int drawCount = player.hand().size() == 0 ? INITIAL_HAND_SIZE : NORMAL_TURN_DRAW;
-        drawCards(player, activeGame.drawPile(), drawCount);
+        drawCards(player, activeGame, drawCount);
     }
 
-    private void drawCards(Player player, Deck deck, int count) {
+    private void drawCardsFromDeck(Player player, Deck deck, int count) {
         for (int i = 0; i < count; i++) {
             deck.tryDraw().ifPresent(player::addToHand);
         }
     }
 
-    private void checkWin(GameSession session, Player player) {
-        if (winRule.hasWon(player, true)) {
+    private void drawCards(Player player, ActiveGameState activeGame, int count) {
+        Deck deck = activeGame.drawPile();
+        for (int i = 0; i < count; i++) {
+            if (deck.isEmpty()) {
+                activeGame.reshuffleDiscardIntoDraw();
+            }
+            deck.tryDraw().ifPresent(player::addToHand);
+        }
+    }
+
+    private void checkWin(GameSession session, Player player, TurnManager turnManager) {
+        if (winRule.hasWon(player, turnManager.isActivePlayer(player.id()))) {
             session.finish(player.id());
         }
     }

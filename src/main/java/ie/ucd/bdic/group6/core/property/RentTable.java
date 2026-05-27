@@ -29,14 +29,14 @@ public final class RentTable {
             case PINK -> n == 1 ? 1 : (n == 2 ? 2 : 4);
             case ORANGE -> n == 1 ? 1 : (n == 2 ? 3 : 5);
             case RED -> n == 1 ? 2 : (n == 2 ? 3 : 6);
-            case YELLOW -> n == 1 ? 2 : (n == 2 ? 4 : 7);
-            case GREEN -> n == 1 ? 3 : (n == 2 ? 5 : 8);
+            case YELLOW -> n == 1 ? 2 : (n == 2 ? 4 : 6);
+            case GREEN -> n == 1 ? 2 : (n == 2 ? 4 : 7);
             case DARK_BLUE -> n == 1 ? 3 : 8;
             case RAILROAD -> switch (n) {
                 case 1 -> 1;
                 case 2 -> 2;
                 case 3 -> 3;
-                default -> 7;
+                default -> 4;
             };
             case UTILITY -> n == 1 ? 1 : 2;
         };
@@ -49,6 +49,9 @@ public final class RentTable {
     public static int completeSetRent(PropertyColor color, boolean house, boolean hotel) {
         if (PropertyColor.isRailOrUtility(color)) {
             return baseRent(color, PropertyColor.fullSetSize(color));
+        }
+        if (hotel && !house) {
+            throw new IllegalArgumentException("hotel requires house for " + color);
         }
         if (hotel) {
             return HOTEL_RENT.get(color);
