@@ -1367,10 +1367,7 @@ public class GameEngine implements ActionExecutor {
         // This guarantees new action types (Sly Deal, Force Deal, etc.) cannot forget to check for victory.
         session.activeGame().ifPresent(ag -> {
             if (session.status() == SessionStatus.ACTIVE) {
-                Player activePlayer = session.findPlayer(ag.turnManager().activePlayerId()).orElse(null);
-                if (activePlayer != null) {
-                    checkWin(session, activePlayer, ag.turnManager());
-                }
+                session.findPlayer(ag.turnManager().activePlayerId()).ifPresent(activePlayer -> checkWin(session, activePlayer, ag.turnManager()));
             }
         });
 
@@ -1379,6 +1376,8 @@ public class GameEngine implements ActionExecutor {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("sessionId", session.sessionId());
         data.put("sessionCode", session.sessionCode());
+        data.put("hostPlayerId", session.hostPlayerId());
+        data.put("maxPlayers", session.maxPlayers());
         data.put("status", session.status().name());
         data.put("activePlayerId", activeGame.map(game -> game.turnManager().activePlayerId()).orElse(""));
         data.put("actionsUsed", activeGame.map(game -> game.turnManager().actionsUsed()).orElse(0));

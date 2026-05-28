@@ -1,40 +1,18 @@
 package ie.ucd.bdic.group6.ui;
 
-import ie.ucd.bdic.group6.core.card.ActionCard;
-import ie.ucd.bdic.group6.core.card.ActionType;
-import ie.ucd.bdic.group6.core.card.Card;
-import ie.ucd.bdic.group6.core.card.CardType;
-import ie.ucd.bdic.group6.core.card.MoneyCard;
-import ie.ucd.bdic.group6.core.card.PropertyCard;
-import ie.ucd.bdic.group6.core.card.PropertyWildCard;
-import ie.ucd.bdic.group6.core.card.StandardDeckFactory;
-import ie.ucd.bdic.group6.core.property.PropertyColor;
+import ie.ucd.bdic.group6.command.CommandType;
+
 import java.util.*;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
+import java.util.function.Function;
 import javafx.application.Platform;
-import javafx.fxml.FXML;
+import javafx.collections.FXCollections;
 import javafx.geometry.Pos;
+import javafx.scene.control.*;
+import javafx.fxml.FXML;
 import javafx.scene.Node;
-import javafx.scene.SnapshotParameters;
-import javafx.scene.control.Label;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
-import javafx.scene.input.ClipboardContent;
-import javafx.scene.input.DataFormat;
-import javafx.scene.input.Dragboard;
-import javafx.scene.input.TransferMode;
-import javafx.scene.layout.FlowPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Pane;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 
 public class GameUI {
-
-    private static final DataFormat CARD_ID_FORMAT = new DataFormat("application/x-monopoly-deal-card-id");
     private static final double CARD_WIDTH = 94;
     private static final double CARD_HEIGHT = 128;
     private static final double COMPACT_CARD_WIDTH = 64;
@@ -45,203 +23,224 @@ public class GameUI {
     private static final double HAND_MAX_STEP = 52;
     private static final double HAND_HOVER_SPREAD = 30;
 
+    private final UiSessionContext context;
+    private final Map<String, Node> cardNodes = new LinkedHashMap<>();
+    private final List<String> handCardIds = new ArrayList<>();
+    private UiSnapshot snapshot = UiSnapshot.empty();
+    private String selectedCardId;
+
     @FXML
     private TextField activePlayerField;
-
     @FXML
     private TextField turnStatusField;
-
     @FXML
     private TextField identityField;
-
     @FXML
     private TextField connectionField;
-
     @FXML
     private TextField targetPlayerField;
-
+    @FXML
+    private Label drawPileLabel;
+    @FXML
+    private HBox opponentsRow;
     @FXML
     private Pane handPane;
-
     @FXML
     private FlowPane bankZone;
-
     @FXML
     private FlowPane actionZone;
-
     @FXML
     private FlowPane paymentZone;
-
     @FXML
     private FlowPane tradeOfferZone;
-
     @FXML
     private FlowPane tradeRequestZone;
-
     @FXML
     private FlowPane discardZone;
-
     @FXML
     private FlowPane brownPropertyZone;
-
     @FXML
     private FlowPane lightBluePropertyZone;
-
     @FXML
     private FlowPane pinkPropertyZone;
-
     @FXML
     private FlowPane orangePropertyZone;
-
     @FXML
     private FlowPane redPropertyZone;
-
     @FXML
     private FlowPane yellowPropertyZone;
-
     @FXML
     private FlowPane greenPropertyZone;
-
     @FXML
     private FlowPane darkBluePropertyZone;
-
     @FXML
     private FlowPane railroadPropertyZone;
-
     @FXML
     private FlowPane utilityPropertyZone;
-
-    @FXML
-    private HBox alexHandBacks;
-
-    @FXML
-    private FlowPane alexBankZone;
-
-    @FXML
-    private FlowPane alexPropertyZone;
-
-    @FXML
-    private HBox morganHandBacks;
-
-    @FXML
-    private FlowPane morganBankZone;
-
-    @FXML
-    private FlowPane morganPropertyZone;
-
-    @FXML
-    private HBox rileyHandBacks;
-
-    @FXML
-    private FlowPane rileyBankZone;
-
-    @FXML
-    private FlowPane rileyPropertyZone;
-
     @FXML
     private TextArea gameLogArea;
-
     @FXML
     private TextArea feedbackArea;
 
-    private final Map<String, Card> cardsById = new LinkedHashMap<>();
-    private final Map<String, Node> cardNodes = new HashMap<>();
-    private final List<String> handCardIds = new ArrayList<>();
-    private final List<DropZone> dropZones = new ArrayList<>();
-    private final Map<FlowPane, DropZone> zonesByPane = new IdentityHashMap<>();
-    private final Map<PropertyColor, DropZone> propertyZones = new EnumMap<>(PropertyColor.class);
-
-    private String selectedCardId;
-    private DragOrigin activeDragOrigin;
+    public GameUI(UiSessionContext context) {
+        this.context = context;
+    }
 
     @FXML
     private void initialize() {
-        activePlayerField.setText("You");
-        turnStatusField.setText("Action 1 of 3");
-        identityField.setText("Jordan");
-        connectionField.setText("Connected");
-        targetPlayerField.setText("Riley");
-
-        registerDropZones();
-        handPane.widthProperty().addListener((observable, oldValue, newValue) -> layoutHand(null));
-        seedPrototypeTable();
+        targetPlayerField.clear();
+        targetPlayerField.setPromptText("Target player id");
+        handPane.widthProperty().addListener((_, _, _) -> layoutHand(null));
+        context.setSnapshotListener(this::render);
+        context.setMessageListener(this::showFeedback);
+        render(context.latestSnapshot());
         Platform.runLater(() -> layoutHand(null));
-
-        gameLogArea.setText("Prototype table ready.\nYour private hand is stacked at the bottom.");
-        feedbackArea.setText("Hover your hand to peek. Drag cards from hand to valid public table zones.");
     }
 
     @FXML
     private void playSelectedCard() {
-        String cardId = selectedOrFirstCardId();
-        if (cardId == null) {
-            feedbackArea.setText("No card is available to play.");
+        UiSnapshot.CardView card = selectedHandCard().orElse(null);
+        if (card == null) {
+            showFeedback("Select a card from your hand first.");
             return;
         }
 
-        Card card = cardsById.get(cardId);
-        DropZone targetZone = defaultPlayZone(card);
-        if (targetZone == null) {
-            feedbackArea.setText(displayName(card) + " has no prototype play zone.");
+        Map<String, Object> payload = basePayload();
+        payload.put("cardId", card.id());
+
+        if ("MONEY".equals(card.type())) {
+            payload.put("playMode", "BANK");
+            submit(CommandType.PLAY_CARD, payload, "Played " + card.title() + " to your bank.");
             return;
         }
 
-        moveCard(cardId, targetZone, "Played");
+        if (card.isPropertyLike()) {
+            payload.put("playMode", "PROPERTY");
+            if ("PROPERTY_WILD".equals(card.type())) {
+                Optional<String> color = chooseOne("Property Color", card.allowedColors(), UiSnapshot::humanize);
+                if (color.isEmpty()) {
+                    return;
+                }
+                payload.put("propertyColor", color.get());
+            }
+            submit(CommandType.PLAY_CARD, payload, "Played " + card.title() + ".");
+            return;
+        }
+
+        if ("ACTION".equals(card.type())) {
+            playActionCard(card, payload);
+        }
     }
 
     @FXML
     private void discardSelectedCard() {
-        String cardId = selectedOrFirstCardId();
-        if (cardId == null) {
-            feedbackArea.setText("No card is available to discard.");
+        int cardsToDiscard = snapshot.currentPlayerHand().size() - 7;
+        if (cardsToDiscard <= 0) {
+            showFeedback("Discarding is only required when your hand has more than 7 cards.");
             return;
         }
 
-        moveCard(cardId, zonesByPane.get(discardZone), "Discarded");
+        List<String> cardIds;
+        if (selectedCardId != null && cardsToDiscard == 1) {
+            cardIds = List.of(selectedCardId);
+        } else {
+            List<UiSnapshot.CardView> selected = chooseCards(
+                    "Discard Cards",
+                    snapshot.currentPlayerHand(),
+                    cardsToDiscard);
+            if (selected.isEmpty()) {
+                return;
+            }
+            cardIds = selected.stream().map(UiSnapshot.CardView::id).toList();
+        }
+
+        Map<String, Object> payload = basePayload();
+        payload.put("discardedCardIds", cardIds);
+        submit(CommandType.DISCARD_CARDS, payload, "Discarded selected cards.");
     }
 
     @FXML
     private void endTurn() {
-        activePlayerField.setText("Alex");
-        turnStatusField.setText("Waiting for next turn");
-        appendLog("Turn ended. Waiting for Alex.");
-        feedbackArea.setText("Prototype mode: only your own hand shows faces; opponents keep hidden card backs.");
+        submit(CommandType.END_TURN, basePayload(), "Ended your turn.");
     }
 
     @FXML
     private void payDebt() {
-        String payment = summarizeZone(paymentZone);
-        if (payment.isBlank()) {
-            feedbackArea.setText("Drop money, property, or wild cards into Payment first.");
+        List<UiSnapshot.PendingDebtView> debts = snapshot.pendingDebts().stream()
+                .filter(debt -> debt.debtorPlayerId().equals(context.playerId()))
+                .toList();
+        if (debts.isEmpty()) {
+            showFeedback("You do not have a pending debt to pay.");
             return;
         }
-        appendLog("Paid debt using " + payment + ".");
-        feedbackArea.setText("Payment accepted in UI prototype mode.");
+        Optional<UiSnapshot.PendingDebtView> debt = chooseOne("Pay Debt", debts,
+                value -> snapshot.playerName(value.creditorPlayerId()) + " - $" + value.amountM() + "M");
+        if (debt.isEmpty()) {
+            return;
+        }
+        List<UiSnapshot.CardView> paymentOptions = snapshot.currentPlayer(context.playerId())
+                .map(UiSnapshot.PlayerView::visibleCards)
+                .orElse(List.of());
+        List<UiSnapshot.CardView> selected = chooseCards("Select Payment Cards", paymentOptions, 1);
+        if (selected.isEmpty()) {
+            return;
+        }
+
+        Map<String, Object> payload = basePayload();
+        payload.put("debtId", debt.get().debtId());
+        payload.put("paymentCardIds", selected.stream().map(UiSnapshot.CardView::id).toList());
+        submit(CommandType.PAY_DEBT, payload, "Submitted payment.");
     }
 
     @FXML
     private void proposeTrade() {
-        String offered = summarizeZone(tradeOfferZone);
-        String requested = summarizeZone(tradeRequestZone);
-        if (offered.isBlank() || requested.isBlank()) {
-            feedbackArea.setText("Trade prototype needs cards in both Trade Offer and Trade Request.");
+        List<UiSnapshot.PlayerView> targets = snapshot.opponents(context.playerId()).stream()
+                .filter(player -> !player.defeated())
+                .toList();
+        Optional<UiSnapshot.PlayerView> target = chooseOne("Trade Target", targets, UiSnapshot.PlayerView::displayName);
+        if (target.isEmpty()) {
+            return;
+        }
+        List<UiSnapshot.CardView> ownCards = snapshot.currentPlayer(context.playerId())
+                .map(UiSnapshot.PlayerView::visibleCards)
+                .orElse(List.of());
+        Optional<UiSnapshot.CardView> offered = chooseOne("Offer Card", ownCards, this::cardChoiceLabel);
+        if (offered.isEmpty()) {
+            return;
+        }
+        Optional<UiSnapshot.CardView> requested = chooseOne(
+                "Request Card",
+                target.get().visibleCards(),
+                this::cardChoiceLabel);
+        if (requested.isEmpty()) {
             return;
         }
 
-        appendLog("Proposed trade with " + targetPlayerField.getText() + ": " + offered + " for " + requested + ".");
-        feedbackArea.setText("Trade request staged in prototype mode.");
+        Map<String, Object> payload = basePayload();
+        payload.put("targetPlayerId", target.get().playerId());
+        payload.put("offeredCardIds", List.of(offered.get().id()));
+        payload.put("requestedCardIds", List.of(requested.get().id()));
+        submit(CommandType.PROPOSE_TRADE, payload, "Proposed trade to " + target.get().displayName() + ".");
     }
 
     @FXML
     private void acceptTrade() {
-        appendLog("Accepted the pending trade.");
-        feedbackArea.setText("Trade completed in prototype mode. Move public cards manually to reflect the result.");
+        respondToTrade(true);
     }
 
     @FXML
     private void rejectTrade() {
-        appendLog("Rejected the pending trade.");
-        feedbackArea.setText("Trade rejected. Drag public cards back from trade zones if needed.");
+        respondToTrade(false);
+    }
+
+    @FXML
+    private void acceptAction() {
+        respondToAction(true);
+    }
+
+    @FXML
+    private void rejectAction() {
+        respondToAction(false);
     }
 
     @FXML
@@ -254,156 +253,446 @@ public class GameUI {
         SceneManager.showHowToPlay();
     }
 
-    @FXML
-    private void finishDemo() {
-        SceneManager.showResult();
-    }
-
-    private void registerDropZones() {
-        dropZones.clear();
-        zonesByPane.clear();
-        propertyZones.clear();
-
-        register(bankZone, ZoneKind.BANK, "Your Bank", null, true);
-        register(actionZone, ZoneKind.ACTION, "Action Cards", null, false);
-        register(paymentZone, ZoneKind.PAYMENT, "Payment", null, true);
-        register(tradeOfferZone, ZoneKind.TRADE, "Trade Offer", null, true);
-        register(tradeRequestZone, ZoneKind.TRADE, "Trade Request", null, true);
-        register(discardZone, ZoneKind.DISCARD, "Discard Pile", null, false);
-
-        register(brownPropertyZone, ZoneKind.PROPERTY_COLOR, "Brown Set", PropertyColor.BROWN, false);
-        register(lightBluePropertyZone, ZoneKind.PROPERTY_COLOR, "Light Blue Set", PropertyColor.LIGHT_BLUE, false);
-        register(pinkPropertyZone, ZoneKind.PROPERTY_COLOR, "Pink Set", PropertyColor.PINK, false);
-        register(orangePropertyZone, ZoneKind.PROPERTY_COLOR, "Orange Set", PropertyColor.ORANGE, false);
-        register(redPropertyZone, ZoneKind.PROPERTY_COLOR, "Red Set", PropertyColor.RED, false);
-        register(yellowPropertyZone, ZoneKind.PROPERTY_COLOR, "Yellow Set", PropertyColor.YELLOW, false);
-        register(greenPropertyZone, ZoneKind.PROPERTY_COLOR, "Green Set", PropertyColor.GREEN, false);
-        register(darkBluePropertyZone, ZoneKind.PROPERTY_COLOR, "Dark Blue Set", PropertyColor.DARK_BLUE, false);
-        register(railroadPropertyZone, ZoneKind.PROPERTY_COLOR, "Railroad Set", PropertyColor.RAILROAD, false);
-        register(utilityPropertyZone, ZoneKind.PROPERTY_COLOR, "Utility Set", PropertyColor.UTILITY, false);
-
-        register(alexBankZone, ZoneKind.PUBLIC_BANK, "Alex Bank", null, true);
-        register(alexPropertyZone, ZoneKind.PUBLIC_PROPERTY, "Alex Properties", null, true);
-        register(morganBankZone, ZoneKind.PUBLIC_BANK, "Morgan Bank", null, true);
-        register(morganPropertyZone, ZoneKind.PUBLIC_PROPERTY, "Morgan Properties", null, true);
-        register(rileyBankZone, ZoneKind.PUBLIC_BANK, "Riley Bank", null, true);
-        register(rileyPropertyZone, ZoneKind.PUBLIC_PROPERTY, "Riley Properties", null, true);
-    }
-
-    private void register(FlowPane pane, ZoneKind kind, String label, PropertyColor color, boolean compact) {
-        DropZone zone = new DropZone(pane, kind, label, color, compact);
-        dropZones.add(zone);
-        zonesByPane.put(pane, zone);
-        if (color != null) {
-            propertyZones.put(color, zone);
+    private void render(UiSnapshot nextSnapshot) {
+        if (nextSnapshot == null || nextSnapshot.isEmpty()) {
+            clearTable();
+            showFeedback("Connect to a session from the main menu.");
+            return;
         }
-        configureDropZone(zone);
-    }
+        if ("LOBBY".equals(nextSnapshot.status())) {
+            SceneManager.showLobby();
+            return;
+        }
+        if ("FINISHED".equals(nextSnapshot.status())) {
+            SceneManager.showResult();
+            return;
+        }
 
-    private void configureDropZone(DropZone zone) {
-        zone.pane.setOnDragOver(event -> {
-            String cardId = draggedCardId(event.getDragboard());
-            if (canAccept(zone, cardsById.get(cardId))) {
-                event.acceptTransferModes(TransferMode.MOVE);
-            }
-            event.consume();
-        });
-
-        zone.pane.setOnDragEntered(event -> {
-            String cardId = draggedCardId(event.getDragboard());
-            Card card = cardsById.get(cardId);
-            if (card != null) {
-                boolean accepted = canAccept(zone, card);
-                toggleStyle(zone.pane, "drop-zone-valid", accepted);
-                toggleStyle(zone.pane, "drop-zone-invalid", !accepted);
-            }
-            event.consume();
-        });
-
-        zone.pane.setOnDragExited(event -> {
-            clearDropHighlight(zone.pane);
-            event.consume();
-        });
-
-        zone.pane.setOnDragDropped(event -> {
-            String cardId = draggedCardId(event.getDragboard());
-            Card card = cardsById.get(cardId);
-            boolean accepted = canAccept(zone, card);
-            if (accepted) {
-                moveCard(cardId, zone, "Moved");
-            } else if (card != null) {
-                returnToOrigin(activeDragOrigin);
-                feedbackArea.setText(displayName(card) + " cannot be placed in " + zone.label + ".");
-            }
-            clearAllDropHighlights();
-            event.setDropCompleted(accepted);
-            event.consume();
-        });
-    }
-
-    private void seedPrototypeTable() {
-        dropZones.forEach(zone -> zone.pane.getChildren().clear());
-        handPane.getChildren().clear();
-        cardsById.clear();
+        snapshot = nextSnapshot;
         cardNodes.clear();
         handCardIds.clear();
+        clearTable();
 
-        List<Card> deck = StandardDeckFactory.createUnshuffledDeck();
-        Set<String> used = new HashSet<>();
+        activePlayerField.setText(snapshot.playerName(snapshot.activePlayerId()));
+        turnStatusField.setText("Actions " + snapshot.actionsUsed() + " used / "
+                + snapshot.actionsRemaining() + " remaining");
+        identityField.setText(snapshot.playerName(context.playerId()) + " (" + context.playerId() + ")");
+        connectionField.setText(context.connectionLabel());
+        drawPileLabel.setText("DRAW\n" + snapshot.deckSize());
 
-        addToHand(pick(deck, used, money(3), "3M money"));
-        addToHand(pick(deck, used, money(5), "5M money"));
-        addToHand(pick(deck, used, property(PropertyColor.RED), "red property"));
-        addToHand(pick(deck, used, property(PropertyColor.DARK_BLUE), "dark blue property"));
-        addToHand(pick(deck, used, wild(PropertyColor.RED, PropertyColor.YELLOW), "red/yellow wild"));
-        addToHand(pick(deck, used, action(ActionType.DEAL_BREAKER), "Deal Breaker"));
-        addToHand(pick(deck, used, action(ActionType.RENT_DARK_BLUE_OR_GREEN), "dark blue/green rent"));
-
-        placeOnTable(pick(deck, used, money(1), "1M money"), zonesByPane.get(bankZone));
-        placeOnTable(pick(deck, used, money(2), "2M money"), zonesByPane.get(bankZone));
-        placeOnTable(pick(deck, used, action(ActionType.PASS_GO), "Pass Go"), zonesByPane.get(bankZone));
-
-        placeOnTable(pick(deck, used, property(PropertyColor.BROWN), "brown property"), propertyZones.get(PropertyColor.BROWN));
-        placeOnTable(pick(deck, used, property(PropertyColor.LIGHT_BLUE), "light blue property"), propertyZones.get(PropertyColor.LIGHT_BLUE));
-        placeOnTable(pick(deck, used, property(PropertyColor.GREEN), "green property"), propertyZones.get(PropertyColor.GREEN));
-
-        placeOnTable(pick(deck, used, action(ActionType.JUST_SAY_NO), "Just Say No"), zonesByPane.get(discardZone));
-        placeOnTable(pick(deck, used, money(4), "4M money"), zonesByPane.get(paymentZone));
-        placeOnTable(pick(deck, used, property(PropertyColor.PINK), "pink property"), zonesByPane.get(tradeOfferZone));
-        placeOnTable(pick(deck, used, money(10), "10M money"), zonesByPane.get(tradeRequestZone));
-
-        placeOnTable(pick(deck, used, money(5), "Alex bank card"), zonesByPane.get(alexBankZone));
-        placeOnTable(pick(deck, used, property(PropertyColor.DARK_BLUE), "Alex property"), zonesByPane.get(alexPropertyZone));
-        placeOnTable(pick(deck, used, money(2), "Morgan bank card"), zonesByPane.get(morganBankZone));
-        placeOnTable(pick(deck, used, property(PropertyColor.RAILROAD), "Morgan property"), zonesByPane.get(morganPropertyZone));
-        placeOnTable(pick(deck, used, money(4), "Riley bank card"), zonesByPane.get(rileyBankZone));
-        placeOnTable(pick(deck, used, property(PropertyColor.YELLOW), "Riley property"), zonesByPane.get(rileyPropertyZone));
-
-        populateOpponentHandBacks(alexHandBacks, 5);
-        populateOpponentHandBacks(morganHandBacks, 4);
-        populateOpponentHandBacks(rileyHandBacks, 6);
+        renderOwnZones();
+        renderOpponents();
+        renderPendingZones();
+        renderLog();
+        preserveSelection();
         layoutHand(null);
     }
 
-    private void addToHand(Card card) {
-        cardsById.put(card.id(), card);
-        Node node = createCardNode(card);
-        cardNodes.put(card.id(), node);
-        handCardIds.add(card.id());
-        applyCardSize(node, false);
-        node.setManaged(false);
-        handPane.getChildren().add(node);
+    private void renderOwnZones() {
+        UiSnapshot.PlayerView currentPlayer = snapshot.currentPlayer(context.playerId()).orElse(null);
+        if (currentPlayer == null) {
+            return;
+        }
+        currentPlayer.bankCards().forEach(card -> bankZone.getChildren().add(createCardNode(card, true, false)));
+        renderPropertyRows(currentPlayer.propertyRows(), propertyZones(), false);
+
+        for (UiSnapshot.CardView card : snapshot.currentPlayerHand()) {
+            Node node = createCardNode(card, false, true);
+            node.setManaged(false);
+            cardNodes.put(card.id(), node);
+            handCardIds.add(card.id());
+            handPane.getChildren().add(node);
+        }
     }
 
-    private void placeOnTable(Card card, DropZone zone) {
-        cardsById.put(card.id(), card);
-        Node node = createCardNode(card);
-        cardNodes.put(card.id(), node);
-        applyCardSize(node, zone.compact);
-        zone.pane.getChildren().add(node);
+    private void renderOpponents() {
+        opponentsRow.getChildren().clear();
+        for (UiSnapshot.PlayerView opponent : snapshot.opponents(context.playerId()).stream().limit(4).toList()) {
+            opponentsRow.getChildren().add(createOpponentSeat(opponent));
+        }
     }
 
-    private Node createCardNode(Card card) {
+    private Node createOpponentSeat(UiSnapshot.PlayerView opponent) {
+        VBox seat = new VBox(7);
+        seat.setPrefWidth(230);
+        seat.getStyleClass().addAll("opponent-seat", "tabletop-panel");
+        Label heading = new Label(opponent.displayName() + " - " + opponent.playerStatus());
+        heading.getStyleClass().add("zone-heading");
+        HBox handBacks = new HBox(5);
+        handBacks.setAlignment(Pos.CENTER_LEFT);
+        handBacks.getStyleClass().add("opponent-hand-backs");
+        populateOpponentHandBacks(handBacks, opponent.handCount());
+
+        HBox zones = new HBox(7);
+        VBox bank = titledZone("Bank");
+        FlowPane bankCards = (FlowPane) bank.getChildren().get(1);
+        opponent.bankCards().forEach(card -> bankCards.getChildren().add(createCardNode(card, true, false)));
+        VBox properties = titledZone("Properties");
+        FlowPane propertyCards = (FlowPane) properties.getChildren().get(1);
+        opponent.propertyRows().forEach(row -> propertyCards.getChildren().add(createPublicRowNode(row)));
+        zones.getChildren().addAll(bank, properties);
+        seat.getChildren().addAll(heading, handBacks, zones);
+        return seat;
+    }
+
+    private VBox titledZone(String title) {
+        VBox box = new VBox(4);
+        box.setPrefWidth(105);
+        HBox.setHgrow(box, Priority.ALWAYS);
+        Label label = new Label(title);
+        label.getStyleClass().add("zone-caption");
+        FlowPane pane = new FlowPane(6, 6);
+        pane.setPrefHeight(92);
+        pane.getStyleClass().addAll("drop-zone", "compact-drop-zone");
+        box.getChildren().addAll(label, pane);
+        return box;
+    }
+
+    private Node createPublicRowNode(UiSnapshot.PropertyRowView row) {
+        VBox rowBox = new VBox(3);
+        rowBox.getStyleClass().add("property-row-chip");
+        Label label = new Label(row.label());
+        label.getStyleClass().add("zone-caption");
+        FlowPane cards = new FlowPane(4, 4);
+        row.cards().forEach(card -> cards.getChildren().add(createCardNode(card, true, false)));
+        rowBox.getChildren().addAll(label, cards);
+        Tooltip.install(rowBox, new Tooltip("Row ID: " + row.rowId()));
+        return rowBox;
+    }
+
+    private void renderPropertyRows(List<UiSnapshot.PropertyRowView> rows, Map<String, FlowPane> zones, boolean compact) {
+        for (UiSnapshot.PropertyRowView row : rows) {
+            FlowPane zone = zones.get(row.anchorColor());
+            if (zone == null) {
+                continue;
+            }
+            VBox rowBox = new VBox(4);
+            Label label = new Label(row.label());
+            label.getStyleClass().add("zone-caption");
+            FlowPane cards = new FlowPane(5, 5);
+            row.cards().forEach(card -> cards.getChildren().add(createCardNode(card, compact, false)));
+            rowBox.getChildren().addAll(label, cards);
+            Tooltip.install(rowBox, new Tooltip("Row ID: " + row.rowId()));
+            zone.getChildren().add(rowBox);
+        }
+    }
+
+    private void renderPendingZones() {
+        discardZone.getChildren().add(infoChip("Discard pile: " + snapshot.discardSize() + " cards"));
+        snapshot.pendingActions().forEach(action -> actionZone.getChildren().add(infoChip(
+                "Pending " + UiSnapshot.humanize(action.actionType())
+                        + " from " + snapshot.playerName(action.actorPlayerId()))));
+        snapshot.pendingDebts().forEach(debt -> paymentZone.getChildren().add(infoChip(
+                snapshot.playerName(debt.debtorPlayerId()) + " owes "
+                        + snapshot.playerName(debt.creditorPlayerId()) + " $" + debt.amountM() + "M")));
+        snapshot.pendingTrades().forEach(trade -> {
+            tradeOfferZone.getChildren().add(infoChip("Offer: " + cardLabels(trade.offeredCardIds())));
+            tradeRequestZone.getChildren().add(infoChip("Request: " + cardLabels(trade.requestedCardIds())));
+        });
+    }
+
+    private void renderLog() {
+        List<String> lines = new ArrayList<>();
+        lines.add("Status: " + snapshot.status());
+        lines.add("Active: " + snapshot.playerName(snapshot.activePlayerId()));
+        lines.add("Players: " + snapshot.players().size() + " / " + snapshot.maxPlayers());
+        lines.add("Pending debts: " + snapshot.pendingDebts().size());
+        lines.add("Pending trades: " + snapshot.pendingTrades().size());
+        lines.add("Pending actions: " + snapshot.pendingActions().size());
+        if (!snapshot.forfeitedPlayerIds().isEmpty()) {
+            lines.add("Forfeits: " + String.join(", ", snapshot.forfeitedPlayerIds()));
+        }
+        gameLogArea.setText(String.join("\n", lines));
+    }
+
+    private void playActionCard(UiSnapshot.CardView card, Map<String, Object> payload) {
+        if (card.bankValueM() > 0) {
+            Optional<String> mode = chooseOne("Play Action Card", List.of("ACTION", "BANK"),
+                    value -> "ACTION".equals(value) ? "Use action effect" : "Bank for $" + card.bankValueM() + "M");
+            if (mode.isEmpty()) {
+                return;
+            }
+            payload.put("playMode", mode.get());
+            if ("BANK".equals(mode.get())) {
+                submit(CommandType.PLAY_CARD, payload, "Banked " + card.title() + ".");
+                return;
+            }
+        } else {
+            payload.put("playMode", "ACTION");
+        }
+
+        if (!configureActionPayload(card, payload)) {
+            return;
+        }
+        submit(CommandType.PLAY_CARD, payload, "Played " + card.title() + ".");
+    }
+
+    private boolean configureActionPayload(UiSnapshot.CardView card, Map<String, Object> payload) {
+        return switch (card.actionType()) {
+            case "PASS_GO", "ITS_MY_BIRTHDAY" -> true;
+            case "DEBT_COLLECTOR" -> chooseTargetPlayer().map(target -> {
+                payload.put("targetPlayerId", target.playerId());
+                return true;
+            }).orElse(false);
+            case "RENT_BROWN_OR_LIGHT_BLUE", "RENT_PINK_OR_ORANGE", "RENT_RED_OR_YELLOW",
+                    "RENT_DARK_BLUE_OR_GREEN", "RENT_RAILROAD_OR_UTILITY" -> {
+                Optional<String> color = chooseRentColor(card);
+                if (color.isEmpty()) {
+                    yield false;
+                }
+                payload.put("propertyColor", color.get());
+                chooseDoubleRent(card).ifPresent(doubleRent -> payload.put("doubleRentCardId", doubleRent.id()));
+                yield true;
+            }
+            case "WILD_RENT" -> {
+                Optional<UiSnapshot.PlayerView> target = chooseTargetPlayer();
+                Optional<String> color = chooseRentColor(card);
+                if (target.isEmpty() || color.isEmpty()) {
+                    yield false;
+                }
+                payload.put("targetPlayerId", target.get().playerId());
+                payload.put("propertyColor", color.get());
+                chooseDoubleRent(card).ifPresent(doubleRent -> payload.put("doubleRentCardId", doubleRent.id()));
+                yield true;
+            }
+            case "HOUSE", "HOTEL" -> chooseOwnPropertyRow().map(row -> {
+                int index = snapshot.currentPlayer(context.playerId()).orElseThrow().propertyRows().indexOf(row);
+                payload.put("propertyRowIndex", Integer.toString(index));
+                payload.put("propertyColor", row.anchorColor());
+                return true;
+            }).orElse(false);
+            case "SLY_DEAL" -> configureSlyDeal(payload);
+            case "FORCED_DEAL" -> configureForcedDeal(payload);
+            case "DEAL_BREAKER" -> configureDealBreaker(payload);
+            case "JUST_SAY_NO" -> {
+                showFeedback("Use Just Say No when responding to a pending action.");
+                yield false;
+            }
+            case "DOUBLE_THE_RENT" -> {
+                showFeedback("Double The Rent must be paired with a rent card, or banked.");
+                yield false;
+            }
+            default -> {
+                showFeedback("Unsupported action card: " + card.actionType());
+                yield false;
+            }
+        };
+    }
+
+    private Optional<String> chooseRentColor(UiSnapshot.CardView card) {
+        List<String> colors = card.rentColorOptions().isEmpty()
+                ? snapshot.currentPlayer(context.playerId()).stream()
+                        .flatMap(player -> player.propertyRows().stream())
+                        .map(UiSnapshot.PropertyRowView::anchorColor)
+                        .distinct()
+                        .toList()
+                : card.rentColorOptions();
+        if (colors.size() == 1) {
+            return Optional.of(colors.getFirst());
+        }
+        return chooseOne("Rent Color", colors, UiSnapshot::humanize);
+    }
+
+    private Optional<UiSnapshot.CardView> chooseDoubleRent(UiSnapshot.CardView rentCard) {
+        List<UiSnapshot.CardView> doubleRentCards = snapshot.currentPlayerHand().stream()
+                .filter(card -> !card.id().equals(rentCard.id()))
+                .filter(card -> card.isAction("DOUBLE_THE_RENT"))
+                .toList();
+        if (doubleRentCards.isEmpty() || snapshot.actionsRemaining() < 2) {
+            return Optional.empty();
+        }
+        List<Choice<UiSnapshot.CardView>> choices = new ArrayList<>();
+        choices.add(new Choice<>("No Double The Rent", null));
+        doubleRentCards.forEach(card -> choices.add(new Choice<>(cardChoiceLabel(card), card)));
+        Optional<Choice<UiSnapshot.CardView>> selected = chooseChoice("Double The Rent", choices);
+        return selected.map(Choice::value);
+    }
+
+    private boolean configureSlyDeal(Map<String, Object> payload) {
+        Optional<UiSnapshot.PlayerView> target = chooseTargetPlayer();
+        if (target.isEmpty()) {
+            return false;
+        }
+        Optional<UiSnapshot.CardView> card = chooseOne("Steal Property", target.get().propertyCards(), this::cardChoiceLabel);
+        if (card.isEmpty()) {
+            return false;
+        }
+        payload.put("targetPlayerId", target.get().playerId());
+        payload.put("targetCardId", card.get().id());
+        return true;
+    }
+
+    private boolean configureForcedDeal(Map<String, Object> payload) {
+        Optional<UiSnapshot.PlayerView> target = chooseTargetPlayer();
+        if (target.isEmpty()) {
+            return false;
+        }
+        List<UiSnapshot.CardView> ownProperties = snapshot.currentPlayer(context.playerId())
+                .map(UiSnapshot.PlayerView::propertyCards)
+                .orElse(List.of());
+        Optional<UiSnapshot.CardView> offered = chooseOne("Offer Property", ownProperties, this::cardChoiceLabel);
+        Optional<UiSnapshot.CardView> requested = chooseOne("Request Property", target.get().propertyCards(), this::cardChoiceLabel);
+        if (offered.isEmpty() || requested.isEmpty()) {
+            return false;
+        }
+        payload.put("targetPlayerId", target.get().playerId());
+        payload.put("offeredCardId", offered.get().id());
+        payload.put("requestedCardId", requested.get().id());
+        return true;
+    }
+
+    private boolean configureDealBreaker(Map<String, Object> payload) {
+        Optional<UiSnapshot.PlayerView> target = chooseTargetPlayer();
+        if (target.isEmpty()) {
+            return false;
+        }
+        List<UiSnapshot.PropertyRowView> completeRows = target.get().propertyRows().stream()
+                .filter(UiSnapshot.PropertyRowView::complete)
+                .toList();
+        Optional<UiSnapshot.PropertyRowView> row = chooseOne("Steal Complete Set", completeRows,
+                value -> value.label() + " (" + value.rowId() + ")");
+        if (row.isEmpty()) {
+            return false;
+        }
+        payload.put("targetPlayerId", target.get().playerId());
+        payload.put("targetPropertyRowId", row.get().rowId());
+        return true;
+    }
+
+    private Optional<UiSnapshot.PlayerView> chooseTargetPlayer() {
+        String typedTarget = targetPlayerField.getText() == null ? "" : targetPlayerField.getText().trim();
+        if (!typedTarget.isBlank()) {
+            Optional<UiSnapshot.PlayerView> typed = snapshot.player(typedTarget);
+            if (typed.isPresent() && !typed.get().playerId().equals(context.playerId())) {
+                return typed;
+            }
+        }
+        List<UiSnapshot.PlayerView> targets = snapshot.opponents(context.playerId()).stream()
+                .filter(player -> !player.defeated())
+                .toList();
+        return chooseOne("Target Player", targets, UiSnapshot.PlayerView::displayName);
+    }
+
+    private Optional<UiSnapshot.PropertyRowView> chooseOwnPropertyRow() {
+        return chooseOne("Property Set", snapshot.currentPlayer(context.playerId())
+                        .map(UiSnapshot.PlayerView::propertyRows)
+                        .orElse(List.of()),
+                value -> value.label() + " (" + value.rowId() + ")");
+    }
+
+    private void respondToTrade(boolean accepted) {
+        List<UiSnapshot.PendingTradeView> trades = snapshot.pendingTrades().stream()
+                .filter(trade -> trade.targetPlayerId().equals(context.playerId()))
+                .filter(trade -> "PENDING".equals(trade.status()))
+                .toList();
+        Optional<UiSnapshot.PendingTradeView> trade = chooseOne("Trade Response", trades,
+                value -> snapshot.playerName(value.proposerPlayerId()));
+        if (trade.isEmpty()) {
+            showFeedback("No pending trade is waiting for your response.");
+            return;
+        }
+        Map<String, Object> payload = basePayload();
+        payload.put("tradeId", trade.get().tradeId());
+        payload.put("accepted", accepted);
+        submit(CommandType.RESPOND_TRADE, payload, accepted ? "Accepted trade." : "Rejected trade.");
+    }
+
+    private void respondToAction(boolean accepted) {
+        List<UiSnapshot.PendingActionView> actions = snapshot.pendingActions().stream()
+                .filter(action -> action.awaits(context.playerId()))
+                .toList();
+        Optional<UiSnapshot.PendingActionView> action = chooseOne("Action Response", actions,
+                value -> UiSnapshot.humanize(value.actionType()) + " from " + snapshot.playerName(value.actorPlayerId()));
+        if (action.isEmpty()) {
+            showFeedback("No pending action is waiting for your response.");
+            return;
+        }
+        Map<String, Object> payload = basePayload();
+        payload.put("actionId", action.get().actionId());
+        payload.put("accepted", accepted);
+        if (!accepted) {
+            List<UiSnapshot.CardView> justSayNoCards = snapshot.currentPlayerHand().stream()
+                    .filter(card -> card.isAction("JUST_SAY_NO"))
+                    .toList();
+            Optional<UiSnapshot.CardView> justSayNo = chooseOne("Just Say No Card", justSayNoCards, this::cardChoiceLabel);
+            if (justSayNo.isEmpty()) {
+                return;
+            }
+            payload.put("justSayNoCardId", justSayNo.get().id());
+        }
+        submit(CommandType.RESPOND_ACTION, payload, accepted ? "Accepted action." : "Played Just Say No.");
+    }
+
+    private Optional<UiSnapshot.CardView> selectedHandCard() {
+        return snapshot.currentPlayerHand().stream()
+                .filter(card -> card.id().equals(selectedCardId))
+                .findFirst();
+    }
+
+    private void submit(CommandType commandType, Map<String, Object> payload, String successMessage) {
+        context.sendCommand(commandType, payload)
+                .thenAccept(result -> {
+                    if (result.success()) {
+                        Platform.runLater(() -> showFeedback(successMessage));
+                    }
+                });
+    }
+
+    private Map<String, Object> basePayload() {
+        return new LinkedHashMap<>(context.sessionCommandPayload());
+    }
+
+    private <T> Optional<T> chooseOne(String title, List<T> values, Function<T, String> labeler) {
+        if (values == null || values.isEmpty()) {
+            showFeedback("No choices available for " + title + ".");
+            return Optional.empty();
+        }
+        return chooseChoice(title, values.stream()
+                .map(value -> new Choice<>(labeler.apply(value), value))
+                .toList())
+                .map(Choice::value);
+    }
+
+    private <T> Optional<Choice<T>> chooseChoice(String title, List<Choice<T>> choices) {
+        ChoiceDialog<Choice<T>> dialog = new ChoiceDialog<>(choices.getFirst(), choices);
+        dialog.setTitle(title);
+        dialog.setHeaderText(null);
+        dialog.setContentText(title);
+        return dialog.showAndWait();
+    }
+
+    private List<UiSnapshot.CardView> chooseCards(String title, List<UiSnapshot.CardView> options, int minimum) {
+        if (options == null || options.isEmpty()) {
+            showFeedback("No cards are available for " + title + ".");
+            return List.of();
+        }
+        Dialog<List<UiSnapshot.CardView>> dialog = new Dialog<>();
+        dialog.setTitle(title);
+        dialog.setHeaderText("Select at least " + minimum + " card(s).");
+        dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+        ListView<Choice<UiSnapshot.CardView>> listView = new ListView<>();
+        listView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        listView.setItems(FXCollections.observableArrayList(options.stream()
+                .map(card -> new Choice<>(cardChoiceLabel(card), card))
+                .toList()));
+        dialog.getDialogPane().setContent(listView);
+        dialog.setResultConverter(button -> {
+            if (button != ButtonType.OK) {
+                return List.of();
+            }
+            return listView.getSelectionModel().getSelectedItems().stream()
+                    .map(Choice::value)
+                    .toList();
+        });
+        List<UiSnapshot.CardView> selected = dialog.showAndWait().orElse(List.of());
+        if (selected.size() < minimum) {
+            showFeedback("Select at least " + minimum + " card(s).");
+            return List.of();
+        }
+        return selected;
+    }
+
+    private Node createCardNode(UiSnapshot.CardView card, boolean compact, boolean selectable) {
         VBox cardBox = new VBox(3);
         cardBox.setAlignment(Pos.TOP_CENTER);
         cardBox.setUserData(card.id());
@@ -415,7 +704,7 @@ public class GameUI {
 
         HBox header = new HBox(4);
         header.setAlignment(Pos.CENTER_LEFT);
-        Label typeLabel = new Label(typeLabel(card));
+        Label typeLabel = new Label(card.type().isBlank() ? "CARD" : card.type());
         typeLabel.getStyleClass().add("card-type-label");
         HBox.setHgrow(typeLabel, Priority.ALWAYS);
         Label valueBadge = new Label(valueBadge(card));
@@ -424,11 +713,11 @@ public class GameUI {
 
         StackPane art = new StackPane();
         art.getStyleClass().add("card-art-placeholder");
-        Label artText = new Label("AI\nART");
+        Label artText = new Label(symbolFor(card));
         artText.getStyleClass().add("card-art-text");
         art.getChildren().add(artText);
 
-        Label title = new Label(displayName(card));
+        Label title = new Label(card.title());
         title.getStyleClass().add("card-title");
         title.setWrapText(true);
 
@@ -437,135 +726,89 @@ public class GameUI {
         detail.setWrapText(true);
 
         cardBox.getChildren().addAll(colorBand, header, art, title, detail);
-        configureCardInteraction(cardBox, card);
+        applyCardSize(cardBox, compact);
+        Tooltip.install(cardBox, new Tooltip(card.title() + "\nID: " + card.id()));
+        if (selectable) {
+            cardBox.setOnMouseClicked(event -> {
+                selectCard(card.id());
+                showFeedback("Selected " + card.title() + ".");
+                event.consume();
+            });
+            cardBox.setOnMouseEntered(_ -> {
+                int index = handCardIds.indexOf(card.id());
+                if (index >= 0) {
+                    layoutHand(index);
+                }
+            });
+            cardBox.setOnMouseExited(_ -> {
+                if (handCardIds.contains(card.id())) {
+                    layoutHand(null);
+                }
+            });
+        }
         return cardBox;
     }
 
-    private void configureCardInteraction(Node cardNode, Card card) {
-        cardNode.setOnMouseClicked(event -> {
-            selectCard(card.id());
-            feedbackArea.setText("Selected " + displayName(card) + ".");
-            event.consume();
-        });
-
-        cardNode.setOnMouseEntered(event -> {
-            int handIndex = handCardIds.indexOf(card.id());
-            if (handIndex >= 0) {
-                layoutHand(handIndex);
-            }
-            event.consume();
-        });
-
-        cardNode.setOnMouseExited(event -> {
-            if (handCardIds.contains(card.id()) && activeDragOrigin == null) {
-                layoutHand(null);
-            }
-            event.consume();
-        });
-
-        cardNode.setOnDragDetected(event -> {
-            selectCard(card.id());
-            activeDragOrigin = originFor(card.id());
-            toggleStyle(cardNode, "deal-card-dragging", true);
-
-            Dragboard dragboard = cardNode.startDragAndDrop(TransferMode.MOVE);
-            ClipboardContent content = new ClipboardContent();
-            content.put(CARD_ID_FORMAT, card.id());
-            content.putString(displayName(card));
-            dragboard.setContent(content);
-            dragboard.setDragView(cardNode.snapshot(new SnapshotParameters(), null));
-            event.consume();
-        });
-
-        cardNode.setOnDragDone(event -> {
-            toggleStyle(cardNode, "deal-card-dragging", false);
-            if (event.getTransferMode() == null) {
-                returnToOrigin(activeDragOrigin);
-                if (activeDragOrigin != null) {
-                    Card originCard = cardsById.get(activeDragOrigin.cardId());
-                    feedbackArea.setText(displayName(originCard) + " returned to its original position.");
-                }
-            }
-            activeDragOrigin = null;
-            clearAllDropHighlights();
-            layoutHand(null);
-            event.consume();
-        });
+    private Node infoChip(String text) {
+        Label label = new Label(text);
+        label.setWrapText(true);
+        label.getStyleClass().add("zone-caption");
+        return label;
     }
 
-    private void moveCard(String cardId, DropZone targetZone, String verb) {
-        Node node = cardNodes.get(cardId);
-        Card card = cardsById.get(cardId);
-        if (node == null || card == null || targetZone == null) {
-            return;
+    private void clearTable() {
+        List.of(bankZone, actionZone, paymentZone, tradeOfferZone, tradeRequestZone, discardZone,
+                        brownPropertyZone, lightBluePropertyZone, pinkPropertyZone, orangePropertyZone,
+                        redPropertyZone, yellowPropertyZone, greenPropertyZone, darkBluePropertyZone,
+                        railroadPropertyZone, utilityPropertyZone)
+                .forEach(zone -> {
+                    if (zone != null) {
+                        zone.getChildren().clear();
+                    }
+                });
+        if (handPane != null) {
+            handPane.getChildren().clear();
         }
-
-        removeFromCurrentParent(cardId, node);
-        applyCardSize(node, targetZone.compact);
-        node.setManaged(true);
-        node.setLayoutX(0);
-        node.setLayoutY(0);
-        targetZone.pane.getChildren().add(node);
-        selectCard(cardId);
-        layoutHand(null);
-
-        appendLog(verb + " " + displayName(card) + " to " + targetZone.label + ".");
-        feedbackArea.setText(displayName(card) + " is now public in " + targetZone.label + ".");
-    }
-
-    private void removeFromCurrentParent(String cardId, Node node) {
-        handCardIds.remove(cardId);
-        if (node.getParent() instanceof Pane parentPane) {
-            parentPane.getChildren().remove(node);
+        if (opponentsRow != null) {
+            opponentsRow.getChildren().clear();
+        }
+        if (drawPileLabel != null) {
+            drawPileLabel.setText("DRAW\n0");
         }
     }
 
-    private DragOrigin originFor(String cardId) {
-        int handIndex = handCardIds.indexOf(cardId);
-        if (handIndex >= 0) {
-            return new DragOrigin(cardId, null, handIndex);
-        }
-
-        Node node = cardNodes.get(cardId);
-        if (node != null && node.getParent() instanceof FlowPane flowPane) {
-            return new DragOrigin(cardId, zonesByPane.get(flowPane), -1);
-        }
-        return new DragOrigin(cardId, null, -1);
+    private Map<String, FlowPane> propertyZones() {
+        Map<String, FlowPane> zones = new LinkedHashMap<>();
+        zones.put("BROWN", brownPropertyZone);
+        zones.put("LIGHT_BLUE", lightBluePropertyZone);
+        zones.put("PINK", pinkPropertyZone);
+        zones.put("ORANGE", orangePropertyZone);
+        zones.put("RED", redPropertyZone);
+        zones.put("YELLOW", yellowPropertyZone);
+        zones.put("GREEN", greenPropertyZone);
+        zones.put("DARK_BLUE", darkBluePropertyZone);
+        zones.put("RAILROAD", railroadPropertyZone);
+        zones.put("UTILITY", utilityPropertyZone);
+        return zones;
     }
 
-    private void returnToOrigin(DragOrigin origin) {
-        if (origin == null) {
+    private void selectCard(String cardId) {
+        selectedCardId = cardId;
+        cardNodes.forEach((id, node) -> toggleStyle(node, "deal-card-selected", id.equals(cardId)));
+    }
+
+    private void preserveSelection() {
+        if (selectedCardId == null || !cardNodes.containsKey(selectedCardId)) {
+            selectedCardId = null;
             return;
         }
-
-        Node node = cardNodes.get(origin.cardId());
-        if (node == null) {
-            return;
-        }
-
-        removeFromCurrentParent(origin.cardId(), node);
-        if (origin.fromHand()) {
-            int index = Math.max(0, Math.min(origin.handIndex(), handCardIds.size()));
-            handCardIds.add(index, origin.cardId());
-            applyCardSize(node, false);
-            node.setManaged(false);
-            handPane.getChildren().add(node);
-            layoutHand(null);
-            return;
-        }
-
-        if (origin.sourceZone() != null) {
-            applyCardSize(node, origin.sourceZone().compact());
-            node.setManaged(true);
-            origin.sourceZone().pane().getChildren().add(node);
-        }
+        selectCard(selectedCardId);
     }
 
     private void layoutHand(Integer hoveredIndex) {
         if (handPane == null) {
             return;
         }
-
         List<Node> orderedNodes = handCardIds.stream()
                 .map(cardNodes::get)
                 .filter(java.util.Objects::nonNull)
@@ -583,10 +826,9 @@ public class GameUI {
         if (width <= 0) {
             width = 760;
         }
-
         double availableForSteps = Math.max(0, width - CARD_WIDTH - 28);
         double step = count == 1 ? 0 : availableForSteps / (count - 1);
-        step = Math.max(HAND_MIN_STEP, Math.min(HAND_MAX_STEP, step));
+        step = Math.clamp(step, HAND_MIN_STEP, HAND_MAX_STEP);
 
         boolean hasHover = hoveredIndex != null && hoveredIndex >= 0 && hoveredIndex < count;
         double spread = hasHover ? Math.min(HAND_HOVER_SPREAD, step * 0.8) : 0;
@@ -602,7 +844,6 @@ public class GameUI {
                 x += spread;
             }
             boolean hovered = hasHover && i == hoveredIndex;
-
             node.setLayoutX(x);
             node.setLayoutY(hovered ? HAND_HOVER_Y : HAND_TOP_Y);
             node.setManaged(false);
@@ -610,7 +851,6 @@ public class GameUI {
             toggleStyle(node, "hand-card-hovered", hovered);
             node.toFront();
         }
-
         if (hasHover) {
             orderedNodes.get(hoveredIndex).toFront();
         }
@@ -624,69 +864,9 @@ public class GameUI {
             cardBack.getStyleClass().add("card-back");
             container.getChildren().add(cardBack);
         }
-
         Label countLabel = new Label(count + " cards");
         countLabel.getStyleClass().add("opponent-hand-count");
         container.getChildren().add(countLabel);
-    }
-
-    private boolean canAccept(DropZone zone, Card card) {
-        if (zone == null || card == null) {
-            return false;
-        }
-
-        return switch (zone.kind) {
-            case DISCARD -> true;
-            case BANK, PUBLIC_BANK -> card.bankValueM().isPresent();
-            case ACTION -> card.type() == CardType.ACTION;
-            case PAYMENT, TRADE -> card.type() == CardType.MONEY
-                    || card.type() == CardType.PROPERTY
-                    || card.type() == CardType.PROPERTY_WILD;
-            case PUBLIC_PROPERTY -> card.type() == CardType.PROPERTY || card.type() == CardType.PROPERTY_WILD;
-            case PROPERTY_COLOR -> acceptsPropertyColor(zone.color, card);
-        };
-    }
-
-    private boolean acceptsPropertyColor(PropertyColor color, Card card) {
-        if (card instanceof PropertyCard propertyCard) {
-            return propertyCard.color() == color;
-        }
-        if (card instanceof PropertyWildCard wildCard) {
-            return wildCard.allows(color);
-        }
-        return false;
-    }
-
-    private DropZone defaultPlayZone(Card card) {
-        if (card instanceof PropertyCard propertyCard) {
-            return propertyZones.get(propertyCard.color());
-        }
-        if (card instanceof PropertyWildCard wildCard) {
-            return propertyZones.get(wildCard.allowedColors().iterator().next());
-        }
-        if (card.type() == CardType.ACTION) {
-            return zonesByPane.get(actionZone);
-        }
-        if (card.bankValueM().isPresent()) {
-            return zonesByPane.get(bankZone);
-        }
-        return null;
-    }
-
-    private String selectedOrFirstCardId() {
-        if (selectedCardId != null && cardNodes.containsKey(selectedCardId)) {
-            return selectedCardId;
-        }
-        if (handCardIds.isEmpty()) {
-            return null;
-        }
-        selectCard(handCardIds.getFirst());
-        return handCardIds.getFirst();
-    }
-
-    private void selectCard(String cardId) {
-        selectedCardId = cardId;
-        cardNodes.forEach((id, node) -> toggleStyle(node, "deal-card-selected", id.equals(cardId)));
     }
 
     private void applyCardSize(Node node, boolean compact) {
@@ -700,23 +880,6 @@ public class GameUI {
         }
     }
 
-    private String draggedCardId(Dragboard dragboard) {
-        if (dragboard == null || !dragboard.hasContent(CARD_ID_FORMAT)) {
-            return null;
-        }
-        Object value = dragboard.getContent(CARD_ID_FORMAT);
-        return value instanceof String cardId ? cardId : null;
-    }
-
-    private void clearAllDropHighlights() {
-        dropZones.forEach(zone -> clearDropHighlight(zone.pane));
-    }
-
-    private void clearDropHighlight(Node node) {
-        toggleStyle(node, "drop-zone-valid", false);
-        toggleStyle(node, "drop-zone-invalid", false);
-    }
-
     private void toggleStyle(Node node, String styleClass, boolean enabled) {
         if (enabled) {
             if (!node.getStyleClass().contains(styleClass)) {
@@ -727,175 +890,106 @@ public class GameUI {
         node.getStyleClass().remove(styleClass);
     }
 
-    private String summarizeZone(FlowPane zone) {
-        return zone.getChildren().stream()
-                .map(Node::getUserData)
-                .filter(String.class::isInstance)
-                .map(String.class::cast)
-                .map(cardsById::get)
-                .map(this::displayName)
-                .collect(Collectors.joining(", "));
+    private String cardLabels(List<String> cardIds) {
+        return cardIds.stream()
+                .map(cardId -> snapshot.card(cardId).map(UiSnapshot.CardView::title).orElse(cardId))
+                .sorted()
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("");
     }
 
-    private Card pick(List<Card> deck, Set<String> used, Predicate<Card> predicate, String description) {
-        for (Card card : deck) {
-            if (!used.contains(card.id()) && predicate.test(card)) {
-                used.add(card.id());
-                return card;
-            }
+    private String cardChoiceLabel(UiSnapshot.CardView card) {
+        return card.title() + " (" + card.id() + ")";
+    }
+
+    private String typeStyle(UiSnapshot.CardView card) {
+        return "deal-card-" + card.type().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    private String valueBadge(UiSnapshot.CardView card) {
+        if (card.bankValueM() > 0) {
+            return "$" + card.bankValueM() + "M";
         }
-        throw new IllegalStateException("Prototype deck is missing " + description + ".");
-    }
-
-    private Predicate<Card> money(int valueM) {
-        return card -> card instanceof MoneyCard moneyCard && moneyCard.valueM() == valueM;
-    }
-
-    private Predicate<Card> property(PropertyColor color) {
-        return card -> card instanceof PropertyCard propertyCard && propertyCard.color() == color;
-    }
-
-    private Predicate<Card> wild(PropertyColor firstColor, PropertyColor secondColor) {
-        return card -> card instanceof PropertyWildCard wildCard
-                && wildCard.allowedColors().contains(firstColor)
-                && wildCard.allowedColors().contains(secondColor);
-    }
-
-    private Predicate<Card> action(ActionType actionType) {
-        return card -> card instanceof ActionCard actionCard && actionCard.actionType() == actionType;
-    }
-
-    private String displayName(Card card) {
-        if (card == null) {
-            return "Card";
+        if (card.requiredToComplete() > 0) {
+            return card.requiredToComplete() + " SET";
         }
-        if (card instanceof MoneyCard moneyCard) {
-            return "$" + moneyCard.valueM() + "M";
-        }
-        return card.displayName();
+        return "";
     }
 
-    private String cardDetail(Card card) {
-        if (card instanceof PropertyCard propertyCard) {
-            return colorLabel(propertyCard.color()) + " property set";
-        }
-        if (card instanceof PropertyWildCard wildCard) {
-            return "Wild: " + formatColors(wildCard.allowedColors());
-        }
-        if (card instanceof ActionCard actionCard) {
-            return actionCard.actionType().name().replace('_', ' ');
-        }
-        return "Money card";
-    }
-
-    private String typeLabel(Card card) {
+    private String symbolFor(UiSnapshot.CardView card) {
         return switch (card.type()) {
-            case MONEY -> "MONEY";
-            case PROPERTY -> "PROPERTY";
-            case PROPERTY_WILD -> "WILD";
-            case ACTION -> "ACTION";
+            case "MONEY" -> "$";
+            case "PROPERTY", "PROPERTY_WILD" -> "SET";
+            case "ACTION" -> "ACT";
+            default -> "";
         };
     }
 
-    private String valueBadge(Card card) {
-        OptionalInt bankValue = card.bankValueM();
-        if (bankValue.isPresent()) {
-            return "$" + bankValue.getAsInt() + "M";
+    private String cardDetail(UiSnapshot.CardView card) {
+        if ("PROPERTY".equals(card.type())) {
+            return UiSnapshot.humanize(card.propertyColor()) + " property";
         }
-        if (card instanceof PropertyCard propertyCard) {
-            return propertyCard.requiredToComplete() + " SET";
+        if ("PROPERTY_WILD".equals(card.type())) {
+            return "Wild: " + card.allowedColors().stream()
+                    .map(UiSnapshot::humanize)
+                    .reduce((left, right) -> left + " / " + right)
+                    .orElse("");
         }
-        return "ANY";
+        if ("ACTION".equals(card.type())) {
+            return UiSnapshot.humanize(card.actionType());
+        }
+        if (card.valueM() > 0) {
+            return "$" + card.valueM() + "M money";
+        }
+        return "";
     }
 
-    private String typeStyle(Card card) {
-        return "deal-card-" + card.type().name().toLowerCase(Locale.ROOT).replace('_', '-');
-    }
-
-    private String colorBandCss(Card card) {
-        if (card instanceof PropertyCard propertyCard) {
-            return propertyCss(propertyCard.color());
+    private String colorBandCss(UiSnapshot.CardView card) {
+        if ("PROPERTY".equals(card.type())) {
+            return propertyCss(card.propertyColor());
         }
-        if (card instanceof PropertyWildCard wildCard) {
-            List<String> colors = wildCard.allowedColors().stream().map(this::propertyCss).toList();
+        if ("PROPERTY_WILD".equals(card.type())) {
+            List<String> colors = card.allowedColors().stream().map(this::propertyCss).toList();
+            if (colors.isEmpty()) {
+                return "#98a2ad";
+            }
             if (colors.size() == 1) {
                 return colors.getFirst();
-            }
-            if (colors.size() == PropertyColor.values().length) {
-                return "linear-gradient(to right, #8b5a2b, #8ad8ff, #d94ca8, #f28a2e, #d83240, #f2d64b, #248f51, #244a96)";
             }
             return "linear-gradient(to right, " + colors.get(0) + " 0%, " + colors.get(0) + " 50%, "
                     + colors.get(1) + " 50%, " + colors.get(1) + " 100%)";
         }
-        if (card.type() == CardType.ACTION) {
+        if ("ACTION".equals(card.type())) {
             return "#a61d24";
         }
         return "#23845b";
     }
 
-    private String propertyCss(PropertyColor color) {
+    private String propertyCss(String color) {
         return switch (color) {
-            case BROWN -> "#8b5a2b";
-            case LIGHT_BLUE -> "#8ad8ff";
-            case PINK -> "#d94ca8";
-            case ORANGE -> "#f28a2e";
-            case RED -> "#d83240";
-            case YELLOW -> "#f2d64b";
-            case GREEN -> "#248f51";
-            case DARK_BLUE -> "#244a96";
-            case RAILROAD -> "#d8dde3";
-            case UTILITY -> "#98a2ad";
+            case "BROWN" -> "#8b5a2b";
+            case "LIGHT_BLUE" -> "#8ad8ff";
+            case "PINK" -> "#d94ca8";
+            case "ORANGE" -> "#f28a2e";
+            case "RED" -> "#d83240";
+            case "YELLOW" -> "#f2d64b";
+            case "GREEN" -> "#248f51";
+            case "DARK_BLUE" -> "#244a96";
+            case "RAILROAD" -> "#d8dde3";
+            default -> "#98a2ad";
         };
     }
 
-    private String formatColors(Set<PropertyColor> colors) {
-        if (colors.size() == PropertyColor.values().length) {
-            return "Any color";
+    private void showFeedback(String message) {
+        if (feedbackArea != null && message != null && !message.isBlank()) {
+            feedbackArea.setText(message);
         }
-        return colors.stream().map(this::colorLabel).collect(Collectors.joining(" / "));
     }
 
-    private String colorLabel(PropertyColor color) {
-        return switch (color) {
-            case BROWN -> "Brown";
-            case LIGHT_BLUE -> "Light Blue";
-            case PINK -> "Pink";
-            case ORANGE -> "Orange";
-            case RED -> "Red";
-            case YELLOW -> "Yellow";
-            case GREEN -> "Green";
-            case DARK_BLUE -> "Dark Blue";
-            case RAILROAD -> "Railroad";
-            case UTILITY -> "Utility";
-        };
-    }
-
-    private void appendLog(String message) {
-        if (gameLogArea.getText().isBlank()) {
-            gameLogArea.setText(message);
-            return;
-        }
-        gameLogArea.appendText("\n" + message);
-    }
-
-    private enum ZoneKind {
-        BANK,
-        PROPERTY_COLOR,
-        ACTION,
-        PAYMENT,
-        TRADE,
-        DISCARD,
-        PUBLIC_BANK,
-        PUBLIC_PROPERTY
-    }
-
-    private record DropZone(FlowPane pane, ZoneKind kind, String label, PropertyColor color, boolean compact) {
-    }
-
-    private record DragOrigin(String cardId, DropZone sourceZone, int handIndex) {
-
-        private boolean fromHand() {
-            return handIndex >= 0;
+    private record Choice<T>(String label, T value) {
+        @Override
+        public String toString() {
+            return label;
         }
     }
 }

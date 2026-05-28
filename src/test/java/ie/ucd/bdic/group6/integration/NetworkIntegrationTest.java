@@ -68,6 +68,8 @@ class NetworkIntegrationTest {
         String sessionCode = text(created.data(), "sessionCode");
         assertNotNull(sessionId);
         assertNotNull(sessionCode);
+        assertEquals("host", created.data().get("hostPlayerId"));
+        assertEquals(2, created.data().get("maxPlayers"));
 
         ServerResult invalidJoin = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
                 "sessionCode", "NOPE",
@@ -97,8 +99,12 @@ class NetworkIntegrationTest {
 
         StateUpdate hostActive = await(hostUpdates, activeUpdate(sessionId, "host"));
         StateUpdate player2Active = await(player2Updates, activeUpdate(sessionId, "player2"));
+        assertNotNull(hostActive);
         assertEquals("ACTIVE", hostActive.data().get("status"));
+        assertNotNull(player2Active);
         assertEquals("ACTIVE", player2Active.data().get("status"));
+        assertEquals("host", hostActive.data().get("hostPlayerId"));
+        assertEquals(2, hostActive.data().get("maxPlayers"));
         assertEquals(7, currentPlayerHand(hostActive).size());
         assertEquals(5, currentPlayerHand(player2Active).size());
         assertNotEquals(currentPlayerHand(hostActive), currentPlayerHand(player2Active));
@@ -113,6 +119,7 @@ class NetworkIntegrationTest {
         assertTrue(rejoined.success());
 
         StateUpdate rejoinedState = await(rejoinedUpdates, activeUpdate(sessionId, "player2"));
+        assertNotNull(rejoinedState);
         assertEquals("ACTIVE", rejoinedState.data().get("status"));
         assertEquals(5, currentPlayerHand(rejoinedState).size());
     }
@@ -141,11 +148,13 @@ class NetworkIntegrationTest {
         String sessionCode = text(created.data(), "sessionCode");
         assertTrue(created.success());
 
+        assertNotNull(sessionCode);
         assertTrue(player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
                 "sessionCode", sessionCode,
                 "playerId", "player2",
                 "playerName", "Player 2"
         )).get(3, TimeUnit.SECONDS).success());
+        assertNotNull(sessionId);
         assertTrue(host.sendCommand(CommandType.START_GAME, Map.of(
                 "sessionId", sessionId,
                 "playerId", "host"
@@ -160,6 +169,7 @@ class NetworkIntegrationTest {
         StateUpdate finished = await(hostUpdates, update -> update.sessionId().equals(sessionId)
                 && "FINISHED".equals(update.data().get("status")));
 
+        assertNotNull(finished);
         assertEquals("host", finished.data().get("winnerPlayerId"));
         assertEquals(List.of("player2"), finished.data().get("forfeitedPlayerIds"));
         assertEquals("DEFEATED", player(finished, "player2").get("playerStatus"));

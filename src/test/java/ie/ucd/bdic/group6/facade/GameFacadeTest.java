@@ -23,6 +23,8 @@ class GameFacadeTest {
                 "maxPlayers", 5
         )));
         assertTrue(created.isSuccess());
+        assertEquals("host", created.getData().get("hostPlayerId"));
+        assertEquals(5, created.getData().get("maxPlayers"));
 
         GameResult joined = facade.execute(new JoinSessionCommand(Map.of(
                 "sessionCode", created.getData().get("sessionCode"),
