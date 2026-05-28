@@ -4,6 +4,7 @@ import ie.ucd.bdic.group6.controller.GameController;
 import ie.ucd.bdic.group6.controller.mapper.RequestMapper;
 import ie.ucd.bdic.group6.core.engine.GameEngine;
 import ie.ucd.bdic.group6.facade.GameFacade;
+import ie.ucd.bdic.group6.network.server.GameServer;
 
 public class AppConfig {
     private final GameEngine gameEngine = new GameEngine();
@@ -20,5 +21,9 @@ public class AppConfig {
 
     public GameController gameController() {
         return new GameController(gameFacade, requestMapper);
+    }
+
+    public GameServer gameServer(int port) {
+        return new GameServer(gameController(), port);
     }
 }

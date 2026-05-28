@@ -2,8 +2,10 @@ package ie.ucd.bdic.group6.core.engine;
 
 import ie.ucd.bdic.group6.core.player.Player;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +19,9 @@ public final class GameSession {
     private final int maxPlayers;
     private final Map<String, Player> playersById = new LinkedHashMap<>();
     private final List<String> playerJoinOrder = new ArrayList<>();
+    private final Map<String, Boolean> connectedByPlayerId = new HashMap<>();
+    private final Map<String, Instant> disconnectedAtByPlayerId = new HashMap<>();
+    private final Map<String, Boolean> defeatedByPlayerId = new HashMap<>();
     private SessionStatus status = SessionStatus.LOBBY;
     private ActiveGameState activeGame;
 
@@ -92,6 +97,8 @@ public final class GameSession {
         }
         playersById.put(player.id(), player);
         playerJoinOrder.add(player.id());
+        connectedByPlayerId.put(player.id(), true);
+        defeatedByPlayerId.put(player.id(), false);
     }
 
     public void start(ActiveGameState activeGame) {
@@ -108,6 +115,71 @@ public final class GameSession {
         }
         activeGame.setWinnerPlayerId(requireText(winnerPlayerId, "winnerPlayerId"));
         this.status = SessionStatus.FINISHED;
+    }
+
+    public void markConnected(String playerId) {
+        requireKnownPlayer(playerId);
+        if (isDefeated(playerId)) {
+            return;
+        }
+        connectedByPlayerId.put(playerId, true);
+        disconnectedAtByPlayerId.remove(playerId);
+    }
+
+    public void markDisconnected(String playerId, Instant disconnectedAt) {
+        requireKnownPlayer(playerId);
+        if (isDefeated(playerId)) {
+            return;
+        }
+        connectedByPlayerId.put(playerId, false);
+        disconnectedAtByPlayerId.put(playerId, Objects.requireNonNull(disconnectedAt, "disconnectedAt"));
+    }
+
+    public boolean isConnected(String playerId) {
+        requireKnownPlayer(playerId);
+        return connectedByPlayerId.getOrDefault(playerId, false);
+    }
+
+    public boolean isDefeated(String playerId) {
+        requireKnownPlayer(playerId);
+        return defeatedByPlayerId.getOrDefault(playerId, false);
+    }
+
+    public Optional<Instant> disconnectedAt(String playerId) {
+        requireKnownPlayer(playerId);
+        return Optional.ofNullable(disconnectedAtByPlayerId.get(playerId));
+    }
+
+    public void markDefeated(String playerId) {
+        requireKnownPlayer(playerId);
+        defeatedByPlayerId.put(playerId, true);
+        connectedByPlayerId.put(playerId, false);
+        disconnectedAtByPlayerId.remove(playerId);
+    }
+
+    public String playerStatus(String playerId) {
+        if (isDefeated(playerId)) {
+            return "DEFEATED";
+        }
+        return isConnected(playerId) ? "CONNECTED" : "DISCONNECTED";
+    }
+
+    public List<String> forfeitedPlayerIds() {
+        return playerJoinOrder.stream()
+                .filter(this::isDefeated)
+                .toList();
+    }
+
+    public List<String> activePlayerIds() {
+        return playerJoinOrder.stream()
+                .filter(playerId -> !isDefeated(playerId))
+                .toList();
+    }
+
+    private void requireKnownPlayer(String playerId) {
+        if (!playersById.containsKey(requireText(playerId, "playerId"))) {
+            throw new IllegalArgumentException("unknown player id: " + playerId);
+        }
     }
 
     private static String requireText(String value, String name) {

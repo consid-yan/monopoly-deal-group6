@@ -73,7 +73,7 @@ public record PlayerSnapshot(
 
         public PropertyRowSnapshot {
             rowId = Objects.requireNonNull(rowId, "rowId");
-            anchorColor = Objects.requireNonNull(anchorColor, "anchorColor");
+            Objects.requireNonNull(anchorColor, "anchorColor");
             cardsInOrder = List.copyOf(cardsInOrder);
             wildAssignments = Map.copyOf(wildAssignments);
         }

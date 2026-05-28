@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/consid-yan/monopoly-deal-group6/actions/workflows/ci.yml/badge.svg)](https://github.com/consid-yan/monopoly-deal-group6/actions/workflows/ci.yml)
 ![Java](https://img.shields.io/badge/Java-25-red)
-![JavaFX](https://img.shields.io/badge/JavaFX-25-blue)
+![JavaFX](https://img.shields.io/badge/JavaFX-25.0.2-blue)
 ![Build](https://img.shields.io/badge/build-Maven-orange)
 ![Tests](https://img.shields.io/badge/tests-JUnit%205-brightgreen)
 
@@ -21,16 +21,18 @@ Monopoly Deal Group 6 is organized as a modular multiplayer card-game applicatio
 ## Tech Stack
 
 - Java 25
-- JavaFX 25
+- JavaFX 25.0.2
 - Maven
 - JUnit 5
+- AtlantaFX
+- Ikonli
 - GitHub Actions
 - TCP/IP socket networking
 
 ## Highlights
 
 - Architecture for a 2 to 5 player Monopoly Deal experience
-- Command-based actions for starting games, playing cards, trading, and ending turns
+- Command-based actions for session setup, card play, debt payment, trading, discarding, turn flow, and rejoin
 - Layered controller and facade flow for clean request handling
 - Core packages for cards, properties, rules, player state, and game sessions
 - JavaFX packages for desktop presentation
@@ -77,13 +79,17 @@ mvn javafx:run
 ```text
 src/main/java/ie/ucd/bdic/group6/
 +-- app/          Application entry point and dependency wiring
-+-- command/      Gameplay command interface and command records
++-- command/      Session, gameplay, payment, trade, discard, and rejoin commands
 +-- controller/   Request intake, DTOs, and request-to-command mapping
-+-- core/         Cards, engine, players, properties, and rules
++-- core/         Cards, common results, engine, players, properties, and rules
 +-- exception/    Project-specific exception types
 +-- facade/       Command dispatch facade, handlers, and result model
 +-- network/      Client and server communication packages
 +-- ui/           JavaFX UI packages
+
+src/main/resources/
++-- css/          Shared JavaFX stylesheet
++-- fxml/         Menu, lobby, game, how-to-play, and result views
 ```
 
 Tests live under `src/test/java/ie/ucd/bdic/group6/`.
@@ -99,7 +105,7 @@ Project documents live under `docs/`:
 The application is organized around a command-driven flow:
 
 1. `GameController` receives a `ControllerRequest`.
-2. `RequestMapper` converts request data into command records such as `StartGameCommand`, `PlayCardCommand`, `EndTurnCommand`, and `TradeCommand`.
+2. `RequestMapper` converts request data into command records such as `CreateSessionCommand`, `JoinSessionCommand`, `StartGameCommand`, `PlayCardCommand`, `PayDebtCommand`, `ProposeTradeCommand`, `RespondTradeCommand`, `DiscardCardsCommand`, `EndTurnCommand`, and `RejoinSessionCommand`.
 3. `GameFacade` routes each command to a matching `CommandHandler`.
 4. Handlers return a `GameResult`.
 
@@ -121,23 +127,7 @@ The game design follows the Monopoly Deal card-game format and includes:
 
 ## Media
 
-Replace the placeholder image paths below with screenshots or demo assets.
-
-### Main Menu
-
-![Main Menu](./docs/media/main-menu.png)
-
-### Gameplay
-
-![Gameplay Screen](./docs/media/gameplay.png)
-
-### How to Play
-
-![How to Play Screen](./docs/media/how-to-play.png)
-
-### Multiplayer Session
-
-![Multiplayer Session](./docs/media/multiplayer-session.png)
+The repository currently includes architecture, sequence, and use-case diagrams under `docs/diagrams/`. UI screenshots and demo media are not committed yet.
 
 ## Useful Maven Commands
 

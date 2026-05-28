@@ -145,22 +145,13 @@ public final class Player {
         OperationResult<Void> placed = propertyBoard.tryAddCardToRow(row, card, wildChoice);
         if (!placed.isSuccess()) {
             hand.add(card);
-            propertyBoard.removeRow(row);
-            propertyBoard.compactEmptyRows();
+            if (row.size() == 0) {
+                propertyBoard.removeRow(row);
+                propertyBoard.compactEmptyRows();
+            }
             return placed;
         }
         return OperationResult.ok();
-    }
-
-    public OperationResult<ActionCard> tryPlayActionFromHand(ActionCard actionCard) {
-        Objects.requireNonNull(actionCard, "actionCard");
-        if (!hand.contains(actionCard)) {
-            return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "action card not in hand: " + actionCard.id());
-        }
-        if (!hand.remove(actionCard)) {
-            return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "action card not in hand: " + actionCard.id());
-        }
-        return OperationResult.ok(actionCard);
     }
 
     public OperationResult<ActionCard> trySpendHouseCardOnRow(ActionCard houseFromHand, PropertySet row) {

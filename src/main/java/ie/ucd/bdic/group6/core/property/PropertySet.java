@@ -54,7 +54,7 @@ public final class PropertySet {
     }
 
     public Map<String, PropertyColor> wildAssignmentsView() {
-        return Collections.unmodifiableMap(new HashMap<>(wildAssignments));
+        return Map.copyOf(wildAssignments);
     }
 
     public boolean contains(Card card) {

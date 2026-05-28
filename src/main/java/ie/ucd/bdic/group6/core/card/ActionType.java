@@ -15,19 +15,17 @@ public enum ActionType {
     HOTEL,
     PASS_GO,
 
-    /** Dual-color rent: brown or light blue (2 in deck). */
+    // Dual-color rent: brown or light blue (2 in deck).
     RENT_BROWN_OR_LIGHT_BLUE,
-    /** Dual-color rent: pink or orange (2 in deck). */
+    // Dual-color rent: pink or orange (2 in deck).
     RENT_PINK_OR_ORANGE,
-    /** Dual-color rent: red or yellow (2 in deck). */
+    // Dual-color rent: red or yellow (2 in deck).
     RENT_RED_OR_YELLOW,
-    /** Dual-color rent: dark blue or green (2 in deck). */
+    // Dual-color rent: dark blue or green (2 in deck).
     RENT_DARK_BLUE_OR_GREEN,
-    /** Dual-color rent: railroad or utility (2 in deck). */
+    // Dual-color rent: railroad or utility (2 in deck).
     RENT_RAILROAD_OR_UTILITY,
-    /**
-     * Wild rent: choose one color you own and charge one player (3 in deck).
-     * Distinct from dual-color rent cards.
-     */
+    // Wild rent: choose one color you own and charge one player (3 in deck).
+    // Distinct from dual-color rent cards.
     WILD_RENT
 }

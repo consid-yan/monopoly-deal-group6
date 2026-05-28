@@ -24,6 +24,10 @@ public class CreateSessionCommand extends AbstractCommand {
         if (raw instanceof Number n) {
             return n.intValue();
         }
-        return Integer.parseInt(raw.toString());
+        try {
+            return Integer.parseInt(raw.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

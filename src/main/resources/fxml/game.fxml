@@ -3,211 +3,300 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
-<?import javafx.scene.control.TitledPane?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane prefHeight="640.0" prefWidth="960.0"
+<BorderPane prefHeight="760.0" prefWidth="1180.0"
             styleClass="menu-root root-screen game-screen"
-            stylesheets="@../css/style.css"
             xmlns="http://javafx.com/javafx/25.0.2"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="ie.ucd.bdic.group6.ui.GameUI">
     <top>
-        <VBox spacing="12.0" BorderPane.alignment="CENTER">
+        <VBox alignment="CENTER" spacing="10.0" BorderPane.alignment="CENTER">
             <padding>
-                <Insets bottom="14.0" left="36.0" right="36.0" top="24.0"/>
+                <Insets bottom="10.0" left="28.0" right="28.0" top="18.0"/>
             </padding>
             <Label styleClass="menu-title title-banner" text="Monopoly Deal">
                 <font>
                     <Font name="System Bold" size="30.0"/>
                 </font>
             </Label>
-            <GridPane hgap="16.0" vgap="8.0">
+            <GridPane hgap="14.0" styleClass="hud-bar" vgap="7.0">
                 <columnConstraints>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="170.0"/>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="170.0"/>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="170.0"/>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="170.0"/>
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="150.0"/>
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="150.0"/>
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="150.0"/>
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="150.0"/>
                 </columnConstraints>
                 <Label text="Active Player" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-                <TextField editable="false" promptText="Active Player" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                <TextField fx:id="activePlayerField" editable="false" promptText="Active Player" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
                 <Label text="Turn Status" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
-                <TextField editable="false" promptText="Turn/status indicator" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+                <TextField fx:id="turnStatusField" editable="false" promptText="Turn/status indicator" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
                 <Label text="You" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
-                <TextField editable="false" promptText="Current user/player identity" GridPane.columnIndex="2" GridPane.rowIndex="1"/>
+                <TextField fx:id="identityField" editable="false" promptText="Current user/player identity" GridPane.columnIndex="2" GridPane.rowIndex="1"/>
                 <Label text="Connection" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
-                <TextField editable="false" promptText="Connected / reconnect countdown" GridPane.columnIndex="3" GridPane.rowIndex="1"/>
+                <TextField fx:id="connectionField" editable="false" promptText="Connected / reconnect countdown" GridPane.columnIndex="3" GridPane.rowIndex="1"/>
             </GridPane>
         </VBox>
     </top>
-    <left>
-        <VBox prefWidth="240.0" spacing="12.0" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets bottom="12.0" left="24.0" right="12.0" top="8.0"/>
-            </padding>
-            <Label styleClass="status-label" text="Private Player Area">
-                <font>
-                    <Font name="System Bold" size="18.0"/>
-                </font>
-            </Label>
-            <TitledPane animated="false" collapsible="false" styleClass="money-panel" text="Your Bank">
-                <ListView prefHeight="120.0">
-                    <placeholder>
-                        <Label text="Your Bank"/>
-                    </placeholder>
-                </ListView>
-            </TitledPane>
-            <TitledPane animated="false" collapsible="false" styleClass="property-set-panel" text="Your Properties">
-                <ListView prefHeight="210.0" VBox.vgrow="ALWAYS">
-                    <placeholder>
-                        <Label text="Your Properties"/>
-                    </placeholder>
-                </ListView>
-            </TitledPane>
-            <Label styleClass="menu-note" text="Only your own hand is shown in this area." wrapText="true">
-                <font>
-                    <Font size="12.0"/>
-                </font>
-            </Label>
-        </VBox>
-    </left>
+
     <center>
-        <VBox spacing="12.0" BorderPane.alignment="CENTER">
+        <VBox spacing="10.0" BorderPane.alignment="CENTER">
             <padding>
-                <Insets bottom="12.0" left="12.0" right="12.0" top="8.0"/>
+                <Insets bottom="8.0" left="24.0" right="12.0" top="4.0"/>
             </padding>
-            <TitledPane animated="false" collapsible="false" styleClass="card-panel" text="Your Hand">
-                <ListView prefHeight="150.0">
-                    <placeholder>
-                        <Label text="Your Hand"/>
-                    </placeholder>
-                </ListView>
-            </TitledPane>
-            <GridPane hgap="12.0" vgap="12.0" VBox.vgrow="ALWAYS">
-                <columnConstraints>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="220.0"/>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="220.0"/>
-                </columnConstraints>
-                <rowConstraints>
-                    <RowConstraints vgrow="ALWAYS"/>
-                </rowConstraints>
-                <TitledPane animated="false" collapsible="false" styleClass="player-panel" text="Other Players" GridPane.columnIndex="0"
-                            GridPane.rowIndex="0">
-                    <ListView prefHeight="250.0">
-                        <placeholder>
-                            <Label text="Other Players"/>
-                        </placeholder>
-                    </ListView>
-                </TitledPane>
-                <TitledPane animated="false" collapsible="false" styleClass="section-panel" text="Public Table State" GridPane.columnIndex="1"
-                            GridPane.rowIndex="0">
-                    <ListView prefHeight="250.0">
-                        <placeholder>
-                            <Label text="Public bank, properties, and winner status"/>
-                        </placeholder>
-                    </ListView>
-                </TitledPane>
-            </GridPane>
+
+            <HBox alignment="CENTER" spacing="10.0" styleClass="opponents-row">
+                <VBox prefWidth="250.0" spacing="7.0" styleClass="opponent-seat tabletop-panel">
+                    <Label styleClass="zone-heading" text="Alex - public area"/>
+                    <HBox fx:id="alexHandBacks" alignment="CENTER_LEFT" spacing="5.0" styleClass="opponent-hand-backs"/>
+                    <HBox spacing="7.0">
+                        <VBox HBox.hgrow="ALWAYS" spacing="4.0">
+                            <Label styleClass="zone-caption" text="Bank"/>
+                            <FlowPane fx:id="alexBankZone" hgap="6.0" prefHeight="92.0" styleClass="drop-zone compact-drop-zone bank-drop-zone" vgap="6.0"/>
+                        </VBox>
+                        <VBox HBox.hgrow="ALWAYS" spacing="4.0">
+                            <Label styleClass="zone-caption" text="Properties"/>
+                            <FlowPane fx:id="alexPropertyZone" hgap="6.0" prefHeight="92.0" styleClass="drop-zone compact-drop-zone property-drop-zone" vgap="6.0"/>
+                        </VBox>
+                    </HBox>
+                </VBox>
+                <VBox prefWidth="250.0" spacing="7.0" styleClass="opponent-seat tabletop-panel">
+                    <Label styleClass="zone-heading" text="Morgan - public area"/>
+                    <HBox fx:id="morganHandBacks" alignment="CENTER_LEFT" spacing="5.0" styleClass="opponent-hand-backs"/>
+                    <HBox spacing="7.0">
+                        <VBox HBox.hgrow="ALWAYS" spacing="4.0">
+                            <Label styleClass="zone-caption" text="Bank"/>
+                            <FlowPane fx:id="morganBankZone" hgap="6.0" prefHeight="92.0" styleClass="drop-zone compact-drop-zone bank-drop-zone" vgap="6.0"/>
+                        </VBox>
+                        <VBox HBox.hgrow="ALWAYS" spacing="4.0">
+                            <Label styleClass="zone-caption" text="Properties"/>
+                            <FlowPane fx:id="morganPropertyZone" hgap="6.0" prefHeight="92.0" styleClass="drop-zone compact-drop-zone property-drop-zone" vgap="6.0"/>
+                        </VBox>
+                    </HBox>
+                </VBox>
+                <VBox prefWidth="250.0" spacing="7.0" styleClass="opponent-seat tabletop-panel">
+                    <Label styleClass="zone-heading" text="Riley - public area"/>
+                    <HBox fx:id="rileyHandBacks" alignment="CENTER_LEFT" spacing="5.0" styleClass="opponent-hand-backs"/>
+                    <HBox spacing="7.0">
+                        <VBox HBox.hgrow="ALWAYS" spacing="4.0">
+                            <Label styleClass="zone-caption" text="Bank"/>
+                            <FlowPane fx:id="rileyBankZone" hgap="6.0" prefHeight="92.0" styleClass="drop-zone compact-drop-zone bank-drop-zone" vgap="6.0"/>
+                        </VBox>
+                        <VBox HBox.hgrow="ALWAYS" spacing="4.0">
+                            <Label styleClass="zone-caption" text="Properties"/>
+                            <FlowPane fx:id="rileyPropertyZone" hgap="6.0" prefHeight="92.0" styleClass="drop-zone compact-drop-zone property-drop-zone" vgap="6.0"/>
+                        </VBox>
+                    </HBox>
+                </VBox>
+            </HBox>
+
+            <VBox spacing="10.0" styleClass="tabletop-board" VBox.vgrow="ALWAYS">
+                <HBox alignment="CENTER" spacing="10.0">
+                    <VBox alignment="CENTER" prefWidth="130.0" spacing="6.0" styleClass="pile-panel">
+                        <Label styleClass="zone-heading" text="Draw Pile"/>
+                        <StackPane prefHeight="124.0" prefWidth="92.0" styleClass="draw-pile-card">
+                            <Label text="DRAW&#10;56"/>
+                        </StackPane>
+                    </VBox>
+                    <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="tabletop-panel">
+                        <Label styleClass="zone-heading" text="Discard Pile"/>
+                        <FlowPane fx:id="discardZone" hgap="8.0" prefHeight="126.0" styleClass="drop-zone discard-drop-zone" vgap="8.0"/>
+                    </VBox>
+                    <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="tabletop-panel">
+                        <Label styleClass="zone-heading" text="Action Cards"/>
+                        <FlowPane fx:id="actionZone" hgap="8.0" prefHeight="126.0" styleClass="drop-zone action-drop-zone" vgap="8.0"/>
+                    </VBox>
+                </HBox>
+
+                <HBox alignment="CENTER" spacing="10.0">
+                    <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="tabletop-panel symbolic-panel">
+                        <Label styleClass="zone-heading" text="Your Bank"/>
+                        <FlowPane fx:id="bankZone" hgap="7.0" prefHeight="96.0" styleClass="drop-zone symbolic-drop-zone bank-drop-zone" vgap="7.0"/>
+                    </VBox>
+                    <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="tabletop-panel symbolic-panel">
+                        <Label styleClass="zone-heading" text="Payment"/>
+                        <FlowPane fx:id="paymentZone" hgap="7.0" prefHeight="96.0" styleClass="drop-zone symbolic-drop-zone payment-drop-zone" vgap="7.0"/>
+                    </VBox>
+                    <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="tabletop-panel symbolic-panel">
+                        <Label styleClass="zone-heading" text="Trade Offer"/>
+                        <FlowPane fx:id="tradeOfferZone" hgap="7.0" prefHeight="96.0" styleClass="drop-zone symbolic-drop-zone trade-drop-zone" vgap="7.0"/>
+                    </VBox>
+                    <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="tabletop-panel symbolic-panel">
+                        <Label styleClass="zone-heading" text="Trade Request"/>
+                        <FlowPane fx:id="tradeRequestZone" hgap="7.0" prefHeight="96.0" styleClass="drop-zone symbolic-drop-zone trade-drop-zone" vgap="7.0"/>
+                    </VBox>
+                </HBox>
+
+                <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="AS_NEEDED" styleClass="table-scroll" VBox.vgrow="ALWAYS" vbarPolicy="AS_NEEDED">
+                    <content>
+                        <GridPane hgap="8.0" styleClass="property-board" vgap="8.0">
+                            <columnConstraints>
+                                <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
+                                <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
+                                <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
+                                <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
+                                <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
+                            </columnConstraints>
+                            <rowConstraints>
+                                <RowConstraints vgrow="ALWAYS"/>
+                                <RowConstraints vgrow="ALWAYS"/>
+                            </rowConstraints>
+                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                <Label styleClass="zone-heading property-brown" text="Brown Set (2)"/>
+                                <FlowPane fx:id="brownPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                <Label styleClass="zone-heading property-light-blue" text="Light Blue Set (3)"/>
+                                <FlowPane fx:id="lightBluePropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="2" GridPane.rowIndex="0">
+                                <Label styleClass="zone-heading property-pink" text="Pink Set (3)"/>
+                                <FlowPane fx:id="pinkPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="3" GridPane.rowIndex="0">
+                                <Label styleClass="zone-heading property-orange" text="Orange Set (3)"/>
+                                <FlowPane fx:id="orangePropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="4" GridPane.rowIndex="0">
+                                <Label styleClass="zone-heading property-red" text="Red Set (3)"/>
+                                <FlowPane fx:id="redPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                <Label styleClass="zone-heading property-yellow" text="Yellow Set (3)"/>
+                                <FlowPane fx:id="yellowPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                <Label styleClass="zone-heading property-green" text="Green Set (3)"/>
+                                <FlowPane fx:id="greenPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="2" GridPane.rowIndex="1">
+                                <Label styleClass="zone-heading property-dark-blue" text="Dark Blue Set (2)"/>
+                                <FlowPane fx:id="darkBluePropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="3" GridPane.rowIndex="1">
+                                <Label styleClass="zone-heading property-railroad" text="Railroad Set (4)"/>
+                                <FlowPane fx:id="railroadPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="4" GridPane.rowIndex="1">
+                                <Label styleClass="zone-heading property-utility" text="Utility Set (2)"/>
+                                <FlowPane fx:id="utilityPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                        </GridPane>
+                    </content>
+                </ScrollPane>
+            </VBox>
         </VBox>
     </center>
+
     <right>
-        <VBox prefWidth="280.0" spacing="12.0" BorderPane.alignment="CENTER">
+        <VBox prefWidth="248.0" spacing="10.0" BorderPane.alignment="CENTER">
             <padding>
-                <Insets bottom="12.0" left="12.0" right="24.0" top="8.0"/>
+                <Insets bottom="10.0" left="8.0" right="22.0" top="4.0"/>
             </padding>
-            <Label text="Actions">
+            <Label styleClass="section-heading" text="Actions">
                 <font>
                     <Font name="System Bold" size="18.0"/>
                 </font>
             </Label>
-            <Button mnemonicParsing="false" prefHeight="38.0" prefWidth="240.0" styleClass="primary-button" text="Play Selected Card"/>
-            <Button mnemonicParsing="false" prefHeight="38.0" prefWidth="240.0" styleClass="danger-button" text="Discard Selected"/>
-            <Button mnemonicParsing="false" prefHeight="38.0" prefWidth="240.0" styleClass="gold-button" text="End Turn"/>
-            <Separator prefWidth="240.0"/>
-            <TitledPane animated="false" collapsible="false" styleClass="money-panel" text="Payment">
-                <VBox spacing="8.0">
-                    <ListView prefHeight="90.0">
-                        <placeholder>
-                            <Label text="Selected payment cards"/>
-                        </placeholder>
-                    </ListView>
-                    <Button mnemonicParsing="false" prefWidth="220.0" styleClass="secondary-button" text="Pay Debt"/>
-                </VBox>
-            </TitledPane>
-            <TitledPane animated="false" collapsible="false" styleClass="action-panel" text="Simplified Trade">
-                <VBox spacing="8.0">
-                    <TextField promptText="Target player"/>
-                    <ListView prefHeight="74.0">
-                        <placeholder>
-                            <Label text="Offered card"/>
-                        </placeholder>
-                    </ListView>
-                    <ListView prefHeight="74.0">
-                        <placeholder>
-                            <Label text="Requested card"/>
-                        </placeholder>
-                    </ListView>
-                    <Label text="Property for Money | Money for Property | Property for Property" wrapText="true">
-                        <font>
-                            <Font size="11.0"/>
-                        </font>
-                    </Label>
-                    <HBox alignment="CENTER" spacing="8.0">
-                        <Button mnemonicParsing="false" prefWidth="104.0" styleClass="primary-button" text="Propose"/>
-                        <Button mnemonicParsing="false" prefWidth="104.0" styleClass="gold-button" text="Accept"/>
-                    </HBox>
-                    <Button mnemonicParsing="false" prefWidth="220.0" styleClass="danger-button" text="Reject Trade"/>
-                </VBox>
-            </TitledPane>
+            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#playSelectedCard" prefHeight="38.0" prefWidth="218.0" styleClass="primary-button" text="Play Selected Card">
+                <graphic>
+                    <FontIcon iconLiteral="bx-play"/>
+                </graphic>
+            </Button>
+            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#discardSelectedCard" prefHeight="38.0" prefWidth="218.0" styleClass="danger-button" text="Discard Selected">
+                <graphic>
+                    <FontIcon iconLiteral="bx-trash"/>
+                </graphic>
+            </Button>
+            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#endTurn" prefHeight="38.0" prefWidth="218.0" styleClass="gold-button" text="End Turn">
+                <graphic>
+                    <FontIcon iconLiteral="bx-skip-next"/>
+                </graphic>
+            </Button>
+            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#finishDemo" prefHeight="38.0" prefWidth="218.0" styleClass="primary-button" text="Finish Demo">
+                <graphic>
+                    <FontIcon iconLiteral="bx-star"/>
+                </graphic>
+            </Button>
+            <Separator prefWidth="218.0"/>
+            <Label styleClass="zone-heading" text="Simplified Trade"/>
+            <TextField fx:id="targetPlayerField" prefWidth="218.0" promptText="Target player"/>
+            <HBox alignment="CENTER" spacing="8.0">
+                <Button graphicTextGap="6.0" mnemonicParsing="false" onAction="#proposeTrade" prefWidth="104.0" styleClass="primary-button" text="Propose">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-log-in-circle"/>
+                    </graphic>
+                </Button>
+                <Button graphicTextGap="6.0" mnemonicParsing="false" onAction="#acceptTrade" prefWidth="104.0" styleClass="gold-button" text="Accept">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-check"/>
+                    </graphic>
+                </Button>
+            </HBox>
+            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#rejectTrade" prefWidth="218.0" styleClass="danger-button" text="Reject Trade">
+                <graphic>
+                    <FontIcon iconLiteral="bx-x"/>
+                </graphic>
+            </Button>
+            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#payDebt" prefWidth="218.0" styleClass="secondary-button" text="Pay Debt">
+                <graphic>
+                    <FontIcon iconLiteral="bx-check"/>
+                </graphic>
+            </Button>
+            <Separator prefWidth="218.0"/>
+            <HBox alignment="CENTER" spacing="8.0">
+                <Button graphicTextGap="6.0" mnemonicParsing="false" onAction="#backToLobby" prefWidth="105.0" styleClass="secondary-button" text="Lobby">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-log-in-circle"/>
+                    </graphic>
+                </Button>
+                <Button graphicTextGap="6.0" mnemonicParsing="false" onAction="#openHowToPlay" prefWidth="105.0" styleClass="secondary-button" text="Rules">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-question-mark"/>
+                    </graphic>
+                </Button>
+            </HBox>
+            <Separator prefWidth="218.0"/>
+            <Label styleClass="section-heading" text="Game Log"/>
+            <TextArea fx:id="gameLogArea"
+                      editable="false"
+                      focusTraversable="false"
+                      prefHeight="116.0"
+                      promptText="Game Log"
+                      styleClass="status-area side-status-area"
+                      wrapText="true"/>
+            <Label styleClass="section-heading" text="Feedback"/>
+            <TextArea fx:id="feedbackArea"
+                      editable="false"
+                      focusTraversable="false"
+                      prefHeight="92.0"
+                      promptText="Invalid action message"
+                      styleClass="error-area side-status-area"
+                      wrapText="true"/>
         </VBox>
     </right>
+
     <bottom>
-        <VBox spacing="8.0" BorderPane.alignment="CENTER">
+        <VBox spacing="6.0" styleClass="hand-panel" BorderPane.alignment="CENTER">
             <padding>
-                <Insets bottom="20.0" left="36.0" right="36.0" top="8.0"/>
+                <Insets bottom="12.0" left="28.0" right="28.0" top="4.0"/>
             </padding>
-            <GridPane hgap="16.0" vgap="8.0">
-                <columnConstraints>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="360.0"/>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="360.0"/>
-                </columnConstraints>
-                <Label text="Game Log" GridPane.columnIndex="0" GridPane.rowIndex="0">
-                    <font>
-                        <Font name="System Bold" size="14.0"/>
-                    </font>
-                </Label>
-                <Label text="Error / Feedback" GridPane.columnIndex="1" GridPane.rowIndex="0">
-                    <font>
-                        <Font name="System Bold" size="14.0"/>
-                    </font>
-                </Label>
-                <TextArea editable="false"
-                          focusTraversable="false"
-                          prefHeight="88.0"
-                          promptText="Game Log"
-                          styleClass="status-area"
-                          wrapText="true"
-                          GridPane.columnIndex="0"
-                          GridPane.rowIndex="1"/>
-                <TextArea editable="false"
-                          focusTraversable="false"
-                          prefHeight="88.0"
-                          promptText="Invalid action message"
-                          styleClass="error-area"
-                          wrapText="true"
-                          GridPane.columnIndex="1"
-                          GridPane.rowIndex="1"/>
-            </GridPane>
+            <Label styleClass="zone-heading" text="Your Hand"/>
+            <Pane fx:id="handPane" minHeight="154.0" prefHeight="158.0" styleClass="hand-fan-pane"/>
         </VBox>
     </bottom>
 </BorderPane>

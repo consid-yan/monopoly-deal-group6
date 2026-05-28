@@ -9,13 +9,15 @@ import ie.ucd.bdic.group6.core.player.PlayerPropertyTransfers;
 import ie.ucd.bdic.group6.core.player.PlayerSnapshot;
 import ie.ucd.bdic.group6.core.property.PropertyColor;
 import ie.ucd.bdic.group6.core.property.PropertyPaymentSupport;
-import ie.ucd.bdic.group6.core.property.PropertyRentSupport;
 import ie.ucd.bdic.group6.core.property.PropertySet;
 import ie.ucd.bdic.group6.core.rules.ActionRule;
 import ie.ucd.bdic.group6.core.rules.PaymentRule;
 import ie.ucd.bdic.group6.core.rules.WinRule;
 import ie.ucd.bdic.group6.exception.GameException;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.function.Supplier;
 
@@ -23,10 +25,13 @@ public class GameEngine implements ActionExecutor {
     private static final int DEFAULT_MAX_PLAYERS = 5;
     private static final int INITIAL_HAND_SIZE = 5;
     private static final int NORMAL_TURN_DRAW = 2;
+    private static final Duration DISCONNECTED_TURN_SKIP_AFTER = Duration.ofSeconds(30);
+    private static final Duration DISCONNECTED_FORFEIT_AFTER = Duration.ofSeconds(90);
 
     private final Map<String, GameSession> sessionsById = new HashMap<>();
     private final Map<String, GameSession> sessionsByCode = new HashMap<>();
     private final Supplier<Deck> deckSupplier;
+    private final Clock clock;
     private final ActionRule actionRule = new ActionRule();
     private final WinRule winRule = new WinRule();
     private final PaymentRule paymentRule = new PaymentRule();
@@ -35,8 +40,17 @@ public class GameEngine implements ActionExecutor {
         this(() -> Deck.shuffled(StandardDeckFactory.createUnshuffledDeck()));
     }
 
+    public GameEngine(Clock clock) {
+        this(() -> Deck.shuffled(StandardDeckFactory.createUnshuffledDeck()), clock);
+    }
+
     GameEngine(Supplier<Deck> deckSupplier) {
+        this(deckSupplier, Clock.systemUTC());
+    }
+
+    GameEngine(Supplier<Deck> deckSupplier, Clock clock) {
         this.deckSupplier = Objects.requireNonNull(deckSupplier, "deckSupplier");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     @Override
@@ -100,11 +114,15 @@ public class GameEngine implements ActionExecutor {
         String cardId = requireText(command.getCardId(), "cardId");
         ActiveGameState activeGame = requireActiveGame(session);
         TurnManager turnManager = activeGame.turnManager();
+        requireNoPendingActionResponses(activeGame);
+        requireNoPendingDebts(activeGame);
         actionRule.requireActivePlayer(turnManager, playerId);
-        actionRule.requireActionAvailable(turnManager);
 
         Player player = requirePlayer(session, playerId);
+        requireNotDefeated(session, playerId);
         Card card = requireCardInHand(player, cardId);
+        int actionCost = actionCost(command, card);
+        requireActionsAvailable(turnManager, actionCost);
         PlayMode playMode = resolvePlayMode(command, card);
         switch (playMode) {
             case BANK -> playBankCard(player, card);
@@ -112,7 +130,9 @@ public class GameEngine implements ActionExecutor {
             case ACTION -> playActionCard(command, session, player, card, activeGame);
         }
 
-        turnManager.recordAction();
+        for (int i = 0; i < actionCost; i++) {
+            turnManager.recordAction();
+        }
         checkWin(session, player, activeGame.turnManager());
         return snapshot(session, playerId);
     }
@@ -124,6 +144,8 @@ public class GameEngine implements ActionExecutor {
         PendingDebt debt = resolvePendingDebt(activeGame, command);
         Player debtor = requirePlayer(session, debt.debtorPlayerId());
         Player creditor = requirePlayer(session, debt.creditorPlayerId());
+        requireNotDefeated(session, debtor.id());
+        requireNotDefeated(session, creditor.id());
         List<String> paymentCardIds = readStringList(command.getPaymentCardIds());
 
         int paymentValueM = paymentValueBeforeTransfer(debtor, paymentCardIds);
@@ -145,6 +167,8 @@ public class GameEngine implements ActionExecutor {
 
         debt.markAsPaid();
         activeGame.removePendingDebt(debt);
+        Player activePlayer = requirePlayer(session, activeGame.turnManager().activePlayerId());
+        checkWin(session, activePlayer, activeGame.turnManager());
         return snapshot(session, debtor.id());
     }
 
@@ -154,13 +178,17 @@ public class GameEngine implements ActionExecutor {
         ActiveGameState activeGame = requireActiveGame(session);
         String proposerId = requireText(command.getPlayerId(), "playerId");
         String targetId = requireText(command.getTargetPlayerId(), "targetPlayerId");
+        requireNoPendingActionResponses(activeGame);
+        requireNoPendingDebts(activeGame);
         actionRule.requireActivePlayer(activeGame.turnManager(), proposerId);
+        requireNotDefeated(session, proposerId);
         if (proposerId.equals(targetId)) {
             throw new GameException("TRADE_WITH_SELF", "Cannot propose a trade with yourself");
         }
 
         Player proposer = requirePlayer(session, proposerId);
         Player target = requirePlayer(session, targetId);
+        requireNotDefeated(session, targetId);
         List<String> offeredCardIds = readStringList(command.getOfferedCardIds());
         List<String> requestedCardIds = readStringList(command.getRequestedCardIds());
         if (offeredCardIds.isEmpty() || requestedCardIds.isEmpty()) {
@@ -186,7 +214,10 @@ public class GameEngine implements ActionExecutor {
         GameSession session = requireActiveSession(command.getSessionId());
         ActiveGameState activeGame = requireActiveGame(session);
         String responderId = requireText(command.getPlayerId(), "playerId");
+        requireNoPendingActionResponses(activeGame);
+        requireNoPendingDebts(activeGame);
         actionRule.requireActivePlayer(activeGame.turnManager(), responderId);
+        requireNotDefeated(session, responderId);
 
         PendingTrade trade = activeGame.findPendingTrade(requireText(command.getTradeId(), "tradeId"))
                 .orElseThrow(() -> new GameException("TRADE_NOT_FOUND", "No pending trade exists with that id"));
@@ -201,10 +232,40 @@ public class GameEngine implements ActionExecutor {
             Player proposer = requirePlayer(session, trade.proposerPlayerId());
             Player responder = requirePlayer(session, responderId);
             acceptTrade(trade, proposer, responder);
+            checkWin(session, responder, activeGame.turnManager());
         } else {
             trade.reject();
         }
         activeGame.removePendingTrade(trade);
+        return snapshot(session, responderId);
+    }
+
+    @Override
+    public synchronized Map<String, Object> executeRespondAction(RespondActionCommand command) {
+        GameSession session = requireActiveSession(command.getSessionId());
+        ActiveGameState activeGame = requireActiveGame(session);
+        String responderId = requireText(command.getPlayerId(), "playerId");
+        requireNotDefeated(session, responderId);
+
+        PendingAction pendingAction = activeGame.findPendingAction(requireText(command.getActionId(), "actionId"))
+                .orElseThrow(() -> new GameException("ACTION_NOT_FOUND", "No pending action exists with that id"));
+        if (!pendingAction.awaitsResponseFrom(responderId)) {
+            throw new GameException("ACTION_RESPONSE_NOT_ALLOWED", "This player is not awaiting this action response");
+        }
+
+        if (command.isAccepted()) {
+            pendingAction.accept(responderId);
+        } else {
+            spendJustSayNo(session, activeGame, responderId, command.getJustSayNoCardId());
+            pendingAction.reject(responderId);
+        }
+
+        if (pendingAction.isComplete()) {
+            applyResolvedPendingAction(session, activeGame, pendingAction);
+            activeGame.removePendingAction(pendingAction);
+        }
+        Player activePlayer = requirePlayer(session, activeGame.turnManager().activePlayerId());
+        checkWin(session, activePlayer, activeGame.turnManager());
         return snapshot(session, responderId);
     }
 
@@ -214,10 +275,11 @@ public class GameEngine implements ActionExecutor {
         String playerId = requireText(command.getPlayerId(), "playerId");
         ActiveGameState activeGame = requireActiveGame(session);
         actionRule.requireActivePlayer(activeGame.turnManager(), playerId);
+        requireNotDefeated(session, playerId);
 
         Player player = requirePlayer(session, playerId);
-        List<String> cardIds = command.getDiscardedCardIds();
-        discardHandDownToSeven(player, cardIds != null ? cardIds : List.of(), activeGame);
+        List<String> cardIds = readStringList(command.getDiscardedCardIds());
+        discardHandDownToSeven(player, cardIds, activeGame);
         return snapshot(session, playerId);
     }
 
@@ -227,21 +289,24 @@ public class GameEngine implements ActionExecutor {
         String playerId = requireText(command.getPlayerId(), "playerId");
         ActiveGameState activeGame = requireActiveGame(session);
         TurnManager turnManager = activeGame.turnManager();
+        requireNoPendingActionResponses(activeGame);
+        requireNoPendingDebts(activeGame);
         actionRule.requireActivePlayer(turnManager, playerId);
+        requireNotDefeated(session, playerId);
 
         Player player = requirePlayer(session, playerId);
         if (player.hand().size() > 7) {
             throw new GameException("HAND_LIMIT_EXCEEDED", "Discard down to 7 cards before ending the turn");
         }
 
-        String nextPlayerId = turnManager.advanceToNextTurn();
+        cancelTradesAwaitingTarget(activeGame, playerId);
+        String nextPlayerId = advanceToNextAvailableTurn(session);
         drawForTurnStart(session, nextPlayerId);
         return snapshot(session, playerId);
     }
 
     @Override
     public synchronized Map<String, Object> executeRejoinSession(RejoinSessionCommand command) {
-        // TODO(engine-rejoin): Replace snapshot lookup with identity validation, timers, skip-turn, and forfeit.
         String sessionIdentity = requireText(command.getSessionIdentity(), "sessionIdentity");
         String playerId = requireText(command.getPlayerId(), "playerId");
         GameSession session = sessionsById.get(sessionIdentity);
@@ -252,7 +317,296 @@ public class GameEngine implements ActionExecutor {
             throw new GameException("SESSION_NOT_FOUND", "No session exists for the given identity");
         }
         requirePlayer(session, playerId);
+        if (session.isDefeated(playerId)) {
+            throw new GameException("PLAYER_FORFEITED", "This player has already forfeited the session");
+        }
+        session.markConnected(playerId);
         return snapshot(session, playerId);
+    }
+
+    @Override
+    public synchronized Map<String, Object> executePlayerDisconnected(PlayerDisconnectedCommand command) {
+        GameSession session = requireSessionById(requireText(command.getSessionId(), "sessionId"));
+        String playerId = requireText(command.getPlayerId(), "playerId");
+        requirePlayer(session, playerId);
+        session.markDisconnected(playerId, Instant.now(clock));
+        return snapshot(session, playerId);
+    }
+
+    @Override
+    public synchronized Map<String, Object> executeProcessDisconnectTimeouts(ProcessDisconnectTimeoutsCommand command) {
+        List<String> changedSessionIds = new ArrayList<>();
+        for (GameSession session : sessionsById.values()) {
+            if (processDisconnectTimeouts(session)) {
+                changedSessionIds.add(session.sessionId());
+            }
+        }
+        return Map.of("sessionIds", changedSessionIds);
+    }
+
+    private int actionCost(PlayCardCommand command, Card card) {
+        PlayMode playMode = resolvePlayMode(command, card);
+        if (playMode == PlayMode.ACTION
+                && card instanceof ActionCard actionCard
+                && isRentAction(actionCard.actionType())
+                && command.getDoubleRentCardId() != null
+                && !command.getDoubleRentCardId().isBlank()) {
+            return 2;
+        }
+        return 1;
+    }
+
+    private void requireActionsAvailable(TurnManager turnManager, int requiredActions) {
+        if (turnManager.actionsRemaining() < requiredActions) {
+            throw new GameException(
+                    "ACTION_LIMIT_REACHED",
+                    "This play requires " + requiredActions + " action(s) but only "
+                            + turnManager.actionsRemaining() + " remain");
+        }
+    }
+
+    private boolean isRentAction(ActionType actionType) {
+        return switch (actionType) {
+            case RENT_BROWN_OR_LIGHT_BLUE,
+                    RENT_PINK_OR_ORANGE,
+                    RENT_RED_OR_YELLOW,
+                    RENT_DARK_BLUE_OR_GREEN,
+                    RENT_RAILROAD_OR_UTILITY,
+                    WILD_RENT -> true;
+            default -> false;
+        };
+    }
+
+    private void requireNoPendingActionResponses(ActiveGameState activeGame) {
+        if (activeGame.hasPendingActions()) {
+            throw new GameException("ACTION_RESPONSE_REQUIRED", "Resolve pending action responses first");
+        }
+    }
+
+    private void requireNoPendingDebts(ActiveGameState activeGame) {
+        if (!activeGame.pendingDebtsView().isEmpty()) {
+            throw new GameException("PAYMENT_REQUIRED", "Resolve pending debts before continuing the turn");
+        }
+    }
+
+    private void requireNotDefeated(GameSession session, String playerId) {
+        if (session.isDefeated(playerId)) {
+            throw new GameException("PLAYER_DEFEATED", "Defeated players cannot act: " + playerId);
+        }
+    }
+
+    private void spendJustSayNo(
+            GameSession session,
+            ActiveGameState activeGame,
+            String responderId,
+            String justSayNoCardId) {
+        Player responder = requirePlayer(session, responderId);
+        Card card = requireCardInHand(responder, requireText(justSayNoCardId, "justSayNoCardId"));
+        if (!(card instanceof ActionCard actionCard) || actionCard.actionType() != ActionType.JUST_SAY_NO) {
+            throw new GameException("JUST_SAY_NO_REQUIRED", "A Just Say No card is required to reject the action");
+        }
+        discardActionFromHand(responder, actionCard, activeGame);
+    }
+
+    private void applyResolvedPendingAction(
+            GameSession session,
+            ActiveGameState activeGame,
+            PendingAction pendingAction) {
+        List<String> acceptedTargets = pendingAction.acceptedTargetIds().stream()
+                .filter(playerId -> !session.isDefeated(playerId))
+                .toList();
+        if (acceptedTargets.isEmpty()) {
+            return;
+        }
+
+        switch (pendingAction.actionType()) {
+            case DEBT_COLLECTOR, ITS_MY_BIRTHDAY,
+                    RENT_BROWN_OR_LIGHT_BLUE,
+                    RENT_PINK_OR_ORANGE,
+                    RENT_RED_OR_YELLOW,
+                    RENT_DARK_BLUE_OR_GREEN,
+                    RENT_RAILROAD_OR_UTILITY,
+                    WILD_RENT -> createDebtsForAcceptedTargets(activeGame, pendingAction, acceptedTargets);
+            case SLY_DEAL -> applySlyDeal(session, pendingAction, acceptedTargets.getFirst());
+            case FORCED_DEAL -> applyForcedDeal(session, pendingAction, acceptedTargets.getFirst());
+            case DEAL_BREAKER -> applyDealBreaker(session, pendingAction, acceptedTargets.getFirst());
+            default -> throw new GameException(
+                    "UNSUPPORTED_PENDING_ACTION",
+                    "Cannot resolve pending action " + pendingAction.actionType());
+        }
+    }
+
+    private void createDebtsForAcceptedTargets(
+            ActiveGameState activeGame,
+            PendingAction pendingAction,
+            List<String> targetIds) {
+        for (String debtorId : targetIds) {
+            activeGame.addPendingDebt(PendingDebt.builder()
+                    .creditorPlayerId(pendingAction.actorPlayerId())
+                    .debtorPlayerId(debtorId)
+                    .amountM(pendingAction.amountM())
+                    .sourceAction(pendingAction.actionType())
+                    .sourceCardId(pendingAction.actionCardId())
+                    .build());
+        }
+    }
+
+    private void applySlyDeal(GameSession session, PendingAction pendingAction, String targetPlayerId) {
+        Player actor = requirePlayer(session, pendingAction.actorPlayerId());
+        Player target = requirePlayer(session, targetPlayerId);
+        String cardId = pendingAction.targetCardId().orElseThrow();
+        PropertyCardLocation targetCard = findPropertyCardLocation(target, cardId)
+                .orElseThrow(() -> new GameException("CARD_NOT_TRADEABLE", "Target property card not found"));
+        if (!target.propertyBoard().canRemoveCardForSteal(targetCard.card())) {
+            throw new GameException("CANNOT_STEAL_FROM_COMPLETE_SET", "Sly Deal cannot steal from a complete set");
+        }
+        requireSuccess(movePropertyCardToBestRow(target, actor, targetCard.card(), targetCard.row()));
+    }
+
+    private void applyForcedDeal(GameSession session, PendingAction pendingAction, String targetPlayerId) {
+        Player actor = requirePlayer(session, pendingAction.actorPlayerId());
+        Player target = requirePlayer(session, targetPlayerId);
+        String offeredCardId = pendingAction.offeredCardId().orElseThrow();
+        String requestedCardId = pendingAction.requestedCardId().orElseThrow();
+        PropertyCardLocation offered = findPropertyCardLocation(actor, offeredCardId)
+                .orElseThrow(() -> new GameException("CARD_NOT_TRADEABLE", "Offered property card not found"));
+        PropertyCardLocation requested = findPropertyCardLocation(target, requestedCardId)
+                .orElseThrow(() -> new GameException("CARD_NOT_TRADEABLE", "Requested property card not found"));
+        if (!actor.propertyBoard().canRemoveCardForSteal(offered.card())
+                || !target.propertyBoard().canRemoveCardForSteal(requested.card())) {
+            throw new GameException("CANNOT_STEAL_FROM_COMPLETE_SET", "Forced Deal cannot swap cards from complete sets");
+        }
+
+        PlayerSnapshot actorSnapshot = actor.snapshot();
+        PlayerSnapshot targetSnapshot = target.snapshot();
+        try {
+            requireSuccess(movePropertyCardToBestRow(actor, target, offered.card(), offered.row()));
+            requireSuccess(movePropertyCardToBestRow(target, actor, requested.card(), requested.row()));
+        } catch (RuntimeException e) {
+            actor.restore(actorSnapshot);
+            target.restore(targetSnapshot);
+            throw e;
+        }
+    }
+
+    private void applyDealBreaker(GameSession session, PendingAction pendingAction, String targetPlayerId) {
+        Player actor = requirePlayer(session, pendingAction.actorPlayerId());
+        Player target = requirePlayer(session, targetPlayerId);
+        String rowId = pendingAction.targetPropertyRowId().orElseThrow();
+        PropertySet row = target.findPropertyRow(rowId)
+                .orElseThrow(() -> new GameException("PROPERTY_ROW_NOT_FOUND", "Target property row not found"));
+        if (!row.isComplete()) {
+            throw new GameException("NO_COMPLETE_SET", "Deal Breaker requires a complete target set");
+        }
+        requireSuccess(PlayerPropertyTransfers.transferEntireRow(target, actor, row));
+    }
+
+    private void cancelTradesAwaitingTarget(ActiveGameState activeGame, String targetPlayerId) {
+        for (PendingTrade trade : activeGame.pendingTradesForTarget(targetPlayerId)) {
+            trade.cancel();
+            activeGame.removePendingTrade(trade);
+        }
+    }
+
+    private String advanceToNextAvailableTurn(GameSession session) {
+        ActiveGameState activeGame = requireActiveGame(session);
+        TurnManager turnManager = activeGame.turnManager();
+        int guard = turnManager.turnOrder().size();
+        String nextPlayerId;
+        do {
+            nextPlayerId = turnManager.advanceToNextTurn();
+            guard--;
+        } while (guard > 0 && session.isDefeated(nextPlayerId));
+        if (session.isDefeated(nextPlayerId)) {
+            throw new GameException("NO_ACTIVE_PLAYERS", "No active players remain in this session");
+        }
+        return nextPlayerId;
+    }
+
+    private boolean processDisconnectTimeouts(GameSession session) {
+        if (session.status() == SessionStatus.FINISHED) {
+            return false;
+        }
+        boolean changed = false;
+        Instant now = Instant.now(clock);
+        for (String playerId : session.playerJoinOrder()) {
+            if (session.isDefeated(playerId)) {
+                continue;
+            }
+            Optional<Instant> disconnectedAt = session.disconnectedAt(playerId);
+            if (disconnectedAt.isPresent()
+                    && Duration.between(disconnectedAt.get(), now).compareTo(DISCONNECTED_FORFEIT_AFTER) >= 0) {
+                forfeitPlayer(session, playerId);
+                changed = true;
+            }
+        }
+
+        if (session.status() == SessionStatus.ACTIVE && session.activeGame().isPresent()) {
+            String activePlayerId = session.activeGame().orElseThrow().turnManager().activePlayerId();
+            Optional<Instant> disconnectedAt = session.disconnectedAt(activePlayerId);
+            if (!session.isDefeated(activePlayerId)
+                    && disconnectedAt.isPresent()
+                    && Duration.between(disconnectedAt.get(), now).compareTo(DISCONNECTED_TURN_SKIP_AFTER) >= 0) {
+                skipDisconnectedActiveTurn(session);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    private void skipDisconnectedActiveTurn(GameSession session) {
+        ActiveGameState activeGame = requireActiveGame(session);
+        String skippedPlayerId = activeGame.turnManager().activePlayerId();
+        cancelTradesAwaitingTarget(activeGame, skippedPlayerId);
+        String nextPlayerId = advanceToNextAvailableTurn(session);
+        drawForTurnStart(session, nextPlayerId);
+    }
+
+    private void forfeitPlayer(GameSession session, String playerId) {
+        if (session.isDefeated(playerId)) {
+            return;
+        }
+        session.markDefeated(playerId);
+        session.activeGame().ifPresent(activeGame -> {
+            discardAllPlayerCards(requirePlayer(session, playerId), activeGame);
+            activeGame.clearAllDebtsForPlayer(playerId);
+            activeGame.clearAllTradesForPlayer(playerId);
+            activeGame.clearAllActionsForPlayer(playerId);
+            if (session.status() == SessionStatus.ACTIVE
+                    && activeGame.turnManager().activePlayerId().equals(playerId)
+                    && session.activePlayerIds().size() > 1) {
+                String nextPlayerId = advanceToNextAvailableTurn(session);
+                drawForTurnStart(session, nextPlayerId);
+            }
+        });
+        finishIfOnlyOneActivePlayerRemains(session);
+    }
+
+    private void discardAllPlayerCards(Player player, ActiveGameState activeGame) {
+        for (Card card : player.hand().copyCards()) {
+            activeGame.discard(card);
+        }
+        for (Card card : player.bank().copyCards()) {
+            activeGame.discard(card);
+        }
+        for (PropertySet row : player.propertyBoard().rowsView()) {
+            for (Card card : row.cardsView()) {
+                activeGame.discard(card);
+            }
+        }
+        player.hand().clear();
+        player.bank().clear();
+        player.propertyBoard().clearAllRows();
+    }
+
+    private void finishIfOnlyOneActivePlayerRemains(GameSession session) {
+        if (session.status() != SessionStatus.ACTIVE) {
+            return;
+        }
+        List<String> activePlayerIds = session.activePlayerIds();
+        if (activePlayerIds.size() == 1) {
+            session.finish(activePlayerIds.getFirst());
+        }
     }
 
     private PendingDebt resolvePendingDebt(ActiveGameState activeGame, PayDebtCommand command) {
@@ -595,12 +949,15 @@ public class GameEngine implements ActionExecutor {
                     RENT_RAILROAD_OR_UTILITY,
                     WILD_RENT -> executeRentCard(command, session, player, actionCard, activeGame);
             case HOUSE, HOTEL -> executeImprovementCard(command, player, actionCard, activeGame);
+            case SLY_DEAL -> executeSlyDeal(command, session, player, actionCard, activeGame);
+            case FORCED_DEAL -> executeForcedDeal(command, session, player, actionCard, activeGame);
+            case DEAL_BREAKER -> executeDealBreaker(command, session, player, actionCard, activeGame);
+            case JUST_SAY_NO -> throw new GameException(
+                    "JUST_SAY_NO_RESPONSE_ONLY",
+                    "Just Say No can only be played through respond action");
             case DOUBLE_THE_RENT -> throw new GameException(
                     "UNSUPPORTED_ACTION",
-                    "Double The Rent must be paired with a rent card and is not supported yet");
-            default -> throw new GameException(
-                    "UNSUPPORTED_ACTION",
-                    actionCard.actionType() + " is not implemented in the Core MVP engine");
+                    "Double The Rent must be paired with a rent card");
         }
     }
 
@@ -615,13 +972,14 @@ public class GameEngine implements ActionExecutor {
             throw new GameException("INVALID_TARGET_PLAYER", "Debt Collector cannot target yourself");
         }
         requirePlayer(session, targetPlayerId);
+        requireNotDefeated(session, targetPlayerId);
         discardActionFromHand(player, actionCard, activeGame);
-        activeGame.addPendingDebt(PendingDebt.builder()
-                .creditorPlayerId(player.id())
-                .debtorPlayerId(targetPlayerId)
+        activeGame.addPendingAction(PendingAction.builder()
+                .actorPlayerId(player.id())
+                .actionType(actionCard.actionType())
+                .actionCardId(actionCard.id())
                 .amountM(5)
-                .sourceAction(actionCard.actionType())
-                .sourceCardId(actionCard.id())
+                .targetPlayerIds(List.of(targetPlayerId))
                 .build());
     }
 
@@ -632,18 +990,20 @@ public class GameEngine implements ActionExecutor {
             ActiveGameState activeGame) {
         List<String> debtorIds = activeGame.turnManager().turnOrder().stream()
                 .filter(playerId -> !playerId.equals(player.id()))
+                .filter(playerId -> !session.isDefeated(playerId))
                 .toList();
         debtorIds.forEach(playerId -> requirePlayer(session, playerId));
-        discardActionFromHand(player, actionCard, activeGame);
-        for (String debtorId : debtorIds) {
-            activeGame.addPendingDebt(PendingDebt.builder()
-                    .creditorPlayerId(player.id())
-                    .debtorPlayerId(debtorId)
-                    .amountM(2)
-                    .sourceAction(actionCard.actionType())
-                    .sourceCardId(actionCard.id())
-                    .build());
+        if (debtorIds.isEmpty()) {
+            throw new GameException("NO_TARGET_PLAYERS", "Birthday requires at least one target player");
         }
+        discardActionFromHand(player, actionCard, activeGame);
+        activeGame.addPendingAction(PendingAction.builder()
+                .actorPlayerId(player.id())
+                .actionType(actionCard.actionType())
+                .actionCardId(actionCard.id())
+                .amountM(2)
+                .targetPlayerIds(debtorIds)
+                .build());
     }
 
     private void executeRentCard(
@@ -653,21 +1013,123 @@ public class GameEngine implements ActionExecutor {
             ActionCard actionCard,
             ActiveGameState activeGame) {
         PropertyColor rentColor = resolveRentColor(command, player, actionCard);
-        int rentM = PropertyRentSupport.maxCompleteRowRentForAnchor(player.propertyBoard(), rentColor);
+        int rentM = maxRentForAnchor(player, rentColor);
         if (rentM <= 0) {
-            throw new GameException("NO_RENTABLE_PROPERTY", "No complete rentable set for " + rentColor);
+            throw new GameException("NO_RENTABLE_PROPERTY", "No rentable set for " + rentColor);
         }
-        List<Player> targets = resolveRentTargets(command, session, player, activeGame);
+        ActionCard doubleRent = resolveDoubleRentCard(command, player);
+        if (doubleRent != null) {
+            rentM *= 2;
+        }
+        List<Player> targets = resolveRentTargets(command, session, player, actionCard, activeGame);
+        if (targets.isEmpty()) {
+            throw new GameException("NO_TARGET_PLAYERS", "Rent requires at least one target player");
+        }
         discardActionFromHand(player, actionCard, activeGame);
-        for (Player target : targets) {
-            activeGame.addPendingDebt(PendingDebt.builder()
-                    .creditorPlayerId(player.id())
-                    .debtorPlayerId(target.id())
-                    .amountM(rentM)
-                    .sourceAction(actionCard.actionType())
-                    .sourceCardId(actionCard.id())
-                    .build());
+        if (doubleRent != null) {
+            discardActionFromHand(player, doubleRent, activeGame);
         }
+        activeGame.addPendingAction(PendingAction.builder()
+                .actorPlayerId(player.id())
+                .actionType(actionCard.actionType())
+                .actionCardId(actionCard.id())
+                .doubleRentCardId(doubleRent == null ? null : doubleRent.id())
+                .propertyColor(rentColor)
+                .amountM(rentM)
+                .targetPlayerIds(targets.stream().map(Player::id).toList())
+                .build());
+    }
+
+    private void executeSlyDeal(
+            PlayCardCommand command,
+            GameSession session,
+            Player player,
+            ActionCard actionCard,
+            ActiveGameState activeGame) {
+        String targetPlayerId = requireText(command.getTargetPlayerId(), "targetPlayerId");
+        if (player.id().equals(targetPlayerId)) {
+            throw new GameException("INVALID_TARGET_PLAYER", "Sly Deal cannot target yourself");
+        }
+        Player target = requirePlayer(session, targetPlayerId);
+        requireNotDefeated(session, targetPlayerId);
+        String targetCardId = requireText(command.getTargetCardId(), "targetCardId");
+        Card targetCard = findPropertyCardLocation(target, targetCardId)
+                .orElseThrow(() -> new GameException("CARD_NOT_TRADEABLE", "Target property card not found"))
+                .card();
+        if (!target.propertyBoard().canRemoveCardForSteal(targetCard)) {
+            throw new GameException("CANNOT_STEAL_FROM_COMPLETE_SET", "Sly Deal cannot steal from a complete set");
+        }
+        discardActionFromHand(player, actionCard, activeGame);
+        activeGame.addPendingAction(PendingAction.builder()
+                .actorPlayerId(player.id())
+                .actionType(actionCard.actionType())
+                .actionCardId(actionCard.id())
+                .targetCardId(targetCardId)
+                .targetPlayerIds(List.of(targetPlayerId))
+                .build());
+    }
+
+    private void executeForcedDeal(
+            PlayCardCommand command,
+            GameSession session,
+            Player player,
+            ActionCard actionCard,
+            ActiveGameState activeGame) {
+        String targetPlayerId = requireText(command.getTargetPlayerId(), "targetPlayerId");
+        if (player.id().equals(targetPlayerId)) {
+            throw new GameException("INVALID_TARGET_PLAYER", "Forced Deal cannot target yourself");
+        }
+        Player target = requirePlayer(session, targetPlayerId);
+        requireNotDefeated(session, targetPlayerId);
+        String offeredCardId = requireText(command.getOfferedCardId(), "offeredCardId");
+        String requestedCardId = requireText(command.getRequestedCardId(), "requestedCardId");
+        Card offered = findPropertyCardLocation(player, offeredCardId)
+                .orElseThrow(() -> new GameException("CARD_NOT_TRADEABLE", "Offered property card not found"))
+                .card();
+        Card requested = findPropertyCardLocation(target, requestedCardId)
+                .orElseThrow(() -> new GameException("CARD_NOT_TRADEABLE", "Requested property card not found"))
+                .card();
+        if (!player.propertyBoard().canRemoveCardForSteal(offered)
+                || !target.propertyBoard().canRemoveCardForSteal(requested)) {
+            throw new GameException("CANNOT_STEAL_FROM_COMPLETE_SET", "Forced Deal cannot swap cards from complete sets");
+        }
+        discardActionFromHand(player, actionCard, activeGame);
+        activeGame.addPendingAction(PendingAction.builder()
+                .actorPlayerId(player.id())
+                .actionType(actionCard.actionType())
+                .actionCardId(actionCard.id())
+                .offeredCardId(offeredCardId)
+                .requestedCardId(requestedCardId)
+                .targetPlayerIds(List.of(targetPlayerId))
+                .build());
+    }
+
+    private void executeDealBreaker(
+            PlayCardCommand command,
+            GameSession session,
+            Player player,
+            ActionCard actionCard,
+            ActiveGameState activeGame) {
+        String targetPlayerId = requireText(command.getTargetPlayerId(), "targetPlayerId");
+        if (player.id().equals(targetPlayerId)) {
+            throw new GameException("INVALID_TARGET_PLAYER", "Deal Breaker cannot target yourself");
+        }
+        Player target = requirePlayer(session, targetPlayerId);
+        requireNotDefeated(session, targetPlayerId);
+        String rowId = requireText(command.getTargetPropertyRowId(), "targetPropertyRowId");
+        PropertySet row = target.findPropertyRow(rowId)
+                .orElseThrow(() -> new GameException("PROPERTY_ROW_NOT_FOUND", "Target property row not found"));
+        if (!row.isComplete()) {
+            throw new GameException("NO_COMPLETE_SET", "Deal Breaker requires a complete target set");
+        }
+        discardActionFromHand(player, actionCard, activeGame);
+        activeGame.addPendingAction(PendingAction.builder()
+                .actorPlayerId(player.id())
+                .actionType(actionCard.actionType())
+                .actionCardId(actionCard.id())
+                .targetPropertyRowId(rowId)
+                .targetPlayerIds(List.of(targetPlayerId))
+                .build());
     }
 
     private void executeImprovementCard(
@@ -683,6 +1145,26 @@ public class GameEngine implements ActionExecutor {
         activeGame.discard(spent.value().orElse(actionCard));
     }
 
+    private int maxRentForAnchor(Player player, PropertyColor rentColor) {
+        return player.propertyBoard().rowsView().stream()
+                .filter(row -> row.anchorColor() == rentColor)
+                .mapToInt(PropertySet::rentValue)
+                .max()
+                .orElse(0);
+    }
+
+    private ActionCard resolveDoubleRentCard(PlayCardCommand command, Player player) {
+        String doubleRentCardId = command.getDoubleRentCardId();
+        if (doubleRentCardId == null || doubleRentCardId.isBlank()) {
+            return null;
+        }
+        Card card = requireCardInHand(player, doubleRentCardId);
+        if (!(card instanceof ActionCard actionCard) || actionCard.actionType() != ActionType.DOUBLE_THE_RENT) {
+            throw new GameException("DOUBLE_RENT_REQUIRED", "doubleRentCardId must identify a Double The Rent card");
+        }
+        return actionCard;
+    }
+
     private PropertyColor resolveRentColor(PlayCardCommand command, Player player, ActionCard actionCard) {
         String rawColor = command.getPropertyColor();
         if (rawColor != null && !rawColor.isBlank()) {
@@ -694,7 +1176,7 @@ public class GameEngine implements ActionExecutor {
         }
 
         List<PropertyColor> availableColors = player.propertyBoard().rowsView().stream()
-                .filter(PropertySet::isComplete)
+                .filter(row -> row.size() > 0)
                 .map(PropertySet::anchorColor)
                 .filter(color -> actionCard.actionType() == ActionType.WILD_RENT
                         || actionCard.rentColorOptions().contains(color))
@@ -713,16 +1195,20 @@ public class GameEngine implements ActionExecutor {
             PlayCardCommand command,
             GameSession session,
             Player player,
+            ActionCard actionCard,
             ActiveGameState activeGame) {
         String targetPlayerId = command.getTargetPlayerId();
-        if (targetPlayerId != null && !targetPlayerId.isBlank()) {
+        if (actionCard.actionType() == ActionType.WILD_RENT) {
+            targetPlayerId = requireText(targetPlayerId, "targetPlayerId");
             if (targetPlayerId.equals(player.id())) {
                 throw new GameException("INVALID_TARGET_PLAYER", "Rent cannot target yourself");
             }
+            requireNotDefeated(session, targetPlayerId);
             return List.of(requirePlayer(session, targetPlayerId));
         }
         return activeGame.turnManager().turnOrder().stream()
                 .filter(playerId -> !playerId.equals(player.id()))
+                .filter(playerId -> !session.isDefeated(playerId))
                 .map(playerId -> requirePlayer(session, playerId))
                 .toList();
     }
@@ -786,6 +1272,9 @@ public class GameEngine implements ActionExecutor {
         if (card instanceof PropertyCard propertyCard && propertyCard.color() != color) {
             throw new GameException("PROPERTY_COLOR_MISMATCH", "Property card cannot be played to " + color);
         }
+        if (card instanceof PropertyWildCard wildCard && !wildCard.allowedColors().contains(color)) {
+            throw new GameException("PROPERTY_COLOR_MISMATCH", "Wild card does not support color " + color);
+        }
         return color;
     }
 
@@ -845,11 +1334,17 @@ public class GameEngine implements ActionExecutor {
 
     private void drawCards(Player player, ActiveGameState activeGame, int count) {
         Deck deck = activeGame.drawPile();
+        int before = player.hand().size();
         for (int i = 0; i < count; i++) {
             if (deck.isEmpty()) {
                 activeGame.reshuffleDiscardIntoDraw();
             }
             deck.tryDraw().ifPresent(player::addToHand);
+        }
+        int drawn = player.hand().size() - before;
+        if (drawn < count) {
+            throw new GameException("DRAW_PILE_EXHAUSTED",
+                    "Expected " + count + " cards but only drew " + drawn + " — both piles exhausted");
         }
     }
 
@@ -868,6 +1363,17 @@ public class GameEngine implements ActionExecutor {
     }
 
     private Map<String, Object> snapshot(GameSession session, String requesterPlayerId) {
+        // Centralized win check: every command path that produces a snapshot evaluates win conditions.
+        // This guarantees new action types (Sly Deal, Force Deal, etc.) cannot forget to check for victory.
+        session.activeGame().ifPresent(ag -> {
+            if (session.status() == SessionStatus.ACTIVE) {
+                Player activePlayer = session.findPlayer(ag.turnManager().activePlayerId()).orElse(null);
+                if (activePlayer != null) {
+                    checkWin(session, activePlayer, ag.turnManager());
+                }
+            }
+        });
+
         // TODO(engine-snapshot): Replace this map with a typed DTO once UI/network contracts stabilize.
         Optional<ActiveGameState> activeGame = session.activeGame();
         Map<String, Object> data = new LinkedHashMap<>();
@@ -886,7 +1392,11 @@ public class GameEngine implements ActionExecutor {
         data.put("pendingTrades", activeGame
                 .map(game -> game.pendingTradesView().stream().map(this::pendingTradeSummary).toList())
                 .orElse(List.of()));
-        data.put("players", session.players().stream().map(this::playerSummary).toList());
+        data.put("pendingActions", activeGame
+                .map(game -> game.pendingActionsView().stream().map(this::pendingActionSummary).toList())
+                .orElse(List.of()));
+        data.put("forfeitedPlayerIds", session.forfeitedPlayerIds());
+        data.put("players", session.players().stream().map(player -> playerSummary(session, player)).toList());
 
         List<Map<String, Object>> currentPlayerHand = session.findPlayer(blankToEmpty(requesterPlayerId))
                 .map(player -> player.handView().stream().map(this::cardSummary).toList())
@@ -919,10 +1429,36 @@ public class GameEngine implements ActionExecutor {
         return Map.copyOf(data);
     }
 
-    private Map<String, Object> playerSummary(Player player) {
+    private Map<String, Object> pendingActionSummary(PendingAction action) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("actionId", action.actionId());
+        data.put("actorPlayerId", action.actorPlayerId());
+        data.put("actionType", action.actionType().name());
+        data.put("actionCardId", action.actionCardId());
+        data.put("doubleRentCardId", action.doubleRentCardId().orElse(""));
+        data.put("propertyColor", action.propertyColor().map(Enum::name).orElse(""));
+        data.put("amountM", action.amountM());
+        data.put("targetCardId", action.targetCardId().orElse(""));
+        data.put("targetPropertyRowId", action.targetPropertyRowId().orElse(""));
+        data.put("offeredCardId", action.offeredCardId().orElse(""));
+        data.put("requestedCardId", action.requestedCardId().orElse(""));
+        data.put("targetPlayerIds", action.targetPlayerIds());
+        data.put("responses", action.responsesView().entrySet().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue().name())));
+        data.put("createdAt", action.createdAt().toString());
+        return Map.copyOf(data);
+    }
+
+    private Map<String, Object> playerSummary(GameSession session, Player player) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("playerId", player.id());
         data.put("name", player.name());
+        data.put("playerStatus", session.playerStatus(player.id()));
+        data.put("connected", session.isConnected(player.id()));
+        data.put("disconnectedAt", session.disconnectedAt(player.id()).map(Instant::toString).orElse(""));
+        data.put("defeated", session.isDefeated(player.id()));
         data.put("handCount", player.hand().size());
         data.put("bankTotalValueM", player.bankTotalValueM());
         data.put("bankCards", player.bankView().stream().map(this::cardSummary).toList());
@@ -932,6 +1468,7 @@ public class GameEngine implements ActionExecutor {
 
     private Map<String, Object> propertyRowSummary(PropertySet row) {
         Map<String, Object> data = new LinkedHashMap<>();
+        data.put("rowId", row.rowId());
         data.put("anchorColor", row.anchorColor().name());
         data.put("complete", row.isComplete());
         data.put("rentValue", row.rentValue());

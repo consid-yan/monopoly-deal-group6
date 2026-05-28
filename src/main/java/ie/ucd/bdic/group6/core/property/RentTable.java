@@ -51,7 +51,7 @@ public final class RentTable {
             return baseRent(color, PropertyColor.fullSetSize(color));
         }
         if (hotel && !house) {
-            throw new IllegalArgumentException("hotel requires house for " + color);
+            return baseRent(color, PropertyColor.fullSetSize(color));
         }
         if (hotel) {
             return HOTEL_RENT.get(color);

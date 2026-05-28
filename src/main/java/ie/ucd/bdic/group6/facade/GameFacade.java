@@ -10,8 +10,11 @@ import ie.ucd.bdic.group6.facade.handler.EndTurnHandler;
 import ie.ucd.bdic.group6.facade.handler.JoinSessionHandler;
 import ie.ucd.bdic.group6.facade.handler.PayDebtHandler;
 import ie.ucd.bdic.group6.facade.handler.PlayCardHandler;
+import ie.ucd.bdic.group6.facade.handler.PlayerDisconnectedHandler;
+import ie.ucd.bdic.group6.facade.handler.ProcessDisconnectTimeoutsHandler;
 import ie.ucd.bdic.group6.facade.handler.ProposeTradeHandler;
 import ie.ucd.bdic.group6.facade.handler.RejoinSessionHandler;
+import ie.ucd.bdic.group6.facade.handler.RespondActionHandler;
 import ie.ucd.bdic.group6.facade.handler.RespondTradeHandler;
 import ie.ucd.bdic.group6.facade.handler.StartGameHandler;
 import ie.ucd.bdic.group6.facade.model.GameResult;
@@ -37,9 +40,12 @@ public class GameFacade implements Facade {
                 new PayDebtHandler(actionExecutor),
                 new ProposeTradeHandler(actionExecutor),
                 new RespondTradeHandler(actionExecutor),
+                new RespondActionHandler(actionExecutor),
                 new DiscardCardsHandler(actionExecutor),
                 new EndTurnHandler(actionExecutor),
-                new RejoinSessionHandler(actionExecutor)
+                new RejoinSessionHandler(actionExecutor),
+                new PlayerDisconnectedHandler(actionExecutor),
+                new ProcessDisconnectTimeoutsHandler(actionExecutor)
         ));
     }
 
