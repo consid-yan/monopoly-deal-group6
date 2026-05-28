@@ -145,6 +145,8 @@ public class GameEngine implements ActionExecutor {
 
         debt.markAsPaid();
         activeGame.removePendingDebt(debt);
+        Player activePlayer = requirePlayer(session, activeGame.turnManager().activePlayerId());
+        checkWin(session, activePlayer, activeGame.turnManager());
         return snapshot(session, debtor.id());
     }
 
@@ -201,6 +203,7 @@ public class GameEngine implements ActionExecutor {
             Player proposer = requirePlayer(session, trade.proposerPlayerId());
             Player responder = requirePlayer(session, responderId);
             acceptTrade(trade, proposer, responder);
+            checkWin(session, responder, activeGame.turnManager());
         } else {
             trade.reject();
         }
@@ -216,8 +219,8 @@ public class GameEngine implements ActionExecutor {
         actionRule.requireActivePlayer(activeGame.turnManager(), playerId);
 
         Player player = requirePlayer(session, playerId);
-        List<String> cardIds = command.getDiscardedCardIds();
-        discardHandDownToSeven(player, cardIds != null ? cardIds : List.of(), activeGame);
+        List<String> cardIds = readStringList(command.payload().get("discardedCardIds"));
+        discardHandDownToSeven(player, cardIds, activeGame);
         return snapshot(session, playerId);
     }
 
@@ -786,6 +789,9 @@ public class GameEngine implements ActionExecutor {
         if (card instanceof PropertyCard propertyCard && propertyCard.color() != color) {
             throw new GameException("PROPERTY_COLOR_MISMATCH", "Property card cannot be played to " + color);
         }
+        if (card instanceof PropertyWildCard wildCard && !wildCard.allowedColors().contains(color)) {
+            throw new GameException("PROPERTY_COLOR_MISMATCH", "Wild card does not support color " + color);
+        }
         return color;
     }
 
@@ -845,11 +851,17 @@ public class GameEngine implements ActionExecutor {
 
     private void drawCards(Player player, ActiveGameState activeGame, int count) {
         Deck deck = activeGame.drawPile();
+        int before = player.hand().size();
         for (int i = 0; i < count; i++) {
             if (deck.isEmpty()) {
                 activeGame.reshuffleDiscardIntoDraw();
             }
             deck.tryDraw().ifPresent(player::addToHand);
+        }
+        int drawn = player.hand().size() - before;
+        if (drawn < count) {
+            throw new GameException("DRAW_PILE_EXHAUSTED",
+                    "Expected " + count + " cards but only drew " + drawn + " — both piles exhausted");
         }
     }
 
@@ -868,6 +880,17 @@ public class GameEngine implements ActionExecutor {
     }
 
     private Map<String, Object> snapshot(GameSession session, String requesterPlayerId) {
+        // Centralized win check: every command path that produces a snapshot evaluates win conditions.
+        // This guarantees new action types (Sly Deal, Force Deal, etc.) cannot forget to check for victory.
+        session.activeGame().ifPresent(ag -> {
+            if (session.status() == SessionStatus.ACTIVE) {
+                Player activePlayer = session.findPlayer(ag.turnManager().activePlayerId()).orElse(null);
+                if (activePlayer != null) {
+                    checkWin(session, activePlayer, ag.turnManager());
+                }
+            }
+        });
+
         // TODO(engine-snapshot): Replace this map with a typed DTO once UI/network contracts stabilize.
         Optional<ActiveGameState> activeGame = session.activeGame();
         Map<String, Object> data = new LinkedHashMap<>();

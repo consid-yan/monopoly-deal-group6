@@ -77,9 +77,7 @@ public final class Bank {
     }
 
     public void addAll(Collection<Card> pile) {
-        for (Card c : pile) {
-            cards.add(c);
-        }
+        cards.addAll(pile);
         fireChanged();
     }
 

@@ -46,8 +46,8 @@ public final class ActiveGameState {
             return false;
         }
         java.util.Collections.shuffle(discardPile);
-        for (Card card : discardPile) {
-            drawPile.discardToBottom(card);
+        for (int i = discardPile.size() - 1; i >= 0; i--) {
+            drawPile.discardToBottom(discardPile.get(i));
         }
         discardPile.clear();
         return true;

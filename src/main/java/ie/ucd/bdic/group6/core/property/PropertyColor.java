@@ -20,9 +20,8 @@ public enum PropertyColor {
      */
     public static int fullSetSize(PropertyColor color) {
         return switch (color) {
-            case BROWN, DARK_BLUE -> 2;
+            case BROWN, DARK_BLUE, UTILITY -> 2;
             case RAILROAD -> 4;
-            case UTILITY -> 2;
             case LIGHT_BLUE, PINK, ORANGE, RED, YELLOW, GREEN -> 3;
         };
     }

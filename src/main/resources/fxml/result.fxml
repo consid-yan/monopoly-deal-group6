@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.Separator?>
@@ -13,10 +14,10 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane prefHeight="640.0" prefWidth="960.0"
             styleClass="menu-root root-screen result-screen"
-            stylesheets="@../css/style.css"
             xmlns="http://javafx.com/javafx/25.0.2"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="ie.ucd.bdic.group6.ui.ResultUI">
@@ -42,7 +43,7 @@
             <padding>
                 <Insets bottom="28.0" left="48.0" right="48.0" top="8.0"/>
             </padding>
-            <GridPane hgap="18.0" vgap="12.0">
+            <GridPane hgap="18.0" styleClass="surface-panel" vgap="12.0">
                 <columnConstraints>
                     <ColumnConstraints minWidth="160.0" prefWidth="190.0"/>
                     <ColumnConstraints hgrow="ALWAYS" minWidth="260.0"/>
@@ -54,13 +55,13 @@
                         <Font name="System Bold" size="16.0"/>
                     </font>
                 </Label>
-                <TextField editable="false" promptText="Winner" styleClass="winner-field" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+                <TextField fx:id="winnerField" editable="false" promptText="Winner" styleClass="winner-field" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
                 <Label text="Completed Property Sets" GridPane.columnIndex="2" GridPane.rowIndex="0">
                     <font>
                         <Font name="System Bold" size="16.0"/>
                     </font>
                 </Label>
-                <TextField editable="false" promptText="Completed Property Sets" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
+                <TextField fx:id="completedSetsField" editable="false" promptText="Completed Property Sets" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
                 <Label text="Win Condition" GridPane.columnIndex="0" GridPane.rowIndex="1">
                     <font>
                         <Font name="System Bold" size="16.0"/>
@@ -72,7 +73,7 @@
             <HBox spacing="20.0">
                 <TitledPane animated="false" collapsible="false" prefHeight="260.0" text="Player Summary"
                             HBox.hgrow="ALWAYS">
-                    <ListView prefHeight="230.0" prefWidth="420.0">
+                    <ListView fx:id="playerSummaryList" prefHeight="230.0" prefWidth="420.0">
                         <placeholder>
                             <Label text="Game Summary"/>
                         </placeholder>
@@ -80,7 +81,7 @@
                 </TitledPane>
                 <TitledPane animated="false" collapsible="false" prefHeight="260.0" text="Defeated / Forfeit Status"
                             HBox.hgrow="ALWAYS">
-                    <ListView prefHeight="230.0" prefWidth="420.0">
+                    <ListView fx:id="forfeitList" prefHeight="230.0" prefWidth="420.0">
                         <placeholder>
                             <Label text="Defeated/Forfeit players"/>
                         </placeholder>
@@ -88,7 +89,8 @@
                 </TitledPane>
             </HBox>
             <TitledPane animated="false" collapsible="false" styleClass="section-panel" text="Final Result">
-                <TextArea editable="false"
+                <TextArea fx:id="finalResultArea"
+                          editable="false"
                           focusTraversable="false"
                           prefHeight="110.0"
                               promptText="Final Result"
@@ -102,4 +104,26 @@
             </Label>
         </VBox>
     </center>
+    <bottom>
+        <HBox alignment="CENTER_RIGHT" spacing="12.0" BorderPane.alignment="CENTER">
+            <padding>
+                <Insets bottom="24.0" left="48.0" right="48.0" top="8.0"/>
+            </padding>
+            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#backToMenu" prefHeight="40.0" prefWidth="140.0" styleClass="secondary-button" text="Main Menu">
+                <graphic>
+                    <FontIcon iconLiteral="bx-home"/>
+                </graphic>
+            </Button>
+            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#playAgain" prefHeight="40.0" prefWidth="140.0" styleClass="primary-button" text="Play Again">
+                <graphic>
+                    <FontIcon iconLiteral="bx-reset"/>
+                </graphic>
+            </Button>
+            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#exitApplication" prefHeight="40.0" prefWidth="120.0" styleClass="danger-button" text="Exit">
+                <graphic>
+                    <FontIcon iconLiteral="bx-exit"/>
+                </graphic>
+            </Button>
+        </HBox>
+    </bottom>
 </BorderPane>

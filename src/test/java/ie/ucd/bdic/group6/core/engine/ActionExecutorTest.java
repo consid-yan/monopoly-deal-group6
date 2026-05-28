@@ -246,7 +246,9 @@ class ActionExecutorTest {
                 money("host-next-1", 1),
                 money("host-next-2", 1),
                 money("extra-1", 1),
-                money("extra-2", 1)
+                money("extra-2", 1),
+                money("player2-next-1", 1),
+                money("player2-next-2", 1)
         ));
         Map<String, Object> created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");

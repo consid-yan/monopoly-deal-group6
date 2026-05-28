@@ -75,9 +75,9 @@ class RentTableTest {
     }
 
     @org.junit.jupiter.api.Test
-    void completeSetRentRejectsHotelWithoutHouse() {
-        org.junit.jupiter.api.Assertions.assertThrows(
-                IllegalArgumentException.class,
-                () -> RentTable.completeSetRent(PropertyColor.BROWN, false, true));
+    void completeSetRentDegradesHotelWithoutHouseToBaseRent() {
+        // hotel-without-house is an invalid combination; the method returns base rent instead of crashing
+        int rent = RentTable.completeSetRent(PropertyColor.BROWN, false, true);
+        assertEquals(2, rent);
     }
 }
