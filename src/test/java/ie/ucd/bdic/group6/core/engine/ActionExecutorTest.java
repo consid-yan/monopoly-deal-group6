@@ -7,6 +7,7 @@ import ie.ucd.bdic.group6.command.JoinSessionCommand;
 import ie.ucd.bdic.group6.command.PayDebtCommand;
 import ie.ucd.bdic.group6.command.PlayCardCommand;
 import ie.ucd.bdic.group6.command.ProposeTradeCommand;
+import ie.ucd.bdic.group6.command.RejoinSessionCommand;
 import ie.ucd.bdic.group6.command.RespondTradeCommand;
 import ie.ucd.bdic.group6.command.StartGameCommand;
 import ie.ucd.bdic.group6.core.card.ActionCard;
@@ -400,6 +401,21 @@ class ActionExecutorTest {
 
         assertEquals("FINISHED", afterWin.get("status"));
         assertEquals("host", afterWin.get("winnerPlayerId"));
+    }
+
+    @Test
+    void rejoinRejectsUnknownPlayerId() {
+        GameEngine engine = engineWithDrawOrder(moneyCards("c", 20));
+        Map<String, Object> created = createSession(engine, "host", 5);
+        join(engine, text(created, "sessionCode"), "player2");
+        startGame(engine, text(created, "sessionId"), "host");
+
+        GameException error = assertThrows(GameException.class,
+                () -> engine.executeRejoinSession(new RejoinSessionCommand(Map.of(
+                        "sessionIdentity", text(created, "sessionId"),
+                        "playerId", "intruder"
+                ))));
+        assertEquals("PLAYER_NOT_FOUND", error.getErrorCode());
     }
 
     private StartedGame startedGameWithHostCards(List<Card> hostCards, List<Card> extraTopCards) {

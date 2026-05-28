@@ -152,6 +152,17 @@ public final class Player {
         return OperationResult.ok();
     }
 
+    public OperationResult<ActionCard> tryPlayActionFromHand(ActionCard actionCard) {
+        Objects.requireNonNull(actionCard, "actionCard");
+        if (!hand.contains(actionCard)) {
+            return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "action card not in hand: " + actionCard.id());
+        }
+        if (!hand.remove(actionCard)) {
+            return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "action card not in hand: " + actionCard.id());
+        }
+        return OperationResult.ok(actionCard);
+    }
+
     public OperationResult<ActionCard> trySpendHouseCardOnRow(ActionCard houseFromHand, PropertySet row) {
         return spendImprovementCard(houseFromHand, row, ActionType.HOUSE, row::tryPlaceHouseStructuralOnly);
     }

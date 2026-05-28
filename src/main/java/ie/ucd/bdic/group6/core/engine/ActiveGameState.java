@@ -41,7 +41,17 @@ public final class ActiveGameState {
         return discardPile.size();
     }
 
-    // TODO(engine-deck): Define deck exhaustion and discard reshuffle rules before advanced draw effects.
+    public boolean reshuffleDiscardIntoDraw() {
+        if (!drawPile.isEmpty() || discardPile.isEmpty()) {
+            return false;
+        }
+        java.util.Collections.shuffle(discardPile);
+        for (Card card : discardPile) {
+            drawPile.discardToBottom(card);
+        }
+        discardPile.clear();
+        return true;
+    }
 
     public Optional<String> winnerPlayerId() {
         return Optional.ofNullable(winnerPlayerId);

@@ -17,6 +17,13 @@ public class CreateSessionCommand extends AbstractCommand {
     }
 
     public Integer getMaxPlayers() {
-        return (Integer) payload().get("maxPlayers");
+        Object raw = payload().get("maxPlayers");
+        if (raw == null) {
+            return null;
+        }
+        if (raw instanceof Number n) {
+            return n.intValue();
+        }
+        return Integer.parseInt(raw.toString());
     }
 }
