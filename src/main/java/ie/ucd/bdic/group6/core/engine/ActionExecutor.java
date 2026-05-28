@@ -12,7 +12,10 @@ public interface ActionExecutor {
     Map<String, Object> executePayDebt(PayDebtCommand command);
     Map<String, Object> executeProposeTrade(ProposeTradeCommand command);
     Map<String, Object> executeRespondTrade(RespondTradeCommand command);
+    Map<String, Object> executeRespondAction(RespondActionCommand command);
     Map<String, Object> executeDiscardCards(DiscardCardsCommand command);
     Map<String, Object> executeEndTurn(EndTurnCommand command);
     Map<String, Object> executeRejoinSession(RejoinSessionCommand command);
+    Map<String, Object> executePlayerDisconnected(PlayerDisconnectedCommand command);
+    Map<String, Object> executeProcessDisconnectTimeouts(ProcessDisconnectTimeoutsCommand command);
 }

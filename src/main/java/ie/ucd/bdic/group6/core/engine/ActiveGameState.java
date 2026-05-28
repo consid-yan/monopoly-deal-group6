@@ -14,6 +14,7 @@ public final class ActiveGameState {
     private final TurnManager turnManager;
     private final List<PendingDebt> pendingDebts = new ArrayList<>();
     private final List<PendingTrade> pendingTrades = new ArrayList<>();
+    private final List<PendingAction> pendingActions = new ArrayList<>();
     private String winnerPlayerId;
 
     public ActiveGameState(Deck drawPile, TurnManager turnManager) {
@@ -46,8 +47,8 @@ public final class ActiveGameState {
             return false;
         }
         java.util.Collections.shuffle(discardPile);
-        for (Card card : discardPile) {
-            drawPile.discardToBottom(card);
+        for (int i = discardPile.size() - 1; i >= 0; i--) {
+            drawPile.discardToBottom(discardPile.get(i));
         }
         discardPile.clear();
         return true;
@@ -150,5 +151,35 @@ public final class ActiveGameState {
 
     public void clearAllTradesForPlayer(String playerId) {
         pendingTrades.removeIf(trade -> trade.involvesPlayer(playerId));
+    }
+
+    public void addPendingAction(PendingAction action) {
+        pendingActions.add(Objects.requireNonNull(action, "action"));
+    }
+
+    public void removePendingAction(PendingAction action) {
+        pendingActions.remove(action);
+    }
+
+    public List<PendingAction> pendingActionsView() {
+        return List.copyOf(pendingActions);
+    }
+
+    public Optional<PendingAction> findPendingAction(String actionId) {
+        if (actionId == null || actionId.isBlank()) {
+            return Optional.empty();
+        }
+        return pendingActions.stream()
+                .filter(action -> action.actionId().equals(actionId))
+                .findFirst();
+    }
+
+    public boolean hasPendingActions() {
+        return !pendingActions.isEmpty();
+    }
+
+    public void clearAllActionsForPlayer(String playerId) {
+        pendingActions.removeIf(action -> action.actorPlayerId().equals(playerId)
+                || action.targetPlayerIds().contains(playerId));
     }
 }

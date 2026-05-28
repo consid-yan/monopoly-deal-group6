@@ -42,6 +42,10 @@ public class GameController {
         return gameFacade.execute(requestMapper.toRespondTradeCommand(request));
     }
 
+    public GameResult respondAction(ControllerRequest request) {
+        return gameFacade.execute(requestMapper.toRespondActionCommand(request));
+    }
+
     public GameResult discardCards(ControllerRequest request) {
         return gameFacade.execute(requestMapper.toDiscardCardsCommand(request));
     }
@@ -52,5 +56,13 @@ public class GameController {
 
     public GameResult rejoinSession(ControllerRequest request) {
         return gameFacade.execute(requestMapper.toRejoinSessionCommand(request));
+    }
+
+    public GameResult playerDisconnected(ControllerRequest request) {
+        return gameFacade.execute(requestMapper.toPlayerDisconnectedCommand(request));
+    }
+
+    public GameResult processDisconnectTimeouts(ControllerRequest request) {
+        return gameFacade.execute(requestMapper.toProcessDisconnectTimeoutsCommand(request));
     }
 }

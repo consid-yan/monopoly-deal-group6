@@ -34,6 +34,10 @@ public class RequestMapper {
         return new RespondTradeCommand(safeData(request));
     }
 
+    public RespondActionCommand toRespondActionCommand(ControllerRequest request) {
+        return new RespondActionCommand(safeData(request));
+    }
+
     public DiscardCardsCommand toDiscardCardsCommand(ControllerRequest request) {
         return new DiscardCardsCommand(safeData(request));
     }
@@ -44,6 +48,14 @@ public class RequestMapper {
 
     public RejoinSessionCommand toRejoinSessionCommand(ControllerRequest request) {
         return new RejoinSessionCommand(safeData(request));
+    }
+
+    public PlayerDisconnectedCommand toPlayerDisconnectedCommand(ControllerRequest request) {
+        return new PlayerDisconnectedCommand(safeData(request));
+    }
+
+    public ProcessDisconnectTimeoutsCommand toProcessDisconnectTimeoutsCommand(ControllerRequest request) {
+        return new ProcessDisconnectTimeoutsCommand(safeData(request));
     }
 
     private Map<String, Object> safeData(ControllerRequest request) {

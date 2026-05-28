@@ -6,10 +6,10 @@
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane prefHeight="640.0" prefWidth="960.0"
             styleClass="menu-root root-screen menu-screen"
-            stylesheets="@../css/style.css"
             xmlns="http://javafx.com/javafx/25.0.2"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="ie.ucd.bdic.group6.ui.MenuUI">
@@ -29,11 +29,31 @@
                 </font>
             </Label>
             <VBox alignment="CENTER" spacing="12.0" styleClass="menu-actions">
-                <Button mnemonicParsing="false" prefHeight="44.0" prefWidth="280.0" styleClass="primary-button" text="New Game"/>
-                <Button mnemonicParsing="false" prefHeight="44.0" prefWidth="280.0" styleClass="secondary-button" text="Join Game"/>
-                <Button mnemonicParsing="false" prefHeight="44.0" prefWidth="280.0" styleClass="gold-button" text="Rejoin Session"/>
-                <Button mnemonicParsing="false" prefHeight="44.0" prefWidth="280.0" styleClass="secondary-button" text="How to Play"/>
-                <Button mnemonicParsing="false" prefHeight="44.0" prefWidth="280.0" styleClass="danger-button" text="Exit"/>
+                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#startNewGame" prefHeight="44.0" prefWidth="280.0" styleClass="primary-button" text="New Game">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-plus-circle"/>
+                    </graphic>
+                </Button>
+                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#joinGame" prefHeight="44.0" prefWidth="280.0" styleClass="secondary-button" text="Join Game">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-log-in-circle"/>
+                    </graphic>
+                </Button>
+                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#rejoinSession" prefHeight="44.0" prefWidth="280.0" styleClass="gold-button" text="Rejoin Session">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-reset"/>
+                    </graphic>
+                </Button>
+                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#openHowToPlay" prefHeight="44.0" prefWidth="280.0" styleClass="secondary-button" text="How to Play">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-question-mark"/>
+                    </graphic>
+                </Button>
+                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#exitApplication" prefHeight="44.0" prefWidth="280.0" styleClass="danger-button" text="Exit">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-exit"/>
+                    </graphic>
+                </Button>
             </VBox>
             <Label styleClass="menu-note" text="2-5 players | Create, join, or rejoin a session">
                 <font>

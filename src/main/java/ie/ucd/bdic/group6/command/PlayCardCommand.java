@@ -21,6 +21,26 @@ public class PlayCardCommand extends AbstractCommand {
         return (String) payload().get("targetPlayerId");
     }
 
+    public String getTargetCardId() {
+        return (String) payload().get("targetCardId");
+    }
+
+    public String getTargetPropertyRowId() {
+        return (String) payload().get("targetPropertyRowId");
+    }
+
+    public String getOfferedCardId() {
+        return (String) payload().get("offeredCardId");
+    }
+
+    public String getRequestedCardId() {
+        return (String) payload().get("requestedCardId");
+    }
+
+    public String getDoubleRentCardId() {
+        return (String) payload().get("doubleRentCardId");
+    }
+
     public String getPlayMode() {
         return (String) payload().get("playMode");
     }

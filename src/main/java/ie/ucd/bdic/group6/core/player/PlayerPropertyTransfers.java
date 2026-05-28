@@ -74,8 +74,10 @@ public final class PlayerPropertyTransfers {
         PropertySet receiverRow = receiver.propertyBoard().startNewRow(anchorColor);
         OperationResult<Void> moved = transferPropertyCardToRow(sender, receiver, card, receiverRow, wildChoice);
         if (!moved.isSuccess()) {
-            receiver.propertyBoard().removeRow(receiverRow);
-            receiver.propertyBoard().compactEmptyRows();
+            if (receiverRow.size() == 0) {
+                receiver.propertyBoard().removeRow(receiverRow);
+                receiver.propertyBoard().compactEmptyRows();
+            }
             return OperationResult.fail(
                     moved.errorCode().orElse(OperationError.GENERIC),
                     moved.errorMessage().orElse(""));
@@ -131,8 +133,10 @@ public final class PlayerPropertyTransfers {
         PropertySet creditorRow = creditor.propertyBoard().startNewRow(anchorColor);
         OperationResult<Void> moved = transferPropertyCardToRow(payer, creditor, card, creditorRow, wildChoice);
         if (!moved.isSuccess()) {
-            creditor.propertyBoard().removeRow(creditorRow);
-            creditor.propertyBoard().compactEmptyRows();
+            if (creditorRow.size() == 0) {
+                creditor.propertyBoard().removeRow(creditorRow);
+                creditor.propertyBoard().compactEmptyRows();
+            }
             return OperationResult.fail(
                     moved.errorCode().orElse(OperationError.GENERIC),
                     moved.errorMessage().orElse(""));

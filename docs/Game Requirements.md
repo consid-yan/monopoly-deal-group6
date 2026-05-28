@@ -308,10 +308,16 @@ When a player is marked as Defeated/Forfeit due to failure to reconnect in time,
 **FR-46 Command Support**
 The system shall support at least these gameplay commands:
 
+* create session,
+* join session,
 * start game,
 * play card,
-* trade,
-* end turn.
+* pay debt,
+* propose trade,
+* respond to trade,
+* discard cards,
+* end turn,
+* rejoin session.
 
 ---
 
