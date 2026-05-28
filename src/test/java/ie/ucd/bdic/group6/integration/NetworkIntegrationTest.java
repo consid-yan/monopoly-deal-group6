@@ -154,7 +154,7 @@ class NetworkIntegrationTest {
 
         player2.close();
         await(hostUpdates, update -> update.sessionId().equals(sessionId)
-                && "DISCONNECTED".equals(player(update, "player2").get("playerStatus")));
+                && playerHasStatus(update, "player2", "DISCONNECTED"));
 
         clock.advance(Duration.ofSeconds(91));
         StateUpdate finished = await(hostUpdates, update -> update.sessionId().equals(sessionId)
@@ -215,6 +215,13 @@ class NetworkIntegrationTest {
                 .filter(player -> playerId.equals(player.get("playerId")))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean playerHasStatus(StateUpdate update, String playerId, String status) {
+        return ((List<Map<String, Object>>) update.data().get("players")).stream()
+                .anyMatch(player -> playerId.equals(player.get("playerId"))
+                        && status.equals(player.get("playerStatus")));
     }
 
     @SuppressWarnings("unchecked")
