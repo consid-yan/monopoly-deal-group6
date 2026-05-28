@@ -59,57 +59,14 @@
                 <Insets bottom="8.0" left="24.0" right="12.0" top="4.0"/>
             </padding>
 
-            <HBox alignment="CENTER" spacing="10.0" styleClass="opponents-row">
-                <VBox prefWidth="250.0" spacing="7.0" styleClass="opponent-seat tabletop-panel">
-                    <Label styleClass="zone-heading" text="Alex - public area"/>
-                    <HBox fx:id="alexHandBacks" alignment="CENTER_LEFT" spacing="5.0" styleClass="opponent-hand-backs"/>
-                    <HBox spacing="7.0">
-                        <VBox HBox.hgrow="ALWAYS" spacing="4.0">
-                            <Label styleClass="zone-caption" text="Bank"/>
-                            <FlowPane fx:id="alexBankZone" hgap="6.0" prefHeight="92.0" styleClass="drop-zone compact-drop-zone bank-drop-zone" vgap="6.0"/>
-                        </VBox>
-                        <VBox HBox.hgrow="ALWAYS" spacing="4.0">
-                            <Label styleClass="zone-caption" text="Properties"/>
-                            <FlowPane fx:id="alexPropertyZone" hgap="6.0" prefHeight="92.0" styleClass="drop-zone compact-drop-zone property-drop-zone" vgap="6.0"/>
-                        </VBox>
-                    </HBox>
-                </VBox>
-                <VBox prefWidth="250.0" spacing="7.0" styleClass="opponent-seat tabletop-panel">
-                    <Label styleClass="zone-heading" text="Morgan - public area"/>
-                    <HBox fx:id="morganHandBacks" alignment="CENTER_LEFT" spacing="5.0" styleClass="opponent-hand-backs"/>
-                    <HBox spacing="7.0">
-                        <VBox HBox.hgrow="ALWAYS" spacing="4.0">
-                            <Label styleClass="zone-caption" text="Bank"/>
-                            <FlowPane fx:id="morganBankZone" hgap="6.0" prefHeight="92.0" styleClass="drop-zone compact-drop-zone bank-drop-zone" vgap="6.0"/>
-                        </VBox>
-                        <VBox HBox.hgrow="ALWAYS" spacing="4.0">
-                            <Label styleClass="zone-caption" text="Properties"/>
-                            <FlowPane fx:id="morganPropertyZone" hgap="6.0" prefHeight="92.0" styleClass="drop-zone compact-drop-zone property-drop-zone" vgap="6.0"/>
-                        </VBox>
-                    </HBox>
-                </VBox>
-                <VBox prefWidth="250.0" spacing="7.0" styleClass="opponent-seat tabletop-panel">
-                    <Label styleClass="zone-heading" text="Riley - public area"/>
-                    <HBox fx:id="rileyHandBacks" alignment="CENTER_LEFT" spacing="5.0" styleClass="opponent-hand-backs"/>
-                    <HBox spacing="7.0">
-                        <VBox HBox.hgrow="ALWAYS" spacing="4.0">
-                            <Label styleClass="zone-caption" text="Bank"/>
-                            <FlowPane fx:id="rileyBankZone" hgap="6.0" prefHeight="92.0" styleClass="drop-zone compact-drop-zone bank-drop-zone" vgap="6.0"/>
-                        </VBox>
-                        <VBox HBox.hgrow="ALWAYS" spacing="4.0">
-                            <Label styleClass="zone-caption" text="Properties"/>
-                            <FlowPane fx:id="rileyPropertyZone" hgap="6.0" prefHeight="92.0" styleClass="drop-zone compact-drop-zone property-drop-zone" vgap="6.0"/>
-                        </VBox>
-                    </HBox>
-                </VBox>
-            </HBox>
+            <HBox fx:id="opponentsRow" alignment="CENTER" spacing="10.0" styleClass="opponents-row"/>
 
             <VBox spacing="10.0" styleClass="tabletop-board" VBox.vgrow="ALWAYS">
                 <HBox alignment="CENTER" spacing="10.0">
                     <VBox alignment="CENTER" prefWidth="130.0" spacing="6.0" styleClass="pile-panel">
                         <Label styleClass="zone-heading" text="Draw Pile"/>
                         <StackPane prefHeight="124.0" prefWidth="92.0" styleClass="draw-pile-card">
-                            <Label text="DRAW&#10;56"/>
+                            <Label fx:id="drawPileLabel"/>
                         </StackPane>
                     </VBox>
                     <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="tabletop-panel">
@@ -141,62 +98,70 @@
                     </VBox>
                 </HBox>
 
-                <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="AS_NEEDED" styleClass="table-scroll" VBox.vgrow="ALWAYS" vbarPolicy="AS_NEEDED">
-                    <content>
-                        <GridPane hgap="8.0" styleClass="property-board" vgap="8.0">
-                            <columnConstraints>
-                                <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
-                                <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
-                                <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
-                                <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
-                                <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
-                            </columnConstraints>
-                            <rowConstraints>
-                                <RowConstraints vgrow="ALWAYS"/>
-                                <RowConstraints vgrow="ALWAYS"/>
-                            </rowConstraints>
-                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="0" GridPane.rowIndex="0">
-                                <Label styleClass="zone-heading property-brown" text="Brown Set (2)"/>
-                                <FlowPane fx:id="brownPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="1" GridPane.rowIndex="0">
-                                <Label styleClass="zone-heading property-light-blue" text="Light Blue Set (3)"/>
-                                <FlowPane fx:id="lightBluePropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="2" GridPane.rowIndex="0">
-                                <Label styleClass="zone-heading property-pink" text="Pink Set (3)"/>
-                                <FlowPane fx:id="pinkPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="3" GridPane.rowIndex="0">
-                                <Label styleClass="zone-heading property-orange" text="Orange Set (3)"/>
-                                <FlowPane fx:id="orangePropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="4" GridPane.rowIndex="0">
-                                <Label styleClass="zone-heading property-red" text="Red Set (3)"/>
-                                <FlowPane fx:id="redPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="0" GridPane.rowIndex="1">
-                                <Label styleClass="zone-heading property-yellow" text="Yellow Set (3)"/>
-                                <FlowPane fx:id="yellowPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="1" GridPane.rowIndex="1">
-                                <Label styleClass="zone-heading property-green" text="Green Set (3)"/>
-                                <FlowPane fx:id="greenPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="2" GridPane.rowIndex="1">
-                                <Label styleClass="zone-heading property-dark-blue" text="Dark Blue Set (2)"/>
-                                <FlowPane fx:id="darkBluePropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="3" GridPane.rowIndex="1">
-                                <Label styleClass="zone-heading property-railroad" text="Railroad Set (4)"/>
-                                <FlowPane fx:id="railroadPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="4" GridPane.rowIndex="1">
-                                <Label styleClass="zone-heading property-utility" text="Utility Set (2)"/>
-                                <FlowPane fx:id="utilityPropertyZone" hgap="7.0" prefHeight="122.0" styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                        </GridPane>
-                    </content>
+                <ScrollPane fitToHeight="true" fitToWidth="true" styleClass="table-scroll" VBox.vgrow="ALWAYS">
+                    <GridPane hgap="8.0" styleClass="property-board" vgap="8.0">
+                        <columnConstraints>
+                            <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
+                            <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
+                            <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
+                            <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
+                            <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
+                        </columnConstraints>
+                        <rowConstraints>
+                            <RowConstraints vgrow="ALWAYS"/>
+                            <RowConstraints vgrow="ALWAYS"/>
+                        </rowConstraints>
+                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                            <Label styleClass="zone-heading property-brown" text="Brown Set (2)"/>
+                            <FlowPane fx:id="brownPropertyZone" hgap="7.0" prefHeight="122.0"
+                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                        </VBox>
+                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                            <Label styleClass="zone-heading property-light-blue" text="Light Blue Set (3)"/>
+                            <FlowPane fx:id="lightBluePropertyZone" hgap="7.0" prefHeight="122.0"
+                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                        </VBox>
+                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="2" GridPane.rowIndex="0">
+                            <Label styleClass="zone-heading property-pink" text="Pink Set (3)"/>
+                            <FlowPane fx:id="pinkPropertyZone" hgap="7.0" prefHeight="122.0"
+                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                        </VBox>
+                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="3" GridPane.rowIndex="0">
+                            <Label styleClass="zone-heading property-orange" text="Orange Set (3)"/>
+                            <FlowPane fx:id="orangePropertyZone" hgap="7.0" prefHeight="122.0"
+                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                        </VBox>
+                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="4" GridPane.rowIndex="0">
+                            <Label styleClass="zone-heading property-red" text="Red Set (3)"/>
+                            <FlowPane fx:id="redPropertyZone" hgap="7.0" prefHeight="122.0"
+                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                        </VBox>
+                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                            <Label styleClass="zone-heading property-yellow" text="Yellow Set (3)"/>
+                            <FlowPane fx:id="yellowPropertyZone" hgap="7.0" prefHeight="122.0"
+                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                        </VBox>
+                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                            <Label styleClass="zone-heading property-green" text="Green Set (3)"/>
+                            <FlowPane fx:id="greenPropertyZone" hgap="7.0" prefHeight="122.0"
+                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                        </VBox>
+                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="2" GridPane.rowIndex="1">
+                            <Label styleClass="zone-heading property-dark-blue" text="Dark Blue Set (2)"/>
+                            <FlowPane fx:id="darkBluePropertyZone" hgap="7.0" prefHeight="122.0"
+                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                        </VBox>
+                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="3" GridPane.rowIndex="1">
+                            <Label styleClass="zone-heading property-railroad" text="Railroad Set (4)"/>
+                            <FlowPane fx:id="railroadPropertyZone" hgap="7.0" prefHeight="122.0"
+                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                        </VBox>
+                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="4" GridPane.rowIndex="1">
+                            <Label styleClass="zone-heading property-utility" text="Utility Set (2)"/>
+                            <FlowPane fx:id="utilityPropertyZone" hgap="7.0" prefHeight="122.0"
+                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
+                        </VBox>
+                    </GridPane>
                 </ScrollPane>
             </VBox>
         </VBox>
@@ -227,11 +192,6 @@
                     <FontIcon iconLiteral="bx-skip-next"/>
                 </graphic>
             </Button>
-            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#finishDemo" prefHeight="38.0" prefWidth="218.0" styleClass="primary-button" text="Finish Demo">
-                <graphic>
-                    <FontIcon iconLiteral="bx-star"/>
-                </graphic>
-            </Button>
             <Separator prefWidth="218.0"/>
             <Label styleClass="zone-heading" text="Simplified Trade"/>
             <TextField fx:id="targetPlayerField" prefWidth="218.0" promptText="Target player"/>
@@ -257,6 +217,18 @@
                     <FontIcon iconLiteral="bx-check"/>
                 </graphic>
             </Button>
+            <HBox alignment="CENTER" spacing="8.0">
+                <Button graphicTextGap="6.0" mnemonicParsing="false" onAction="#acceptAction" prefWidth="104.0" styleClass="gold-button" text="Allow Action">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-check"/>
+                    </graphic>
+                </Button>
+                <Button graphicTextGap="6.0" mnemonicParsing="false" onAction="#rejectAction" prefWidth="104.0" styleClass="danger-button" text="Just Say No">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-x"/>
+                    </graphic>
+                </Button>
+            </HBox>
             <Separator prefWidth="218.0"/>
             <HBox alignment="CENTER" spacing="8.0">
                 <Button graphicTextGap="6.0" mnemonicParsing="false" onAction="#backToLobby" prefWidth="105.0" styleClass="secondary-button" text="Lobby">

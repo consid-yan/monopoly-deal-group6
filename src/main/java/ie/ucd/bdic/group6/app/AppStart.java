@@ -13,15 +13,11 @@ public class AppStart {
     }
 
     public void start(Stage primaryStage) {
-        SceneManager.initialize(primaryStage);
+        SceneManager.initialize(primaryStage, appConfig);
     }
 
     public static void main(String[] args) {
         Application.launch(FxApplication.class, args);
-    }
-
-    public AppConfig getAppConfig() {
-        return appConfig;
     }
 
     public static final class FxApplication extends Application {

@@ -8,10 +8,6 @@ import java.util.Map;
 import java.util.Objects;
 
 public final class NetworkPayloads {
-
-    private NetworkPayloads() {
-    }
-
     public static Map<String, Object> normalizeMap(Map<String, Object> payload) {
         if (payload == null || payload.isEmpty()) {
             return new LinkedHashMap<>();
@@ -21,7 +17,6 @@ public final class NetworkPayloads {
         return normalized;
     }
 
-    @SuppressWarnings("unchecked")
     public static Object normalizeValue(Object value) {
         if (value == null
                 || value instanceof String

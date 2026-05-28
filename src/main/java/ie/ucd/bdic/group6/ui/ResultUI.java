@@ -6,7 +6,11 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 
+import java.util.Comparator;
+import java.util.List;
+
 public class ResultUI {
+    private final UiSessionContext context;
 
     @FXML
     private TextField winnerField;
@@ -23,38 +27,75 @@ public class ResultUI {
     @FXML
     private TextArea finalResultArea;
 
+    public ResultUI(UiSessionContext context) {
+        this.context = context;
+    }
+
     @FXML
     private void initialize() {
-        winnerField.setText("Jordan");
-        completedSetsField.setText("3 full sets");
-        playerSummaryList.setItems(FXCollections.observableArrayList(
-                "Jordan - 3 full sets - Bank $8M",
-                "Riley - 2 full sets - Bank $7M",
-                "Alex - 1 full set - Bank $6M",
-                "Morgan - 0 full sets - Bank $4M"
-        ));
-        forfeitList.setItems(FXCollections.observableArrayList(
-                "No defeated players",
-                "No disconnect forfeits"
-        ));
-        finalResultArea.setText(
-                "Jordan completed Blue, Red, and Green property sets. "
-                        + "The session is now closed and gameplay actions are disabled."
-        );
+        winnerField.clear();
+        completedSetsField.clear();
+        playerSummaryList.setItems(FXCollections.observableArrayList());
+        forfeitList.setItems(FXCollections.observableArrayList());
+        finalResultArea.clear();
+        context.setSnapshotListener(this::render);
+        context.setMessageListener(message -> finalResultArea.setText(message));
+        render(context.latestSnapshot());
     }
 
     @FXML
     private void playAgain() {
-        SceneManager.showLobby();
+        context.leaveSession();
+        SceneManager.showMenu();
     }
 
     @FXML
     private void backToMenu() {
+        context.leaveSession();
         SceneManager.showMenu();
     }
 
     @FXML
     private void exitApplication() {
         SceneManager.exitApplication();
+    }
+
+    private void render(UiSnapshot snapshot) {
+        if (snapshot == null || snapshot.isEmpty()) {
+            finalResultArea.setText("No completed game result is available.");
+            return;
+        }
+        if (!"FINISHED".equals(snapshot.status())) {
+            finalResultArea.setText("The game is not finished yet.");
+            return;
+        }
+
+        UiSnapshot.PlayerView winner = snapshot.player(snapshot.winnerPlayerId()).orElse(null);
+        winnerField.setText(winner == null ? snapshot.winnerPlayerId() : winner.displayName());
+        completedSetsField.setText((winner == null ? 0 : winner.completedSetCount()) + " full sets");
+        playerSummaryList.setItems(FXCollections.observableArrayList(playerSummaries(snapshot)));
+        forfeitList.setItems(FXCollections.observableArrayList(forfeitRows(snapshot)));
+        finalResultArea.setText(winnerField.getText()
+                + " won the session. Gameplay has terminated and further game actions are rejected.");
+    }
+
+    private List<String> playerSummaries(UiSnapshot snapshot) {
+        return snapshot.players().stream()
+                .sorted(Comparator.comparingInt(UiSnapshot.PlayerView::completedSetCount).reversed()
+                        .thenComparing(UiSnapshot.PlayerView::displayName))
+                .map(player -> player.displayName()
+                        + " - " + player.completedSetCount() + " full sets"
+                        + " - Bank $" + player.bankTotalValueM() + "M"
+                        + " - " + player.playerStatus())
+                .toList();
+    }
+
+    private List<String> forfeitRows(UiSnapshot snapshot) {
+        if (snapshot.forfeitedPlayerIds().isEmpty()) {
+            return List.of("No disconnect forfeits");
+        }
+        return snapshot.forfeitedPlayerIds().stream()
+                .map(playerId -> snapshot.playerName(playerId) + " - Forfeit")
+                .toList();
     }
 }

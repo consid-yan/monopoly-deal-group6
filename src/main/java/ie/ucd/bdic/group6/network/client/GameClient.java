@@ -29,8 +29,6 @@ public class GameClient implements AutoCloseable {
 
     private Socket socket;
     private ObjectOutputStream output;
-    private ObjectInputStream input;
-    private GameThread gameThread;
 
     public synchronized void connect(String host, int port) throws IOException {
         if (connected.get()) {
@@ -39,9 +37,9 @@ public class GameClient implements AutoCloseable {
         socket = new Socket(Objects.requireNonNull(host, "host"), port);
         output = new ObjectOutputStream(socket.getOutputStream());
         output.flush();
-        input = new ObjectInputStream(socket.getInputStream());
+        var input = new ObjectInputStream(socket.getInputStream());
         connected.set(true);
-        gameThread = new GameThread(input, this);
+        var gameThread = new GameThread(input, this);
         gameThread.start();
     }
 
@@ -124,7 +122,7 @@ public class GameClient implements AutoCloseable {
         if (cause != null) {
             cancellation.initCause(cause);
         }
-        pendingResults.forEach((requestId, future) -> future.completeExceptionally(cancellation));
+        pendingResults.forEach((_, future) -> future.completeExceptionally(cancellation));
         pendingResults.clear();
         if (cause != null) {
             ServerNotice notice = new ServerNotice("CONNECTION_CLOSED", cause.getMessage(), Map.of());
@@ -139,7 +137,7 @@ public class GameClient implements AutoCloseable {
             closeSocket();
             return;
         }
-        pendingResults.forEach((requestId, future) ->
+        pendingResults.forEach((_, future) ->
                 future.completeExceptionally(new CancellationException("Client closed")));
         pendingResults.clear();
         closeSocket();

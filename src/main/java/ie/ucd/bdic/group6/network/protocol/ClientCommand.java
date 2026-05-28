@@ -17,7 +17,7 @@ public record ClientCommand(
 
     public ClientCommand {
         requestId = Objects.requireNonNull(requestId, "requestId");
-        commandType = Objects.requireNonNull(commandType, "commandType");
+        Objects.requireNonNull(commandType, "commandType");
         payload = NetworkPayloads.normalizeMap(payload);
     }
 }

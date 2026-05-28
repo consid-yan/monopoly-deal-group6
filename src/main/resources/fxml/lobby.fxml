@@ -78,12 +78,7 @@
                         <Font name="System Bold" size="18.0"/>
                     </font>
                 </Label>
-                <Button fx:id="readyButton" graphicTextGap="8.0" mnemonicParsing="false" onAction="#toggleReady" prefHeight="42.0" prefWidth="260.0" styleClass="gold-button" text="Ready Up">
-                    <graphic>
-                        <FontIcon iconLiteral="bx-check"/>
-                    </graphic>
-                </Button>
-                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#startGame" prefHeight="42.0" prefWidth="260.0" styleClass="primary-button" text="Start Game">
+                <Button fx:id="startGameButton" graphicTextGap="8.0" mnemonicParsing="false" onAction="#startGame" prefHeight="42.0" prefWidth="260.0" styleClass="primary-button" text="Start Game">
                     <graphic>
                         <FontIcon iconLiteral="bx-play"/>
                     </graphic>
