@@ -5,7 +5,6 @@ import ie.ucd.bdic.group6.core.card.PropertyWildCard;
 import ie.ucd.bdic.group6.core.common.OperationError;
 import ie.ucd.bdic.group6.core.common.OperationResult;
 import ie.ucd.bdic.group6.core.property.PropertyColor;
-import ie.ucd.bdic.group6.core.property.PropertyPaymentSupport;
 import ie.ucd.bdic.group6.core.property.PropertySet;
 
 import java.util.Objects;
@@ -83,65 +82,6 @@ public final class PlayerPropertyTransfers {
                     moved.errorMessage().orElse(""));
         }
         return OperationResult.ok(receiverRow);
-    }
-
-    public static OperationResult<Integer> payPropertyCardToCreditor(
-            Player payer,
-            Player creditor,
-            Card card,
-            PropertySet creditorRow,
-            Optional<PropertyColor> wildChoice) {
-        if (!payer.propertyBoard().canPayWithPropertyCard(card)) {
-            return OperationResult.fail(
-                    OperationError.PROPERTY_CANNOT_PAY_DEBT, "card cannot be paid from payer property board: " + card.id());
-        }
-        Optional<PropertySet> payerRow = payer.propertyBoard().findRowContaining(card);
-        if (payerRow.isEmpty()) {
-            return OperationResult.fail(OperationError.CARD_NOT_ON_PROPERTY_BOARD, "card not on payer board");
-        }
-        OperationResult<Integer> value = PropertyPaymentSupport.paymentValueM(payerRow.get(), card);
-        if (!value.isSuccess()) {
-            return value;
-        }
-        OperationResult<Void> moved = transferPropertyCardToRow(payer, creditor, card, creditorRow, wildChoice);
-        if (!moved.isSuccess()) {
-            return OperationResult.fail(
-                    moved.errorCode().orElse(OperationError.GENERIC),
-                    moved.errorMessage().orElse(""));
-        }
-        return OperationResult.ok(value.value().orElseThrow());
-    }
-
-    public static OperationResult<Integer> payPropertyCardToCreditorNewRow(
-            Player payer,
-            Player creditor,
-            Card card,
-            PropertyColor anchorColor,
-            Optional<PropertyColor> wildChoice) {
-        if (!payer.propertyBoard().canPayWithPropertyCard(card)) {
-            return OperationResult.fail(
-                    OperationError.PROPERTY_CANNOT_PAY_DEBT, "card cannot be paid from payer property board: " + card.id());
-        }
-        Optional<PropertySet> payerRow = payer.propertyBoard().findRowContaining(card);
-        if (payerRow.isEmpty()) {
-            return OperationResult.fail(OperationError.CARD_NOT_ON_PROPERTY_BOARD, "card not on payer board");
-        }
-        OperationResult<Integer> value = PropertyPaymentSupport.paymentValueM(payerRow.get(), card);
-        if (!value.isSuccess()) {
-            return value;
-        }
-        PropertySet creditorRow = creditor.propertyBoard().startNewRow(anchorColor);
-        OperationResult<Void> moved = transferPropertyCardToRow(payer, creditor, card, creditorRow, wildChoice);
-        if (!moved.isSuccess()) {
-            if (creditorRow.size() == 0) {
-                creditor.propertyBoard().removeRow(creditorRow);
-                creditor.propertyBoard().compactEmptyRows();
-            }
-            return OperationResult.fail(
-                    moved.errorCode().orElse(OperationError.GENERIC),
-                    moved.errorMessage().orElse(""));
-        }
-        return OperationResult.ok(value.value().orElseThrow());
     }
 
     /**

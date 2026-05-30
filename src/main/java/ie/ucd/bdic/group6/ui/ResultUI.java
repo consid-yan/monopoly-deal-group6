@@ -37,9 +37,9 @@ public class ResultUI {
         completedSetsField.clear();
         playerSummaryList.setItems(FXCollections.observableArrayList());
         forfeitList.setItems(FXCollections.observableArrayList());
-        finalResultArea.clear();
+        MessageUI.clear(finalResultArea);
         context.setSnapshotListener(this::render);
-        context.setMessageListener(message -> finalResultArea.setText(message));
+        context.setMessageListener(message -> MessageUI.show(finalResultArea, message));
         render(context.latestSnapshot());
     }
 
@@ -62,11 +62,11 @@ public class ResultUI {
 
     private void render(UiSnapshot snapshot) {
         if (snapshot == null || snapshot.isEmpty()) {
-            finalResultArea.setText("No completed game result is available.");
+            MessageUI.show(finalResultArea, "No completed game result is available.");
             return;
         }
         if (!"FINISHED".equals(snapshot.status())) {
-            finalResultArea.setText("The game is not finished yet.");
+            MessageUI.show(finalResultArea, "The game is not finished yet.");
             return;
         }
 
@@ -75,7 +75,7 @@ public class ResultUI {
         completedSetsField.setText((winner == null ? 0 : winner.completedSetCount()) + " full sets");
         playerSummaryList.setItems(FXCollections.observableArrayList(playerSummaries(snapshot)));
         forfeitList.setItems(FXCollections.observableArrayList(forfeitRows(snapshot)));
-        finalResultArea.setText(winnerField.getText()
+        MessageUI.show(finalResultArea, winnerField.getText()
                 + " won the session. Gameplay has terminated and further game actions are rejected.");
     }
 

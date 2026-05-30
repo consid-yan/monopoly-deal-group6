@@ -1,65 +1,123 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
-<?import org.kordamp.ikonli.javafx.FontIcon?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+<?import org.kordamp.ikonli.javafx.*?>
+<StackPane prefHeight="640.0" prefWidth="960.0"
+           styleClass="menu-screen-root"
+           xmlns="http://javafx.com/javafx/25.0.2"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="ie.ucd.bdic.group6.ui.MenuUI">
+    <StackPane mouseTransparent="true" styleClass="menu-bg-pattern"/>
 
-<BorderPane prefHeight="640.0" prefWidth="960.0"
-            styleClass="menu-root root-screen menu-screen"
-            xmlns="http://javafx.com/javafx/25.0.2"
-            xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="ie.ucd.bdic.group6.ui.MenuUI">
-    <center>
-        <VBox alignment="CENTER" spacing="22.0" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets bottom="48.0" left="48.0" right="48.0" top="48.0"/>
-            </padding>
-            <Label styleClass="menu-title title-banner" text="Monopoly Deal">
+    <!-- Four-corner diamond decorators -->
+    <Label mouseTransparent="true" styleClass="menu-card-suit menu-card-suit-tl" text="&#9670;"
+           StackPane.alignment="TOP_LEFT">
+        <StackPane.margin>
+            <Insets left="-10.0" top="-24.0"/>
+        </StackPane.margin>
+    </Label>
+    <Label mouseTransparent="true" styleClass="menu-card-suit menu-card-suit-tr" text="&#9670;"
+           StackPane.alignment="TOP_RIGHT">
+        <StackPane.margin>
+            <Insets right="-10.0" top="-24.0"/>
+        </StackPane.margin>
+    </Label>
+    <Label mouseTransparent="true" rotate="180.0" styleClass="menu-card-suit menu-card-suit-bl" text="&#9670;"
+           StackPane.alignment="BOTTOM_LEFT">
+        <StackPane.margin>
+            <Insets bottom="-24.0" left="-10.0"/>
+        </StackPane.margin>
+    </Label>
+    <Label mouseTransparent="true" rotate="180.0" styleClass="menu-card-suit menu-card-suit-br" text="&#9670;"
+           StackPane.alignment="BOTTOM_RIGHT">
+        <StackPane.margin>
+            <Insets bottom="-24.0" right="-10.0"/>
+        </StackPane.margin>
+    </Label>
+
+    <VBox alignment="CENTER" spacing="20.0" styleClass="menu-content">
+        <VBox alignment="CENTER" spacing="6.0" styleClass="menu-brand">
+            <VBox alignment="CENTER" spacing="-16.0" styleClass="menu-logo-lockup" translateY="-2.0">
+                <Label styleClass="menu-logo-title" text="Monopoly" textAlignment="CENTER">
+                    <font>
+                        <Font name="Georgia Bold" size="80.0"/>
+                    </font>
+                </Label>
+                <Label styleClass="menu-logo-title" text="Deal" textAlignment="CENTER">
+                    <font>
+                        <Font name="Georgia Bold" size="80.0"/>
+                    </font>
+                </Label>
+            </VBox>
+            <Label styleClass="menu-logo-subtitle" text="Group 6  &#183;  Multiplayer">
                 <font>
-                    <Font name="System Bold" size="42.0"/>
+                    <Font size="11.0"/>
                 </font>
             </Label>
-            <Label styleClass="menu-subtitle" text="Group 6 Multiplayer Card Game">
+            <Label styleClass="menu-tagline" text="The fast-dealing property card game">
                 <font>
-                    <Font size="16.0"/>
+                    <Font size="11.0"/>
                 </font>
+                <VBox.margin>
+                    <Insets top="2.0"/>
+                </VBox.margin>
             </Label>
-            <VBox alignment="CENTER" spacing="12.0" styleClass="menu-actions">
-                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#startNewGame" prefHeight="44.0" prefWidth="280.0" styleClass="primary-button" text="New Game">
+        </VBox>
+
+        <VBox alignment="CENTER" maxWidth="492.0" prefWidth="492.0" styleClass="menu-actions-panel">
+            <HBox alignment="CENTER" maxWidth="380.0" prefWidth="380.0" spacing="12.0" styleClass="divider-ornament">
+                <VBox.margin>
+                    <Insets bottom="18.0"/>
+                </VBox.margin>
+                <Separator styleClass="divider-line" HBox.hgrow="ALWAYS"/>
+                <Label styleClass="divider-symbol" text="&#9670;  &#9670;  &#9670;"/>
+                <Separator styleClass="divider-line" HBox.hgrow="ALWAYS"/>
+            </HBox>
+
+            <VBox alignment="CENTER" spacing="11.0" styleClass="menu-button-list">
+                <Button graphicTextGap="12.0" mnemonicParsing="false" onAction="#startNewGame" prefHeight="48.0"
+                        prefWidth="380.0" styleClass="menu-primary-button" text="New Game">
                     <graphic>
-                        <FontIcon iconLiteral="bx-plus-circle"/>
+                        <FontIcon iconLiteral="bx-plus-circle" styleClass="menu-icon-primary"/>
                     </graphic>
                 </Button>
-                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#joinGame" prefHeight="44.0" prefWidth="280.0" styleClass="secondary-button" text="Join Game">
+                <Button graphicTextGap="12.0" mnemonicParsing="false" onAction="#joinGame" prefHeight="48.0"
+                        prefWidth="380.0" styleClass="menu-secondary-button" text="Join Game">
                     <graphic>
-                        <FontIcon iconLiteral="bx-log-in-circle"/>
+                        <FontIcon iconLiteral="bx-log-in-circle" styleClass="menu-icon-secondary"/>
                     </graphic>
                 </Button>
-                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#rejoinSession" prefHeight="44.0" prefWidth="280.0" styleClass="gold-button" text="Rejoin Session">
+                <Button graphicTextGap="12.0" mnemonicParsing="false" onAction="#rejoinSession" prefHeight="48.0"
+                        prefWidth="380.0" styleClass="menu-outline-button" text="Rejoin Session">
                     <graphic>
-                        <FontIcon iconLiteral="bx-reset"/>
+                        <FontIcon iconLiteral="bx-reset" styleClass="menu-icon-outline"/>
                     </graphic>
                 </Button>
-                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#openHowToPlay" prefHeight="44.0" prefWidth="280.0" styleClass="secondary-button" text="How to Play">
+                <Button graphicTextGap="12.0" mnemonicParsing="false" onAction="#openHowToPlay" prefHeight="48.0"
+                        prefWidth="380.0" styleClass="menu-secondary-button" text="How to Play">
                     <graphic>
-                        <FontIcon iconLiteral="bx-question-mark"/>
+                        <FontIcon iconLiteral="bx-question-mark" styleClass="menu-icon-secondary"/>
                     </graphic>
                 </Button>
-                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#exitApplication" prefHeight="44.0" prefWidth="280.0" styleClass="danger-button" text="Exit">
+                <Button graphicTextGap="12.0" mnemonicParsing="false" onAction="#exitApplication" prefHeight="48.0"
+                        prefWidth="380.0" styleClass="menu-danger-button" text="Exit">
                     <graphic>
-                        <FontIcon iconLiteral="bx-exit"/>
+                        <FontIcon iconLiteral="bx-exit" styleClass="menu-icon-danger"/>
                     </graphic>
                 </Button>
             </VBox>
-            <Label styleClass="menu-note" text="2-5 players | Create, join, or rejoin a session">
+
+            <Label styleClass="menu-player-note" text="2 &#8211; 5 players">
                 <font>
-                    <Font size="13.0"/>
+                    <Font size="12.0"/>
                 </font>
+                <VBox.margin>
+                    <Insets top="20.0"/>
+                </VBox.margin>
             </Label>
         </VBox>
-    </center>
-</BorderPane>
+    </VBox>
+</StackPane>

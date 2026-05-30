@@ -1,4 +1,3 @@
-// StartGameCommand.java
 package ie.ucd.bdic.group6.command;
 
 import java.util.Map;

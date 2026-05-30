@@ -18,22 +18,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PlayerPropertyTransfersTest {
 
     @Test
-    void payPropertyCardMovesCardAndReportsRentValue() {
-        Player payer = new Player("p1", "Payer");
-        Player creditor = new Player("p2", "Creditor");
+    void transferToNewRowCreatesReceiverRowAndMovesCard() {
+        Player sender = new Player("p1", "Sender");
+        Player receiver = new Player("p2", "Receiver");
         PropertyCard b1 = new PropertyCard("b1", "B1", PropertyColor.BROWN, 2);
-        PropertyCard b2 = new PropertyCard("b2", "B2", PropertyColor.BROWN, 2);
-        PropertySet payerRow = payer.propertyBoard().startNewRow(PropertyColor.BROWN);
-        assertTrue(payerRow.tryAdd(b1, Optional.empty()));
-        assertTrue(payerRow.tryAdd(b2, Optional.empty()));
+        sender.addToHand(b1);
+        sender.tryStartNewPropertyRowFromHand(PropertyColor.BROWN, b1, Optional.empty());
 
-        PropertySet creditorRow = creditor.propertyBoard().startNewRow(PropertyColor.BROWN);
-        var paid = PlayerPropertyTransfers.payPropertyCardToCreditor(
-                payer, creditor, b1, creditorRow, Optional.empty());
-        assertTrue(paid.isSuccess());
-        assertEquals(2, paid.value().orElseThrow());
-        assertTrue(creditorRow.contains(b1));
-        assertEquals(1, payer.propertyBoard().rowsView().size());
+        var moved = PlayerPropertyTransfers.transferPropertyCardToNewRow(
+                sender, receiver, b1, PropertyColor.BROWN, Optional.empty());
+
+        assertTrue(moved.isSuccess());
+        assertTrue(moved.value().orElseThrow().contains(b1));
+        assertTrue(sender.propertyBoard().rowsView().isEmpty());
+        assertEquals(1, receiver.propertyBoard().rowsView().size());
     }
 
     @Test

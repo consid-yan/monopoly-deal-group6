@@ -7,112 +7,131 @@
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
-<?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane prefHeight="640.0" prefWidth="960.0"
-            styleClass="menu-root root-screen lobby-screen"
-            xmlns="http://javafx.com/javafx/25.0.2"
-            xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="ie.ucd.bdic.group6.ui.LobbyUI">
-    <top>
-        <VBox alignment="CENTER_LEFT" spacing="8.0" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets bottom="20.0" left="48.0" right="48.0" top="36.0"/>
-            </padding>
-            <Label styleClass="menu-title title-banner" text="Game Lobby">
+<StackPane prefHeight="640.0" prefWidth="960.0"
+           styleClass="lobby-screen-root"
+           xmlns="http://javafx.com/javafx/25.0.2"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="ie.ucd.bdic.group6.ui.LobbyUI">
+    <StackPane mouseTransparent="true" styleClass="menu-bg-pattern"/>
+    <Label mouseTransparent="true" styleClass="menu-card-suit" text="&#9670;" StackPane.alignment="TOP_LEFT">
+        <StackPane.margin>
+            <Insets left="-10.0" top="-24.0"/>
+        </StackPane.margin>
+    </Label>
+    <Label mouseTransparent="true" rotate="180.0" styleClass="menu-card-suit" text="&#9670;" StackPane.alignment="BOTTOM_RIGHT">
+        <StackPane.margin>
+            <Insets bottom="-24.0" right="-10.0"/>
+        </StackPane.margin>
+    </Label>
+
+    <VBox alignment="CENTER" maxWidth="920.0" spacing="18.0" styleClass="lobby-content">
+        <VBox alignment="CENTER" spacing="8.0" styleClass="lobby-brand">
+            <Label styleClass="lobby-logo-title" text="Game Lobby" textAlignment="CENTER">
                 <font>
-                    <Font name="System Bold" size="34.0"/>
+                    <Font name="Georgia Bold" size="54.0"/>
                 </font>
             </Label>
-            <Label styleClass="menu-subtitle" text="Create a session, invite players, and start when 2 to 5 players are ready">
+            <Label styleClass="lobby-logo-subtitle" text="Start when 2 to 5 players are ready" textAlignment="CENTER">
                 <font>
-                    <Font size="15.0"/>
+                    <Font size="12.0"/>
                 </font>
             </Label>
         </VBox>
-    </top>
-    <center>
-        <HBox alignment="CENTER" spacing="24.0" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets bottom="28.0" left="48.0" right="48.0" top="8.0"/>
-            </padding>
-            <VBox spacing="14.0" styleClass="surface-panel" HBox.hgrow="ALWAYS">
-                <Label text="Session Information">
-                    <font>
-                        <Font name="System Bold" size="18.0"/>
-                    </font>
-                </Label>
-                <GridPane hgap="12.0" vgap="12.0">
-                    <columnConstraints>
-                        <ColumnConstraints minWidth="120.0" prefWidth="140.0"/>
-                        <ColumnConstraints hgrow="ALWAYS" minWidth="220.0"/>
-                    </columnConstraints>
-                    <Label text="Session Code" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-                    <TextField fx:id="sessionCodeField" editable="false" promptText="Waiting for session code" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
-                    <Label text="Host" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-                    <TextField fx:id="hostField" editable="false" promptText="Waiting for host" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
-                    <Label text="Player Count" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
-                    <TextField fx:id="playerCountField" editable="false" promptText="0 / 5" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
-                </GridPane>
-                <Separator/>
-                <Label text="Connected Players">
-                    <font>
-                        <Font name="System Bold" size="18.0"/>
-                    </font>
-                </Label>
-                <ListView fx:id="playersList" prefHeight="260.0" prefWidth="520.0" VBox.vgrow="ALWAYS">
-                    <placeholder>
-                        <Label text="Waiting for players to join"/>
-                    </placeholder>
-                </ListView>
-            </VBox>
-            <VBox alignment="TOP_CENTER" prefWidth="280.0" spacing="14.0" styleClass="surface-panel">
-                <Label text="Lobby Controls">
-                    <font>
-                        <Font name="System Bold" size="18.0"/>
-                    </font>
-                </Label>
-                <Button fx:id="startGameButton" graphicTextGap="8.0" mnemonicParsing="false" onAction="#startGame" prefHeight="42.0" prefWidth="260.0" styleClass="primary-button" text="Start Game">
-                    <graphic>
-                        <FontIcon iconLiteral="bx-play"/>
-                    </graphic>
-                </Button>
-                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#openHowToPlay" prefHeight="42.0" prefWidth="260.0" styleClass="secondary-button" text="How to Play">
-                    <graphic>
-                        <FontIcon iconLiteral="bx-question-mark"/>
-                    </graphic>
-                </Button>
-                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#leaveLobby" prefHeight="42.0" prefWidth="260.0" styleClass="danger-button" text="Leave Lobby">
-                    <graphic>
-                        <FontIcon iconLiteral="bx-exit"/>
-                    </graphic>
-                </Button>
-                <Separator prefWidth="260.0"/>
-                <Label text="Status">
-                    <font>
-                        <Font name="System Bold" size="16.0"/>
-                    </font>
-                </Label>
-                <TextArea fx:id="statusArea"
-                          editable="false"
-                          focusTraversable="false"
-                          prefHeight="136.0"
-                          prefWidth="260.0"
-                          promptText="Lobby messages and validation feedback will appear here."
-                          styleClass="status-area"
-                          wrapText="true"/>
-                <Label styleClass="menu-note" text="A game can start only with 2-5 players." wrapText="true">
-                    <font>
-                        <Font size="13.0"/>
-                    </font>
-                </Label>
-            </VBox>
-        </HBox>
-    </center>
-</BorderPane>
+
+        <VBox alignment="CENTER" maxWidth="860.0" prefWidth="860.0" styleClass="lobby-panel">
+            <HBox alignment="CENTER" maxWidth="720.0" prefWidth="720.0" spacing="10.0" styleClass="divider-ornament">
+                <VBox.margin>
+                    <Insets bottom="18.0"/>
+                </VBox.margin>
+                <Separator styleClass="divider-line" HBox.hgrow="ALWAYS"/>
+                <Label styleClass="divider-symbol" text="&#9670;"/>
+                <Separator styleClass="divider-line" HBox.hgrow="ALWAYS"/>
+            </HBox>
+
+            <HBox alignment="TOP_CENTER" maxWidth="760.0" prefWidth="760.0" spacing="24.0">
+                <VBox spacing="14.0" HBox.hgrow="ALWAYS">
+                    <Label styleClass="lobby-section-title" text="Session Information">
+                        <font>
+                            <Font name="System Bold" size="15.0"/>
+                        </font>
+                    </Label>
+                    <GridPane hgap="12.0" styleClass="lobby-info-grid" vgap="12.0">
+                        <columnConstraints>
+                            <ColumnConstraints minWidth="120.0" prefWidth="132.0"/>
+                            <ColumnConstraints hgrow="ALWAYS" minWidth="220.0"/>
+                        </columnConstraints>
+                        <Label styleClass="lobby-field-label" text="Session Code" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                        <TextField fx:id="sessionCodeField" editable="false" promptText="Waiting for session code" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+                        <Label styleClass="lobby-field-label" text="Host" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                        <TextField fx:id="hostField" editable="false" promptText="Waiting for host" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+                        <Label styleClass="lobby-field-label" text="Player Count" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+                        <TextField fx:id="playerCountField" editable="false" promptText="0 / 5" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+                    </GridPane>
+
+                    <Separator/>
+                    <Label styleClass="lobby-section-title" text="Connected Players">
+                        <font>
+                            <Font name="System Bold" size="15.0"/>
+                        </font>
+                    </Label>
+                    <ListView fx:id="playersList" prefHeight="232.0" prefWidth="456.0" styleClass="lobby-player-list" VBox.vgrow="ALWAYS">
+                        <placeholder>
+                            <Label text="Waiting for players to join"/>
+                        </placeholder>
+                    </ListView>
+                </VBox>
+
+                <VBox alignment="TOP_CENTER" prefWidth="260.0" spacing="12.0">
+                    <Label styleClass="lobby-section-title" text="Lobby Controls">
+                        <font>
+                            <Font name="System Bold" size="15.0"/>
+                        </font>
+                    </Label>
+                    <Button fx:id="startGameButton" graphicTextGap="10.0" mnemonicParsing="false" onAction="#startGame" prefHeight="44.0" prefWidth="260.0" styleClass="menu-primary-button" text="Start Game">
+                        <graphic>
+                            <FontIcon iconLiteral="bx-play" styleClass="menu-icon-primary"/>
+                        </graphic>
+                    </Button>
+                    <Button graphicTextGap="10.0" mnemonicParsing="false" onAction="#openHowToPlay" prefHeight="44.0" prefWidth="260.0" styleClass="menu-secondary-button" text="How to Play">
+                        <graphic>
+                            <FontIcon iconLiteral="bx-question-mark" styleClass="menu-icon-secondary"/>
+                        </graphic>
+                    </Button>
+                    <Button graphicTextGap="10.0" mnemonicParsing="false" onAction="#leaveLobby" prefHeight="44.0" prefWidth="260.0" styleClass="menu-danger-button" text="Leave Lobby">
+                        <graphic>
+                            <FontIcon iconLiteral="bx-exit" styleClass="menu-icon-danger"/>
+                        </graphic>
+                    </Button>
+
+                    <Separator prefWidth="260.0"/>
+                    <Label styleClass="lobby-section-title" text="Status">
+                        <font>
+                            <Font name="System Bold" size="15.0"/>
+                        </font>
+                    </Label>
+                    <TextArea fx:id="statusArea"
+                              editable="false"
+                              focusTraversable="false"
+                              prefHeight="134.0"
+                              prefWidth="260.0"
+                              promptText="Lobby messages and validation feedback will appear here."
+                              styleClass="lobby-status-area"
+                              wrapText="true"/>
+                    <Label styleClass="help-note" text="A game can start only with 2-5 players." textAlignment="CENTER" wrapText="true">
+                        <font>
+                            <Font size="12.0"/>
+                        </font>
+                    </Label>
+                </VBox>
+            </HBox>
+        </VBox>
+    </VBox>
+</StackPane>
