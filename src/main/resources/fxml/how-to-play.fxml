@@ -6,146 +6,185 @@
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.TitledPane?>
-<?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
+<?import javafx.scene.text.Text?>
+<?import javafx.scene.text.TextFlow?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane prefHeight="640.0" prefWidth="960.0"
-            styleClass="menu-root root-screen help-screen"
-            xmlns="http://javafx.com/javafx/25.0.2"
-            xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="ie.ucd.bdic.group6.ui.HowToPlayUI">
-    <top>
-        <VBox alignment="CENTER_LEFT" spacing="8.0" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets bottom="18.0" left="48.0" right="48.0" top="36.0"/>
-            </padding>
-            <Label styleClass="menu-title title-banner" text="How to Play">
+<StackPane prefHeight="640.0" prefWidth="960.0"
+           styleClass="help-screen-root"
+           xmlns="http://javafx.com/javafx/25.0.2"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="ie.ucd.bdic.group6.ui.HowToPlayUI">
+    <StackPane mouseTransparent="true" styleClass="menu-bg-pattern"/>
+    <Label mouseTransparent="true" styleClass="menu-card-suit" text="&#9670;" StackPane.alignment="TOP_LEFT">
+        <StackPane.margin>
+            <Insets left="-10.0" top="-24.0"/>
+        </StackPane.margin>
+    </Label>
+    <Label mouseTransparent="true" rotate="180.0" styleClass="menu-card-suit" text="&#9670;" StackPane.alignment="BOTTOM_RIGHT">
+        <StackPane.margin>
+            <Insets bottom="-24.0" right="-10.0"/>
+        </StackPane.margin>
+    </Label>
+
+    <VBox alignment="CENTER" maxWidth="920.0" spacing="18.0" styleClass="help-content">
+        <VBox alignment="CENTER" spacing="8.0" styleClass="help-brand">
+            <Label styleClass="help-logo-title" text="How to Play" textAlignment="CENTER">
                 <font>
-                    <Font name="System Bold" size="34.0"/>
+                    <Font name="Georgia Bold" size="54.0"/>
                 </font>
             </Label>
-            <Label styleClass="menu-subtitle" text="Monopoly Deal Group 6 rules and gameplay guide" wrapText="true">
+            <Label styleClass="help-logo-subtitle" text="Monopoly Deal - Group 6 Rules Guide" textAlignment="CENTER" wrapText="true">
                 <font>
-                    <Font size="15.0"/>
+                    <Font size="12.0"/>
                 </font>
             </Label>
         </VBox>
-    </top>
-    <center>
-        <ScrollPane fitToWidth="true" hbarPolicy="NEVER" pannable="true" BorderPane.alignment="CENTER">
-            <VBox spacing="14.0">
-                <padding>
-                    <Insets bottom="36.0" left="48.0" right="48.0" top="8.0"/>
-                </padding>
-                <TitledPane animated="false" collapsible="false" text="Objective and Players">
-                    <Label text="Complete 3 full property sets to win. Monopoly Deal Group 6 supports 2 to 5 players in one game session."
-                           wrapText="true">
-                        <font>
-                            <Font size="14.0"/>
-                        </font>
-                    </Label>
-                </TitledPane>
-                <TitledPane animated="false" collapsible="false" text="Starting a Game">
-                    <Label text="Create or join a session from the menu and lobby. The game may start only when the session has a valid number of players. Each player receives a unique identity within the session."
-                           wrapText="true">
-                        <font>
-                            <Font size="14.0"/>
-                        </font>
-                    </Label>
-                </TitledPane>
-                <TitledPane animated="false" collapsible="false" text="Card Types">
-                    <Label text="- Property Cards: placed into property areas and used to build full sets.&#10;- Money Cards: placed into your bank and used for payments.&#10;- Action Cards: played for rule effects defined by the game."
-                           wrapText="true">
-                        <font>
-                            <Font size="14.0"/>
-                        </font>
-                    </Label>
-                </TitledPane>
-                <TitledPane animated="false" collapsible="false" text="Turn Overview">
-                    <Label text="The game has exactly one active player turn at a time. At the start of a player's turn, cards are drawn according to the standard Monopoly Deal draw rule. During your turn, play only valid cards, follow the action limit, and end your turn when allowed. The standard hand-limit rule is enforced at the correct point in the turn."
-                           wrapText="true">
-                        <font>
-                            <Font size="14.0"/>
-                        </font>
-                    </Label>
-                </TitledPane>
-                <TitledPane animated="false" collapsible="false" text="Game State Visibility">
-                    <Label text="Your own hand is private. Other players should see only public information such as banked money, property sets, status, and visible game progress."
-                           wrapText="true">
-                        <font>
-                            <Font size="14.0"/>
-                        </font>
-                    </Label>
-                </TitledPane>
-                <TitledPane animated="false" collapsible="false" text="Payments">
-                    <Label text="When a debt must be paid, pay with a valid combination of banked money and/or property cards. Invalid payment choices are rejected before they change the game state."
-                           wrapText="true">
-                        <font>
-                            <Font size="14.0"/>
-                        </font>
-                    </Label>
-                </TitledPane>
-                <TitledPane animated="false" collapsible="false" text="Simplified Trading">
-                    <Label text="This project supports only these trade types: Property Card for Money Card, Money Card for Property Card, and Property Card for Property Card. Invalid trade types are rejected. Player A initiates a trade during Player A's turn. Player B accepts or rejects during Player B's turn. A trade completes only after the required sequential mutual agreement. If a trade is rejected or incomplete, both players keep their cards unchanged."
-                           wrapText="true">
-                        <font>
-                            <Font size="14.0"/>
-                        </font>
-                    </Label>
-                </TitledPane>
-                <TitledPane animated="false" collapsible="false" text="Invalid Actions">
-                    <Label text="Moves that violate turn order, card rules, payment rules, trade rules, or game state rules are rejected with feedback instead of crashing the game."
-                           wrapText="true">
-                        <font>
-                            <Font size="14.0"/>
-                        </font>
-                    </Label>
-                </TitledPane>
-                <TitledPane animated="false" collapsible="false" text="Disconnect and Rejoin">
-                    <Label text="A disconnected player may rejoin only with the same account or session identity. Recoverable session state is preserved for 90 seconds. If the disconnected player's turn is active, the turn is skipped after 30 seconds so the game can continue. If the player does not rejoin within 90 seconds, that player is marked Defeated/Forfeit and their cards are discarded according to the project rules."
-                           wrapText="true">
-                        <font>
-                            <Font size="14.0"/>
-                        </font>
-                    </Label>
-                </TitledPane>
-                <TitledPane animated="false" collapsible="false" text="Winning and Result">
-                    <Label text="The game continuously checks for the win condition. When a player completes 3 full property sets, gameplay ends and the winner is displayed."
-                           wrapText="true">
-                        <font>
-                            <Font size="14.0"/>
-                        </font>
-                    </Label>
-                </TitledPane>
-                <Separator/>
-                <Label styleClass="menu-note"
-                       text="Read this guide once before playing, then use the game screen status and feedback areas to follow each turn."
-                       wrapText="true">
-                    <font>
-                        <Font size="13.0"/>
-                    </font>
-                </Label>
-            </VBox>
-        </ScrollPane>
-    </center>
-    <bottom>
-        <HBox alignment="CENTER_RIGHT" spacing="12.0" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets bottom="24.0" left="48.0" right="48.0" top="10.0"/>
-            </padding>
-            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#backToMenu" prefHeight="40.0" prefWidth="150.0" styleClass="secondary-button" text="Main Menu">
-                <graphic>
-                    <FontIcon iconLiteral="bx-home"/>
-                </graphic>
-            </Button>
-            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#openLobby" prefHeight="40.0" prefWidth="150.0" styleClass="primary-button" text="Open Lobby">
-                <graphic>
-                    <FontIcon iconLiteral="bx-log-in-circle"/>
-                </graphic>
-            </Button>
-        </HBox>
-    </bottom>
-</BorderPane>
+
+        <VBox alignment="CENTER" maxWidth="860.0" prefWidth="860.0" styleClass="help-guide-panel">
+            <HBox alignment="CENTER" maxWidth="720.0" prefWidth="720.0" spacing="10.0" styleClass="divider-ornament">
+                <VBox.margin>
+                    <Insets bottom="18.0"/>
+                </VBox.margin>
+                <Separator styleClass="divider-line" HBox.hgrow="ALWAYS"/>
+                <Label styleClass="divider-symbol" text="&#9670;"/>
+                <Separator styleClass="divider-line" HBox.hgrow="ALWAYS"/>
+            </HBox>
+
+            <ScrollPane fitToWidth="true" hbarPolicy="NEVER" pannable="true" prefHeight="430.0" styleClass="help-scroll-pane">
+                <VBox spacing="12.0" styleClass="help-rules-list">
+                    <TitledPane animated="false" collapsible="false" styleClass="help-rule-pane" text="Objective and Players">
+                        <TextFlow styleClass="help-rule-flow">
+                            <Text styleClass="help-rule-text" text="Complete "/>
+                            <Text styleClass="help-rule-quantity" text="3 full property sets"/>
+                            <Text styleClass="help-rule-text" text=" to win. Monopoly Deal Group 6 supports "/>
+                            <Text styleClass="help-rule-quantity" text="2 to 5 players"/>
+                            <Text styleClass="help-rule-text" text=" in one game session."/>
+                        </TextFlow>
+                    </TitledPane>
+                    <TitledPane animated="false" collapsible="false" styleClass="help-rule-pane" text="Starting a Game">
+                        <TextFlow styleClass="help-rule-flow">
+                            <Text styleClass="help-rule-text" text="Create or join a session from the menu and lobby. The game may start "/>
+                            <Text styleClass="help-rule-danger" text="only when the session has a valid number of players"/>
+                            <Text styleClass="help-rule-text" text=". Each player receives a "/>
+                            <Text styleClass="help-rule-text" text="unique identity"/>
+                            <Text styleClass="help-rule-text" text=" within the session."/>
+                        </TextFlow>
+                    </TitledPane>
+                    <TitledPane animated="false" collapsible="false" styleClass="help-rule-pane" text="Card Types">
+                        <TextFlow styleClass="help-rule-flow">
+                            <Text styleClass="help-rule-key" text="Property Cards"/>
+                            <Text styleClass="help-rule-text" text=": placed into property areas and used to build full sets.&#10;"/>
+                            <Text styleClass="help-rule-key" text="Money Cards"/>
+                            <Text styleClass="help-rule-text" text=": placed into your bank and used for payments.&#10;"/>
+                            <Text styleClass="help-rule-key" text="Action Cards"/>
+                            <Text styleClass="help-rule-text" text=": played for rule effects defined by the game."/>
+                        </TextFlow>
+                    </TitledPane>
+                    <TitledPane animated="false" collapsible="false" styleClass="help-rule-pane" text="Turn Overview">
+                        <TextFlow styleClass="help-rule-flow">
+                            <Text styleClass="help-rule-text" text="The game has exactly "/>
+                            <Text styleClass="help-rule-quantity" text="one active player turn"/>
+                            <Text styleClass="help-rule-text" text=" at a time. At the start of a player's turn, cards are drawn according to the standard Monopoly Deal draw rule. During your turn, play only "/>
+                            <Text styleClass="help-rule-good" text="valid cards"/>
+                            <Text styleClass="help-rule-text" text=", follow the "/>
+                            <Text styleClass="help-rule-danger" text="action limit"/>
+                            <Text styleClass="help-rule-text" text=", and end your turn when allowed. The "/>
+                            <Text styleClass="help-rule-danger" text="hand-limit rule"/>
+                            <Text styleClass="help-rule-text" text=" is enforced at the correct point in the turn."/>
+                        </TextFlow>
+                    </TitledPane>
+                    <TitledPane animated="false" collapsible="false" styleClass="help-rule-pane" text="Game State Visibility">
+                        <TextFlow styleClass="help-rule-flow">
+                            <Text styleClass="help-rule-danger" text="Your own hand is private"/>
+                            <Text styleClass="help-rule-text" text=". Other players should see only "/>
+                            <Text styleClass="help-rule-good" text="public information"/>
+                            <Text styleClass="help-rule-text" text=" such as banked money, property sets, status, and visible game progress."/>
+                        </TextFlow>
+                    </TitledPane>
+                    <TitledPane animated="false" collapsible="false" styleClass="help-rule-pane" text="Payments">
+                        <TextFlow styleClass="help-rule-flow">
+                            <Text styleClass="help-rule-text" text="When a debt must be paid, pay with a "/>
+                            <Text styleClass="help-rule-good" text="valid combination"/>
+                            <Text styleClass="help-rule-text" text=" of banked money and/or property cards. "/>
+                            <Text styleClass="help-rule-danger" text="Invalid payment choices are rejected"/>
+                            <Text styleClass="help-rule-text" text=" before they change the game state."/>
+                        </TextFlow>
+                    </TitledPane>
+                    <TitledPane animated="false" collapsible="false" styleClass="help-rule-pane" text="Simplified Trading">
+                        <TextFlow styleClass="help-rule-flow">
+                            <Text styleClass="help-rule-text" text="This project supports only these trade types: "/>
+                            <Text styleClass="help-rule-good" text="Property Card for Money Card"/>
+                            <Text styleClass="help-rule-text" text=", "/>
+                            <Text styleClass="help-rule-good" text="Money Card for Property Card"/>
+                            <Text styleClass="help-rule-text" text=", and "/>
+                            <Text styleClass="help-rule-good" text="Property Card for Property Card"/>
+                            <Text styleClass="help-rule-text" text=". "/>
+                            <Text styleClass="help-rule-danger" text="Invalid trade types are rejected"/>
+                            <Text styleClass="help-rule-text" text=". Player A initiates a trade during Player A's turn. Player B accepts or rejects during Player B's turn. A trade completes only after "/>
+                            <Text styleClass="help-rule-danger" text="sequential mutual agreement"/>
+                            <Text styleClass="help-rule-text" text=". If a trade is rejected or incomplete, both players keep their cards unchanged."/>
+                        </TextFlow>
+                    </TitledPane>
+                    <TitledPane animated="false" collapsible="false" styleClass="help-rule-pane" text="Invalid Actions">
+                        <TextFlow styleClass="help-rule-flow">
+                            <Text styleClass="help-rule-text" text="Moves that violate turn order, card rules, payment rules, trade rules, or game state rules are "/>
+                            <Text styleClass="help-rule-danger" text="rejected with feedback"/>
+                            <Text styleClass="help-rule-text" text=" instead of crashing the game."/>
+                        </TextFlow>
+                    </TitledPane>
+                    <TitledPane animated="false" collapsible="false" styleClass="help-rule-pane" text="Disconnect and Rejoin">
+                        <TextFlow styleClass="help-rule-flow">
+                            <Text styleClass="help-rule-text" text="A disconnected player may rejoin only with the "/>
+                            <Text styleClass="help-rule-danger" text="same account or session identity"/>
+                            <Text styleClass="help-rule-text" text=". Recoverable session state is preserved for "/>
+                            <Text styleClass="help-rule-quantity" text="90 seconds"/>
+                            <Text styleClass="help-rule-text" text=". If the disconnected player's turn is active, the turn is skipped after "/>
+                            <Text styleClass="help-rule-quantity" text="30 seconds"/>
+                            <Text styleClass="help-rule-text" text=" so the game can continue. If the player does not rejoin within "/>
+                            <Text styleClass="help-rule-quantity" text="90 seconds"/>
+                            <Text styleClass="help-rule-text" text=", that player is marked "/>
+                            <Text styleClass="help-rule-danger" text="Defeated/Forfeit"/>
+                            <Text styleClass="help-rule-text" text=" and their cards are discarded according to the project rules."/>
+                        </TextFlow>
+                    </TitledPane>
+                    <TitledPane animated="false" collapsible="false" styleClass="help-rule-pane" text="Winning and Result">
+                        <TextFlow styleClass="help-rule-flow">
+                            <Text styleClass="help-rule-text" text="The game continuously checks for the "/>
+                            <Text styleClass="help-rule-text" text="win condition"/>
+                            <Text styleClass="help-rule-text" text=". When a player completes "/>
+                            <Text styleClass="help-rule-quantity" text="3 full property sets"/>
+                            <Text styleClass="help-rule-text" text=", gameplay ends and the "/>
+                            <Text styleClass="help-rule-good" text="winner is displayed"/>
+                            <Text styleClass="help-rule-text" text="."/>
+                        </TextFlow>
+                    </TitledPane>
+                </VBox>
+            </ScrollPane>
+
+            <Label styleClass="help-note"
+                   text="Read this guide once before playing, then use the game screen status and feedback areas to follow each turn."
+                   textAlignment="CENTER"
+                   wrapText="true">
+                <VBox.margin>
+                    <Insets top="18.0"/>
+                </VBox.margin>
+            </Label>
+
+            <HBox alignment="CENTER_RIGHT" maxWidth="720.0" prefWidth="720.0">
+                <VBox.margin>
+                    <Insets top="18.0"/>
+                </VBox.margin>
+                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#goBack" prefHeight="40.0" prefWidth="150.0" styleClass="menu-secondary-button" text="Back">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-arrow-back" styleClass="menu-icon-secondary"/>
+                    </graphic>
+                </Button>
+            </HBox>
+        </VBox>
+    </VBox>
+</StackPane>

@@ -1,4 +1,3 @@
-// DiscardCardsCommand.java
 package ie.ucd.bdic.group6.command;
 
 import java.util.List;

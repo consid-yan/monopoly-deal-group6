@@ -104,11 +104,11 @@ public class LobbyUI {
         if (startGameButton != null) {
             startGameButton.setDisable(!context.playerId().equals(snapshot.hostPlayerId()));
         }
-        statusArea.setText("""
+        MessageUI.show(statusArea, """
                 Session ID: %s
                 Your Player ID: %s
                 Waiting for the host to start when 2 to 5 players are present.
-                """.formatted(snapshot.sessionId(), context.playerId()).strip());
+                """.formatted(snapshot.sessionId(), context.playerId()));
     }
 
     private List<String> playerRows(UiSnapshot snapshot) {
@@ -131,9 +131,6 @@ public class LobbyUI {
     }
 
     private void showStatus(String message) {
-        if (message == null || message.isBlank()) {
-            return;
-        }
-        statusArea.setText(message);
+        MessageUI.show(statusArea, message);
     }
 }

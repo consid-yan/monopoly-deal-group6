@@ -42,6 +42,12 @@ public class GameUI {
     @FXML
     private Label drawPileLabel;
     @FXML
+    private Label deckSummaryLabel;
+    @FXML
+    private Label discardPileSummaryLabel;
+    @FXML
+    private Label selectedCardSummaryLabel;
+    @FXML
     private HBox opponentsRow;
     @FXML
     private Pane handPane;
@@ -81,6 +87,24 @@ public class GameUI {
     private TextArea gameLogArea;
     @FXML
     private TextArea feedbackArea;
+    @FXML
+    private Button playSelectedButton;
+    @FXML
+    private Button discardSelectedButton;
+    @FXML
+    private Button endTurnButton;
+    @FXML
+    private Button proposeTradeButton;
+    @FXML
+    private Button payDebtButton;
+    @FXML
+    private Button acceptTradeButton;
+    @FXML
+    private Button rejectTradeButton;
+    @FXML
+    private Button acceptActionButton;
+    @FXML
+    private Button rejectActionButton;
 
     public GameUI(UiSessionContext context) {
         this.context = context;
@@ -89,7 +113,7 @@ public class GameUI {
     @FXML
     private void initialize() {
         targetPlayerField.clear();
-        targetPlayerField.setPromptText("Target player id");
+        targetPlayerField.setPromptText("Optional target player id");
         handPane.widthProperty().addListener((_, _, _) -> layoutHand(null));
         context.setSnapshotListener(this::render);
         context.setMessageListener(this::showFeedback);
@@ -256,6 +280,8 @@ public class GameUI {
     private void render(UiSnapshot nextSnapshot) {
         if (nextSnapshot == null || nextSnapshot.isEmpty()) {
             clearTable();
+            updateSelectedCardSummary();
+            updateButtonStates();
             showFeedback("Connect to a session from the main menu.");
             return;
         }
@@ -279,6 +305,8 @@ public class GameUI {
         identityField.setText(snapshot.playerName(context.playerId()) + " (" + context.playerId() + ")");
         connectionField.setText(context.connectionLabel());
         drawPileLabel.setText("DRAW\n" + snapshot.deckSize());
+        setLabelText(deckSummaryLabel, snapshot.deckSize() + " cards");
+        setLabelText(discardPileSummaryLabel, snapshot.discardSize() + " cards");
 
         renderOwnZones();
         renderOpponents();
@@ -286,6 +314,8 @@ public class GameUI {
         renderLog();
         preserveSelection();
         layoutHand(null);
+        updateSelectedCardSummary();
+        updateButtonStates();
     }
 
     private void renderOwnZones() {
@@ -294,7 +324,7 @@ public class GameUI {
             return;
         }
         currentPlayer.bankCards().forEach(card -> bankZone.getChildren().add(createCardNode(card, true, false)));
-        renderPropertyRows(currentPlayer.propertyRows(), propertyZones(), false);
+        renderPropertyRows(currentPlayer.propertyRows(), propertyZones(), true);
 
         for (UiSnapshot.CardView card : snapshot.currentPlayerHand()) {
             Node node = createCardNode(card, false, true);
@@ -313,51 +343,65 @@ public class GameUI {
     }
 
     private Node createOpponentSeat(UiSnapshot.PlayerView opponent) {
-        VBox seat = new VBox(7);
-        seat.setPrefWidth(230);
-        seat.getStyleClass().addAll("opponent-seat", "tabletop-panel");
+        VBox seat = new VBox(5);
+        seat.setMinWidth(220);
+        seat.setPrefWidth(220);
+        seat.getStyleClass().add("opponent-seat");
         Label heading = new Label(opponent.displayName() + " - " + opponent.playerStatus());
         heading.getStyleClass().add("zone-heading");
+        heading.setMaxWidth(206);
+
+        Label summary = new Label("Hand " + opponent.handCount()
+                + " | Bank $" + opponent.bankTotalValueM() + "M"
+                + " | Sets " + opponent.completedSetCount() + "/3");
+        summary.getStyleClass().add("zone-caption");
+        summary.setMaxWidth(206);
+
         HBox handBacks = new HBox(5);
         handBacks.setAlignment(Pos.CENTER_LEFT);
         handBacks.getStyleClass().add("opponent-hand-backs");
         populateOpponentHandBacks(handBacks, opponent.handCount());
 
-        HBox zones = new HBox(7);
-        VBox bank = titledZone("Bank");
-        FlowPane bankCards = (FlowPane) bank.getChildren().get(1);
-        opponent.bankCards().forEach(card -> bankCards.getChildren().add(createCardNode(card, true, false)));
-        VBox properties = titledZone("Properties");
-        FlowPane propertyCards = (FlowPane) properties.getChildren().get(1);
-        opponent.propertyRows().forEach(row -> propertyCards.getChildren().add(createPublicRowNode(row)));
-        zones.getChildren().addAll(bank, properties);
-        seat.getChildren().addAll(heading, handBacks, zones);
+        FlowPane publicChips = new FlowPane(4, 4);
+        publicChips.getStyleClass().add("opponent-public-chips");
+        if (opponent.bankCards().isEmpty()) {
+            publicChips.getChildren().add(opponentChip("Bank empty"));
+        } else {
+            opponent.bankCards().stream()
+                    .limit(2)
+                    .map(card -> opponentChip("Bank: " + card.title()))
+                    .forEach(publicChips.getChildren()::add);
+            addOverflowChip(publicChips, opponent.bankCards().size(), 2, "bank");
+        }
+
+        if (opponent.propertyRows().isEmpty()) {
+            publicChips.getChildren().add(opponentChip("No properties"));
+        } else {
+            opponent.propertyRows().stream()
+                    .limit(3)
+                    .map(row -> opponentChip(row.label() + " (" + row.cards().size() + ")"))
+                    .forEach(publicChips.getChildren()::add);
+            addOverflowChip(publicChips, opponent.propertyRows().size(), 3, "sets");
+        }
+
+        seat.getChildren().addAll(heading, summary, handBacks, publicChips);
         return seat;
     }
 
-    private VBox titledZone(String title) {
-        VBox box = new VBox(4);
-        box.setPrefWidth(105);
-        HBox.setHgrow(box, Priority.ALWAYS);
-        Label label = new Label(title);
-        label.getStyleClass().add("zone-caption");
-        FlowPane pane = new FlowPane(6, 6);
-        pane.setPrefHeight(92);
-        pane.getStyleClass().addAll("drop-zone", "compact-drop-zone");
-        box.getChildren().addAll(label, pane);
-        return box;
+    private Label opponentChip(String text) {
+        Label label = new Label(text);
+        label.setMaxWidth(96);
+        label.setWrapText(false);
+        label.getStyleClass().add("opponent-public-chip");
+        Tooltip.install(label, new Tooltip(text));
+        return label;
     }
 
-    private Node createPublicRowNode(UiSnapshot.PropertyRowView row) {
-        VBox rowBox = new VBox(3);
-        rowBox.getStyleClass().add("property-row-chip");
-        Label label = new Label(row.label());
-        label.getStyleClass().add("zone-caption");
-        FlowPane cards = new FlowPane(4, 4);
-        row.cards().forEach(card -> cards.getChildren().add(createCardNode(card, true, false)));
-        rowBox.getChildren().addAll(label, cards);
-        Tooltip.install(rowBox, new Tooltip("Row ID: " + row.rowId()));
-        return rowBox;
+    private void addOverflowChip(FlowPane pane, int size, int visibleCount, String label) {
+        int overflow = size - visibleCount;
+        if (overflow > 0) {
+            pane.getChildren().add(opponentChip("+" + overflow + " " + label));
+        }
     }
 
     private void renderPropertyRows(List<UiSnapshot.PropertyRowView> rows, Map<String, FlowPane> zones, boolean compact) {
@@ -402,7 +446,7 @@ public class GameUI {
         if (!snapshot.forfeitedPlayerIds().isEmpty()) {
             lines.add("Forfeits: " + String.join(", ", snapshot.forfeitedPlayerIds()));
         }
-        gameLogArea.setText(String.join("\n", lines));
+        MessageUI.showLines(gameLogArea, lines);
     }
 
     private void playActionCard(UiSnapshot.CardView card, Map<String, Object> payload) {
@@ -775,6 +819,8 @@ public class GameUI {
         if (drawPileLabel != null) {
             drawPileLabel.setText("DRAW\n0");
         }
+        setLabelText(deckSummaryLabel, "0 cards");
+        setLabelText(discardPileSummaryLabel, "0 cards");
     }
 
     private Map<String, FlowPane> propertyZones() {
@@ -795,14 +841,129 @@ public class GameUI {
     private void selectCard(String cardId) {
         selectedCardId = cardId;
         cardNodes.forEach((id, node) -> toggleStyle(node, "deal-card-selected", id.equals(cardId)));
+        updateSelectedCardSummary();
+        updateButtonStates();
     }
 
     private void preserveSelection() {
         if (selectedCardId == null || !cardNodes.containsKey(selectedCardId)) {
             selectedCardId = null;
+            updateSelectedCardSummary();
+            updateButtonStates();
             return;
         }
         selectCard(selectedCardId);
+    }
+
+    private void updateSelectedCardSummary() {
+        if (selectedCardSummaryLabel == null) {
+            return;
+        }
+        if (snapshot == null || snapshot.isEmpty()) {
+            selectedCardSummaryLabel.setText("Connect to a session to view your private hand.");
+            return;
+        }
+        Optional<UiSnapshot.CardView> selected = selectedHandCard();
+        if (selected.isPresent()) {
+            UiSnapshot.CardView card = selected.get();
+            selectedCardSummaryLabel.setText("Selected: " + card.title() + " - " + selectedCardHint(card));
+            return;
+        }
+        int cardsToDiscard = snapshot.currentPlayerHand().size() - 7;
+        if (cardsToDiscard > 0 && isYourTurn()) {
+            selectedCardSummaryLabel.setText("Choose " + cardsToDiscard
+                    + " card(s) to discard before ending your turn.");
+            return;
+        }
+        if (isYourTurn()) {
+            selectedCardSummaryLabel.setText("Select a card from your private hand, then choose Play Selected.");
+            return;
+        }
+        selectedCardSummaryLabel.setText("Waiting for " + snapshot.playerName(snapshot.activePlayerId())
+                + ". You can still answer pending trade, debt, or action prompts.");
+    }
+
+    private String selectedCardHint(UiSnapshot.CardView card) {
+        if ("MONEY".equals(card.type())) {
+            return "bank for $" + card.bankValueM() + "M.";
+        }
+        if (card.isPropertyLike()) {
+            return "play to your property area.";
+        }
+        if ("ACTION".equals(card.type()) && card.bankValueM() > 0) {
+            return "use the action effect or bank for $" + card.bankValueM() + "M.";
+        }
+        if ("ACTION".equals(card.type())) {
+            return "use the action effect.";
+        }
+        return "ready to play.";
+    }
+
+    private void updateButtonStates() {
+        boolean hasSnapshot = snapshot != null && !snapshot.isEmpty();
+        boolean yourTurn = hasSnapshot && isYourTurn();
+        boolean hasSelection = hasSnapshot && selectedHandCard().isPresent();
+        int cardsToDiscard = hasSnapshot ? snapshot.currentPlayerHand().size() - 7 : 0;
+
+        setButtonText(playSelectedButton, hasSelection ? "Play Selected" : "Select a Card");
+        setButtonText(discardSelectedButton, cardsToDiscard > 0
+                ? "Discard " + cardsToDiscard + " Card" + (cardsToDiscard == 1 ? "" : "s")
+                : "No Discard Needed");
+        setButtonText(endTurnButton, yourTurn ? "End Turn" : "Waiting");
+
+        setButtonDisabled(playSelectedButton, !yourTurn || !hasSelection);
+        setButtonDisabled(discardSelectedButton, !yourTurn || cardsToDiscard <= 0);
+        setButtonDisabled(endTurnButton, !yourTurn);
+        setButtonDisabled(proposeTradeButton, !yourTurn || !canProposeTrade());
+        setButtonDisabled(payDebtButton, !hasPendingDebtForCurrentPlayer());
+        setButtonDisabled(acceptTradeButton, !hasPendingTradeForCurrentPlayer());
+        setButtonDisabled(rejectTradeButton, !hasPendingTradeForCurrentPlayer());
+        setButtonDisabled(acceptActionButton, !hasPendingActionForCurrentPlayer());
+        setButtonDisabled(rejectActionButton, !hasPendingActionForCurrentPlayer());
+    }
+
+    private boolean isYourTurn() {
+        return snapshot != null && context.playerId().equals(snapshot.activePlayerId());
+    }
+
+    private boolean canProposeTrade() {
+        return snapshot.opponents(context.playerId()).stream().anyMatch(player -> !player.defeated())
+                && snapshot.currentPlayer(context.playerId())
+                .map(player -> !player.visibleCards().isEmpty())
+                .orElse(false);
+    }
+
+    private boolean hasPendingDebtForCurrentPlayer() {
+        return snapshot.pendingDebts().stream()
+                .anyMatch(debt -> debt.debtorPlayerId().equals(context.playerId()));
+    }
+
+    private boolean hasPendingTradeForCurrentPlayer() {
+        return snapshot.pendingTrades().stream()
+                .filter(trade -> trade.targetPlayerId().equals(context.playerId()))
+                .anyMatch(trade -> "PENDING".equals(trade.status()));
+    }
+
+    private boolean hasPendingActionForCurrentPlayer() {
+        return snapshot.pendingActions().stream().anyMatch(action -> action.awaits(context.playerId()));
+    }
+
+    private void setButtonDisabled(Button button, boolean disabled) {
+        if (button != null) {
+            button.setDisable(disabled);
+        }
+    }
+
+    private void setButtonText(Button button, String text) {
+        if (button != null) {
+            button.setText(text);
+        }
+    }
+
+    private void setLabelText(Label label, String text) {
+        if (label != null) {
+            label.setText(text);
+        }
     }
 
     private void layoutHand(Integer hoveredIndex) {
@@ -981,9 +1142,7 @@ public class GameUI {
     }
 
     private void showFeedback(String message) {
-        if (feedbackArea != null && message != null && !message.isBlank()) {
-            feedbackArea.setText(message);
-        }
+        MessageUI.show(feedbackArea, message);
     }
 
     private record Choice<T>(String label, T value) {

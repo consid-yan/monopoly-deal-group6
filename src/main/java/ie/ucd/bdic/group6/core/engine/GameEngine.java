@@ -9,11 +9,16 @@ import ie.ucd.bdic.group6.core.player.PlayerPropertyTransfers;
 import ie.ucd.bdic.group6.core.player.PlayerSnapshot;
 import ie.ucd.bdic.group6.core.property.PropertyColor;
 import ie.ucd.bdic.group6.core.property.PropertyPaymentSupport;
+import ie.ucd.bdic.group6.core.property.PropertyRentSupport;
 import ie.ucd.bdic.group6.core.property.PropertySet;
 import ie.ucd.bdic.group6.core.rules.ActionRule;
 import ie.ucd.bdic.group6.core.rules.PaymentRule;
 import ie.ucd.bdic.group6.core.rules.WinRule;
 import ie.ucd.bdic.group6.exception.GameException;
+import ie.ucd.bdic.group6.exception.InvalidCommandException;
+import ie.ucd.bdic.group6.exception.InvalidGameStateException;
+import ie.ucd.bdic.group6.exception.PlayerNotFoundException;
+import ie.ucd.bdic.group6.exception.SessionNotFoundException;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -192,7 +197,7 @@ public class GameEngine implements ActionExecutor {
         List<String> offeredCardIds = readStringList(command.getOfferedCardIds());
         List<String> requestedCardIds = readStringList(command.getRequestedCardIds());
         if (offeredCardIds.isEmpty() || requestedCardIds.isEmpty()) {
-            throw new GameException("EMPTY_TRADE", "Trade must include offered and requested cards");
+            throw new InvalidCommandException("EMPTY_TRADE", "Trade must include offered and requested cards");
         }
         if (activeGame.hasPendingTradeInvolving(proposerId) || activeGame.hasPendingTradeInvolving(targetId)) {
             throw new GameException("PENDING_TRADE_EXISTS", "A player in this trade already has a pending trade");
@@ -314,11 +319,11 @@ public class GameEngine implements ActionExecutor {
             session = sessionsByCode.get(sessionIdentity);
         }
         if (session == null) {
-            throw new GameException("SESSION_NOT_FOUND", "No session exists for the given identity");
+            throw new SessionNotFoundException("No session exists for the given identity");
         }
         requirePlayer(session, playerId);
         if (session.isDefeated(playerId)) {
-            throw new GameException("PLAYER_FORFEITED", "This player has already forfeited the session");
+            throw new InvalidGameStateException("PLAYER_FORFEITED", "This player has already forfeited the session");
         }
         session.markConnected(playerId);
         return snapshot(session, playerId);
@@ -358,7 +363,7 @@ public class GameEngine implements ActionExecutor {
 
     private void requireActionsAvailable(TurnManager turnManager, int requiredActions) {
         if (turnManager.actionsRemaining() < requiredActions) {
-            throw new GameException(
+            throw new InvalidGameStateException(
                     "ACTION_LIMIT_REACHED",
                     "This play requires " + requiredActions + " action(s) but only "
                             + turnManager.actionsRemaining() + " remain");
@@ -379,19 +384,19 @@ public class GameEngine implements ActionExecutor {
 
     private void requireNoPendingActionResponses(ActiveGameState activeGame) {
         if (activeGame.hasPendingActions()) {
-            throw new GameException("ACTION_RESPONSE_REQUIRED", "Resolve pending action responses first");
+            throw new InvalidGameStateException("ACTION_RESPONSE_REQUIRED", "Resolve pending action responses first");
         }
     }
 
     private void requireNoPendingDebts(ActiveGameState activeGame) {
         if (!activeGame.pendingDebtsView().isEmpty()) {
-            throw new GameException("PAYMENT_REQUIRED", "Resolve pending debts before continuing the turn");
+            throw new InvalidGameStateException("PAYMENT_REQUIRED", "Resolve pending debts before continuing the turn");
         }
     }
 
     private void requireNotDefeated(GameSession session, String playerId) {
         if (session.isDefeated(playerId)) {
-            throw new GameException("PLAYER_DEFEATED", "Defeated players cannot act: " + playerId);
+            throw new InvalidGameStateException("PLAYER_DEFEATED", "Defeated players cannot act: " + playerId);
         }
     }
 
@@ -662,7 +667,7 @@ public class GameEngine implements ActionExecutor {
 
     private DebtPaymentSelection resolveDebtPayment(Player debtor, List<String> paymentCardIds) {
         if (paymentCardIds.isEmpty()) {
-            throw new GameException("PAYMENT_REQUIRED", "At least one payment card is required");
+            throw new InvalidCommandException("PAYMENT_REQUIRED", "At least one payment card is required");
         }
         Set<String> seen = new HashSet<>();
         List<Card> bankCards = new ArrayList<>();
@@ -671,7 +676,7 @@ public class GameEngine implements ActionExecutor {
 
         for (String cardId : paymentCardIds) {
             if (!seen.add(cardId)) {
-                throw new GameException("DUPLICATE_CARD_SELECTION", "Card selected more than once: " + cardId);
+                throw new InvalidCommandException("DUPLICATE_CARD_SELECTION", "Card selected more than once: " + cardId);
             }
             Optional<Card> bankCard = findBankCard(debtor, cardId);
             if (bankCard.isPresent()) {
@@ -733,13 +738,13 @@ public class GameEngine implements ActionExecutor {
 
     private List<TradeCardSelection> resolveTradeCards(Player player, List<String> cardIds) {
         if (cardIds.isEmpty()) {
-            throw new GameException("EMPTY_TRADE_SIDE", "Each side of a trade must contain at least one card");
+            throw new InvalidCommandException("EMPTY_TRADE_SIDE", "Each side of a trade must contain at least one card");
         }
         Set<String> seen = new HashSet<>();
         List<TradeCardSelection> selections = new ArrayList<>();
         for (String cardId : cardIds) {
             if (!seen.add(cardId)) {
-                throw new GameException("DUPLICATE_CARD_SELECTION", "Card selected more than once: " + cardId);
+                throw new InvalidCommandException("DUPLICATE_CARD_SELECTION", "Card selected more than once: " + cardId);
             }
             Optional<Card> bankCard = findBankCard(player, cardId);
             if (bankCard.isPresent()) {
@@ -853,13 +858,15 @@ public class GameEngine implements ActionExecutor {
 
     private ActiveGameState requireActiveGame(GameSession session) {
         return session.activeGame()
-                .orElseThrow(() -> new GameException("GAME_NOT_STARTED", "The active game has not been created"));
+                .orElseThrow(() -> new InvalidGameStateException(
+                        "GAME_NOT_STARTED",
+                        "The active game has not been created"));
     }
 
     private GameSession requireSessionById(String sessionId) {
         GameSession session = sessionsById.get(sessionId);
         if (session == null) {
-            throw new GameException("SESSION_NOT_FOUND", "No session exists for id " + sessionId);
+            throw new SessionNotFoundException("No session exists for id " + sessionId);
         }
         return session;
     }
@@ -867,14 +874,14 @@ public class GameEngine implements ActionExecutor {
     private GameSession requireSessionByCode(String sessionCode) {
         GameSession session = sessionsByCode.get(sessionCode);
         if (session == null) {
-            throw new GameException("SESSION_NOT_FOUND", "No session exists for code " + sessionCode);
+            throw new SessionNotFoundException("No session exists for code " + sessionCode);
         }
         return session;
     }
 
     private Player requirePlayer(GameSession session, String playerId) {
         return session.findPlayer(playerId)
-                .orElseThrow(() -> new GameException("PLAYER_NOT_FOUND", "No player exists for id " + playerId));
+                .orElseThrow(() -> new PlayerNotFoundException("No player exists for id " + playerId));
     }
 
     private Card requireCardInHand(Player player, String cardId) {
@@ -890,7 +897,7 @@ public class GameEngine implements ActionExecutor {
 
     private void playPropertyCard(PlayCardCommand command, Player player, Card card) {
         if (!(card instanceof PropertyCard) && !(card instanceof PropertyWildCard)) {
-            throw new GameException("INVALID_PLAY_MODE", "Only property cards can be played as properties");
+            throw new InvalidCommandException("INVALID_PLAY_MODE", "Only property cards can be played as properties");
         }
 
         PropertyColor anchorColor = resolvePropertyColor(command, card);
@@ -932,7 +939,7 @@ public class GameEngine implements ActionExecutor {
             Card card,
             ActiveGameState activeGame) {
         if (!(card instanceof ActionCard actionCard)) {
-            throw new GameException("INVALID_PLAY_MODE", "Only action cards can be played as actions");
+            throw new InvalidCommandException("INVALID_PLAY_MODE", "Only action cards can be played as actions");
         }
 
         switch (actionCard.actionType()) {
@@ -1013,7 +1020,7 @@ public class GameEngine implements ActionExecutor {
             ActionCard actionCard,
             ActiveGameState activeGame) {
         PropertyColor rentColor = resolveRentColor(command, player, actionCard);
-        int rentM = maxRentForAnchor(player, rentColor);
+        int rentM = PropertyRentSupport.maxRentForAnchor(player.propertyBoard(), rentColor);
         if (rentM <= 0) {
             throw new GameException("NO_RENTABLE_PROPERTY", "No rentable set for " + rentColor);
         }
@@ -1145,14 +1152,6 @@ public class GameEngine implements ActionExecutor {
         activeGame.discard(spent.value().orElse(actionCard));
     }
 
-    private int maxRentForAnchor(Player player, PropertyColor rentColor) {
-        return player.propertyBoard().rowsView().stream()
-                .filter(row -> row.anchorColor() == rentColor)
-                .mapToInt(PropertySet::rentValue)
-                .max()
-                .orElse(0);
-    }
-
     private ActionCard resolveDoubleRentCard(PlayCardCommand command, Player player) {
         String doubleRentCardId = command.getDoubleRentCardId();
         if (doubleRentCardId == null || doubleRentCardId.isBlank()) {
@@ -1170,23 +1169,22 @@ public class GameEngine implements ActionExecutor {
         if (rawColor != null && !rawColor.isBlank()) {
             PropertyColor color = parsePropertyColor(rawColor);
             if (actionCard.actionType() != ActionType.WILD_RENT && !actionCard.rentColorOptions().contains(color)) {
-                throw new GameException("INVALID_RENT_COLOR", "Rent card cannot charge " + color);
+                throw new InvalidCommandException("INVALID_RENT_COLOR", "Rent card cannot charge " + color);
             }
             return color;
         }
 
-        List<PropertyColor> availableColors = player.propertyBoard().rowsView().stream()
-                .filter(row -> row.size() > 0)
-                .map(PropertySet::anchorColor)
+        List<PropertyColor> availableColors = PropertyRentSupport.rentableAnchors(player.propertyBoard()).stream()
                 .filter(color -> actionCard.actionType() == ActionType.WILD_RENT
                         || actionCard.rentColorOptions().contains(color))
-                .distinct()
                 .toList();
         if (availableColors.isEmpty()) {
-            throw new GameException("NO_RENTABLE_PROPERTY", "No complete set matches this rent card");
+            throw new GameException("NO_RENTABLE_PROPERTY", "No rentable property matches this rent card");
         }
         if (availableColors.size() > 1) {
-            throw new GameException("PROPERTY_COLOR_REQUIRED", "propertyColor is required when multiple rents apply");
+            throw new InvalidCommandException(
+                    "PROPERTY_COLOR_REQUIRED",
+                    "propertyColor is required when multiple rents apply");
         }
         return availableColors.getFirst();
     }
@@ -1226,7 +1224,9 @@ public class GameEngine implements ActionExecutor {
 
         String rawColor = command.getPropertyColor();
         if (rawColor == null || rawColor.isBlank()) {
-            throw new GameException("PROPERTY_ROW_REQUIRED", "propertyRowIndex or propertyColor is required");
+            throw new InvalidCommandException(
+                    "PROPERTY_ROW_REQUIRED",
+                    "propertyRowIndex or propertyColor is required");
         }
         PropertyColor color = parsePropertyColor(rawColor);
         return player.propertyBoard().rowsView().stream()
@@ -1256,7 +1256,7 @@ public class GameEngine implements ActionExecutor {
         try {
             return PlayMode.valueOf(rawPlayMode.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw new GameException("INVALID_PLAY_MODE", "Unsupported play mode: " + rawPlayMode, e);
+            throw new InvalidCommandException("INVALID_PLAY_MODE", "Unsupported play mode: " + rawPlayMode, e);
         }
     }
 
@@ -1266,7 +1266,9 @@ public class GameEngine implements ActionExecutor {
             return propertyCard.color();
         }
         if (rawColor == null || rawColor.isBlank()) {
-            throw new GameException("PROPERTY_COLOR_REQUIRED", "propertyColor is required for wild property cards");
+            throw new InvalidCommandException(
+                    "PROPERTY_COLOR_REQUIRED",
+                    "propertyColor is required for wild property cards");
         }
         PropertyColor color = parsePropertyColor(rawColor);
         if (card instanceof PropertyCard propertyCard && propertyCard.color() != color) {
@@ -1286,7 +1288,10 @@ public class GameEngine implements ActionExecutor {
         try {
             return Optional.of(Integer.parseInt(rawIndex.trim()));
         } catch (NumberFormatException e) {
-            throw new GameException("INVALID_PROPERTY_ROW_INDEX", "propertyRowIndex must be a number", e);
+            throw new InvalidCommandException(
+                    "INVALID_PROPERTY_ROW_INDEX",
+                    "propertyRowIndex must be a number",
+                    e);
         }
     }
 
@@ -1511,11 +1516,11 @@ public class GameEngine implements ActionExecutor {
             try {
                 maxPlayers = Integer.parseInt(raw.toString());
             } catch (NumberFormatException e) {
-                throw new GameException("INVALID_MAX_PLAYERS", "maxPlayers must be a number", e);
+                throw new InvalidCommandException("INVALID_MAX_PLAYERS", "maxPlayers must be a number", e);
             }
         }
         if (maxPlayers < 2 || maxPlayers > 5) {
-            throw new GameException("INVALID_MAX_PLAYERS", "maxPlayers must be between 2 and 5");
+            throw new InvalidCommandException("INVALID_MAX_PLAYERS", "maxPlayers must be between 2 and 5");
         }
         return maxPlayers;
     }
@@ -1525,7 +1530,7 @@ public class GameEngine implements ActionExecutor {
             return List.of();
         }
         if (!(raw instanceof List<?> rawList)) {
-            throw new GameException("INVALID_CARD_SELECTION", "Card selection must be a list of ids");
+            throw new InvalidCommandException("INVALID_CARD_SELECTION", "Card selection must be a list of ids");
         }
         List<String> ids = new ArrayList<>();
         for (Object value : rawList) {
@@ -1552,7 +1557,10 @@ public class GameEngine implements ActionExecutor {
         try {
             return PropertyColor.valueOf(normalizeEnumToken(rawColor));
         } catch (IllegalArgumentException e) {
-            throw new GameException("INVALID_PROPERTY_COLOR", "Unsupported property color: " + rawColor, e);
+            throw new InvalidCommandException(
+                    "INVALID_PROPERTY_COLOR",
+                    "Unsupported property color: " + rawColor,
+                    e);
         }
     }
 
@@ -1563,7 +1571,7 @@ public class GameEngine implements ActionExecutor {
 
     private String requireText(String value, String name) {
         if (value == null || value.isBlank()) {
-            throw new GameException("MISSING_REQUIRED_FIELD", name + " is required");
+            throw new InvalidCommandException("MISSING_REQUIRED_FIELD", name + " is required");
         }
         return value;
     }

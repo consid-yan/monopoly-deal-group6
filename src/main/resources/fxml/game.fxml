@@ -19,256 +19,308 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane prefHeight="760.0" prefWidth="1180.0"
-            styleClass="menu-root root-screen game-screen"
-            xmlns="http://javafx.com/javafx/25.0.2"
-            xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="ie.ucd.bdic.group6.ui.GameUI">
-    <top>
-        <VBox alignment="CENTER" spacing="10.0" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets bottom="10.0" left="28.0" right="28.0" top="18.0"/>
-            </padding>
-            <Label styleClass="menu-title title-banner" text="Monopoly Deal">
-                <font>
-                    <Font name="System Bold" size="30.0"/>
-                </font>
-            </Label>
-            <GridPane hgap="14.0" styleClass="hud-bar" vgap="7.0">
-                <columnConstraints>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="150.0"/>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="150.0"/>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="150.0"/>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="150.0"/>
-                </columnConstraints>
-                <Label text="Active Player" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-                <TextField fx:id="activePlayerField" editable="false" promptText="Active Player" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-                <Label text="Turn Status" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
-                <TextField fx:id="turnStatusField" editable="false" promptText="Turn/status indicator" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
-                <Label text="You" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
-                <TextField fx:id="identityField" editable="false" promptText="Current user/player identity" GridPane.columnIndex="2" GridPane.rowIndex="1"/>
-                <Label text="Connection" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
-                <TextField fx:id="connectionField" editable="false" promptText="Connected / reconnect countdown" GridPane.columnIndex="3" GridPane.rowIndex="1"/>
-            </GridPane>
-        </VBox>
-    </top>
+<StackPane prefHeight="760.0" prefWidth="1180.0"
+           styleClass="game-screen-root"
+           xmlns="http://javafx.com/javafx/25.0.2"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="ie.ucd.bdic.group6.ui.GameUI">
+    <StackPane mouseTransparent="true" styleClass="menu-bg-pattern"/>
+    <Label mouseTransparent="true" styleClass="menu-card-suit" text="&#9670;" StackPane.alignment="TOP_LEFT">
+        <StackPane.margin>
+            <Insets left="-10.0" top="-24.0"/>
+        </StackPane.margin>
+    </Label>
+    <Label mouseTransparent="true" rotate="180.0" styleClass="menu-card-suit" text="&#9670;" StackPane.alignment="BOTTOM_RIGHT">
+        <StackPane.margin>
+            <Insets bottom="-24.0" right="-10.0"/>
+        </StackPane.margin>
+    </Label>
 
-    <center>
-        <VBox spacing="10.0" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets bottom="8.0" left="24.0" right="12.0" top="4.0"/>
-            </padding>
-
-            <HBox fx:id="opponentsRow" alignment="CENTER" spacing="10.0" styleClass="opponents-row"/>
-
-            <VBox spacing="10.0" styleClass="tabletop-board" VBox.vgrow="ALWAYS">
-                <HBox alignment="CENTER" spacing="10.0">
-                    <VBox alignment="CENTER" prefWidth="130.0" spacing="6.0" styleClass="pile-panel">
-                        <Label styleClass="zone-heading" text="Draw Pile"/>
-                        <StackPane prefHeight="124.0" prefWidth="92.0" styleClass="draw-pile-card">
-                            <Label fx:id="drawPileLabel"/>
-                        </StackPane>
+    <BorderPane maxHeight="744.0" maxWidth="1168.0" styleClass="game-shell" StackPane.alignment="CENTER">
+        <top>
+            <VBox spacing="10.0" styleClass="game-header" BorderPane.alignment="CENTER">
+                <padding>
+                    <Insets bottom="10.0" left="28.0" right="28.0" top="20.0"/>
+                </padding>
+                <HBox alignment="CENTER_LEFT" spacing="16.0">
+                    <VBox spacing="1.0" HBox.hgrow="ALWAYS">
+                        <Label styleClass="game-logo-title" text="Monopoly Deal">
+                            <font>
+                                <Font name="Georgia Bold" size="36.0"/>
+                            </font>
+                        </Label>
+                        <Label styleClass="game-logo-subtitle" text="Gameplay Table"/>
                     </VBox>
-                    <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="tabletop-panel">
-                        <Label styleClass="zone-heading" text="Discard Pile"/>
-                        <FlowPane fx:id="discardZone" hgap="8.0" prefHeight="126.0" styleClass="drop-zone discard-drop-zone" vgap="8.0"/>
-                    </VBox>
-                    <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="tabletop-panel">
-                        <Label styleClass="zone-heading" text="Action Cards"/>
-                        <FlowPane fx:id="actionZone" hgap="8.0" prefHeight="126.0" styleClass="drop-zone action-drop-zone" vgap="8.0"/>
-                    </VBox>
+                    <HBox alignment="CENTER_RIGHT" spacing="8.0">
+                        <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#backToLobby" prefHeight="36.0" prefWidth="106.0" styleClass="menu-secondary-button game-nav-button" text="Lobby">
+                            <graphic>
+                                <FontIcon iconLiteral="bx-log-in-circle" styleClass="menu-icon-secondary"/>
+                            </graphic>
+                        </Button>
+                        <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#openHowToPlay" prefHeight="36.0" prefWidth="106.0" styleClass="menu-outline-button game-nav-button" text="Rules">
+                            <graphic>
+                                <FontIcon iconLiteral="bx-question-mark" styleClass="menu-icon-outline"/>
+                            </graphic>
+                        </Button>
+                    </HBox>
                 </HBox>
 
-                <HBox alignment="CENTER" spacing="10.0">
-                    <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="tabletop-panel symbolic-panel">
-                        <Label styleClass="zone-heading" text="Your Bank"/>
-                        <FlowPane fx:id="bankZone" hgap="7.0" prefHeight="96.0" styleClass="drop-zone symbolic-drop-zone bank-drop-zone" vgap="7.0"/>
+                <GridPane hgap="8.0" styleClass="game-status-strip" vgap="6.0">
+                    <columnConstraints>
+                        <ColumnConstraints hgrow="ALWAYS" percentWidth="19.0"/>
+                        <ColumnConstraints hgrow="ALWAYS" percentWidth="18.0"/>
+                        <ColumnConstraints hgrow="ALWAYS" percentWidth="21.0"/>
+                        <ColumnConstraints hgrow="ALWAYS" percentWidth="18.0"/>
+                        <ColumnConstraints hgrow="ALWAYS" percentWidth="12.0"/>
+                        <ColumnConstraints hgrow="ALWAYS" percentWidth="12.0"/>
+                    </columnConstraints>
+                    <VBox spacing="3.0" styleClass="game-stat-chip" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                        <Label styleClass="game-stat-label" text="Active Player"/>
+                        <TextField fx:id="activePlayerField" editable="false" focusTraversable="false" promptText="Waiting" styleClass="game-stat-value"/>
                     </VBox>
-                    <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="tabletop-panel symbolic-panel">
-                        <Label styleClass="zone-heading" text="Payment"/>
-                        <FlowPane fx:id="paymentZone" hgap="7.0" prefHeight="96.0" styleClass="drop-zone symbolic-drop-zone payment-drop-zone" vgap="7.0"/>
+                    <VBox spacing="3.0" styleClass="game-stat-chip" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                        <Label styleClass="game-stat-label" text="Turn"/>
+                        <TextField fx:id="turnStatusField" editable="false" focusTraversable="false" promptText="Actions" styleClass="game-stat-value"/>
                     </VBox>
-                    <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="tabletop-panel symbolic-panel">
-                        <Label styleClass="zone-heading" text="Trade Offer"/>
-                        <FlowPane fx:id="tradeOfferZone" hgap="7.0" prefHeight="96.0" styleClass="drop-zone symbolic-drop-zone trade-drop-zone" vgap="7.0"/>
+                    <VBox spacing="3.0" styleClass="game-stat-chip" GridPane.columnIndex="2" GridPane.rowIndex="0">
+                        <Label styleClass="game-stat-label" text="You"/>
+                        <TextField fx:id="identityField" editable="false" focusTraversable="false" promptText="Player" styleClass="game-stat-value"/>
                     </VBox>
-                    <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="tabletop-panel symbolic-panel">
-                        <Label styleClass="zone-heading" text="Trade Request"/>
-                        <FlowPane fx:id="tradeRequestZone" hgap="7.0" prefHeight="96.0" styleClass="drop-zone symbolic-drop-zone trade-drop-zone" vgap="7.0"/>
+                    <VBox spacing="3.0" styleClass="game-stat-chip" GridPane.columnIndex="3" GridPane.rowIndex="0">
+                        <Label styleClass="game-stat-label" text="Connection"/>
+                        <TextField fx:id="connectionField" editable="false" focusTraversable="false" promptText="Status" styleClass="game-stat-value"/>
                     </VBox>
-                </HBox>
-
-                <ScrollPane fitToHeight="true" fitToWidth="true" styleClass="table-scroll" VBox.vgrow="ALWAYS">
-                    <GridPane hgap="8.0" styleClass="property-board" vgap="8.0">
-                        <columnConstraints>
-                            <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
-                            <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
-                            <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
-                            <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
-                            <ColumnConstraints hgrow="ALWAYS" minWidth="132.0"/>
-                        </columnConstraints>
-                        <rowConstraints>
-                            <RowConstraints vgrow="ALWAYS"/>
-                            <RowConstraints vgrow="ALWAYS"/>
-                        </rowConstraints>
-                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="0" GridPane.rowIndex="0">
-                            <Label styleClass="zone-heading property-brown" text="Brown Set (2)"/>
-                            <FlowPane fx:id="brownPropertyZone" hgap="7.0" prefHeight="122.0"
-                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                        </VBox>
-                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="1" GridPane.rowIndex="0">
-                            <Label styleClass="zone-heading property-light-blue" text="Light Blue Set (3)"/>
-                            <FlowPane fx:id="lightBluePropertyZone" hgap="7.0" prefHeight="122.0"
-                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                        </VBox>
-                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="2" GridPane.rowIndex="0">
-                            <Label styleClass="zone-heading property-pink" text="Pink Set (3)"/>
-                            <FlowPane fx:id="pinkPropertyZone" hgap="7.0" prefHeight="122.0"
-                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                        </VBox>
-                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="3" GridPane.rowIndex="0">
-                            <Label styleClass="zone-heading property-orange" text="Orange Set (3)"/>
-                            <FlowPane fx:id="orangePropertyZone" hgap="7.0" prefHeight="122.0"
-                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                        </VBox>
-                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="4" GridPane.rowIndex="0">
-                            <Label styleClass="zone-heading property-red" text="Red Set (3)"/>
-                            <FlowPane fx:id="redPropertyZone" hgap="7.0" prefHeight="122.0"
-                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                        </VBox>
-                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="0" GridPane.rowIndex="1">
-                            <Label styleClass="zone-heading property-yellow" text="Yellow Set (3)"/>
-                            <FlowPane fx:id="yellowPropertyZone" hgap="7.0" prefHeight="122.0"
-                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                        </VBox>
-                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="1" GridPane.rowIndex="1">
-                            <Label styleClass="zone-heading property-green" text="Green Set (3)"/>
-                            <FlowPane fx:id="greenPropertyZone" hgap="7.0" prefHeight="122.0"
-                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                        </VBox>
-                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="2" GridPane.rowIndex="1">
-                            <Label styleClass="zone-heading property-dark-blue" text="Dark Blue Set (2)"/>
-                            <FlowPane fx:id="darkBluePropertyZone" hgap="7.0" prefHeight="122.0"
-                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                        </VBox>
-                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="3" GridPane.rowIndex="1">
-                            <Label styleClass="zone-heading property-railroad" text="Railroad Set (4)"/>
-                            <FlowPane fx:id="railroadPropertyZone" hgap="7.0" prefHeight="122.0"
-                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                        </VBox>
-                        <VBox spacing="5.0" styleClass="property-slot" GridPane.columnIndex="4" GridPane.rowIndex="1">
-                            <Label styleClass="zone-heading property-utility" text="Utility Set (2)"/>
-                            <FlowPane fx:id="utilityPropertyZone" hgap="7.0" prefHeight="122.0"
-                                      styleClass="drop-zone property-drop-zone" vgap="7.0"/>
-                        </VBox>
-                    </GridPane>
-                </ScrollPane>
+                    <VBox spacing="3.0" styleClass="game-stat-chip" GridPane.columnIndex="4" GridPane.rowIndex="0">
+                        <Label styleClass="game-stat-label" text="Deck"/>
+                        <Label fx:id="deckSummaryLabel" styleClass="game-stat-readout" text="0 cards"/>
+                    </VBox>
+                    <VBox spacing="3.0" styleClass="game-stat-chip" GridPane.columnIndex="5" GridPane.rowIndex="0">
+                        <Label styleClass="game-stat-label" text="Discard"/>
+                        <Label fx:id="discardPileSummaryLabel" styleClass="game-stat-readout" text="0 cards"/>
+                    </VBox>
+                </GridPane>
             </VBox>
-        </VBox>
-    </center>
+        </top>
 
-    <right>
-        <VBox prefWidth="248.0" spacing="10.0" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets bottom="10.0" left="8.0" right="22.0" top="4.0"/>
-            </padding>
-            <Label styleClass="section-heading" text="Actions">
-                <font>
-                    <Font name="System Bold" size="18.0"/>
-                </font>
-            </Label>
-            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#playSelectedCard" prefHeight="38.0" prefWidth="218.0" styleClass="primary-button" text="Play Selected Card">
-                <graphic>
-                    <FontIcon iconLiteral="bx-play"/>
-                </graphic>
-            </Button>
-            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#discardSelectedCard" prefHeight="38.0" prefWidth="218.0" styleClass="danger-button" text="Discard Selected">
-                <graphic>
-                    <FontIcon iconLiteral="bx-trash"/>
-                </graphic>
-            </Button>
-            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#endTurn" prefHeight="38.0" prefWidth="218.0" styleClass="gold-button" text="End Turn">
-                <graphic>
-                    <FontIcon iconLiteral="bx-skip-next"/>
-                </graphic>
-            </Button>
-            <Separator prefWidth="218.0"/>
-            <Label styleClass="zone-heading" text="Simplified Trade"/>
-            <TextField fx:id="targetPlayerField" prefWidth="218.0" promptText="Target player"/>
-            <HBox alignment="CENTER" spacing="8.0">
-                <Button graphicTextGap="6.0" mnemonicParsing="false" onAction="#proposeTrade" prefWidth="104.0" styleClass="primary-button" text="Propose">
-                    <graphic>
-                        <FontIcon iconLiteral="bx-log-in-circle"/>
-                    </graphic>
-                </Button>
-                <Button graphicTextGap="6.0" mnemonicParsing="false" onAction="#acceptTrade" prefWidth="104.0" styleClass="gold-button" text="Accept">
-                    <graphic>
-                        <FontIcon iconLiteral="bx-check"/>
-                    </graphic>
-                </Button>
-            </HBox>
-            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#rejectTrade" prefWidth="218.0" styleClass="danger-button" text="Reject Trade">
-                <graphic>
-                    <FontIcon iconLiteral="bx-x"/>
-                </graphic>
-            </Button>
-            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#payDebt" prefWidth="218.0" styleClass="secondary-button" text="Pay Debt">
-                <graphic>
-                    <FontIcon iconLiteral="bx-check"/>
-                </graphic>
-            </Button>
-            <HBox alignment="CENTER" spacing="8.0">
-                <Button graphicTextGap="6.0" mnemonicParsing="false" onAction="#acceptAction" prefWidth="104.0" styleClass="gold-button" text="Allow Action">
-                    <graphic>
-                        <FontIcon iconLiteral="bx-check"/>
-                    </graphic>
-                </Button>
-                <Button graphicTextGap="6.0" mnemonicParsing="false" onAction="#rejectAction" prefWidth="104.0" styleClass="danger-button" text="Just Say No">
-                    <graphic>
-                        <FontIcon iconLiteral="bx-x"/>
-                    </graphic>
-                </Button>
-            </HBox>
-            <Separator prefWidth="218.0"/>
-            <HBox alignment="CENTER" spacing="8.0">
-                <Button graphicTextGap="6.0" mnemonicParsing="false" onAction="#backToLobby" prefWidth="105.0" styleClass="secondary-button" text="Lobby">
-                    <graphic>
-                        <FontIcon iconLiteral="bx-log-in-circle"/>
-                    </graphic>
-                </Button>
-                <Button graphicTextGap="6.0" mnemonicParsing="false" onAction="#openHowToPlay" prefWidth="105.0" styleClass="secondary-button" text="Rules">
-                    <graphic>
-                        <FontIcon iconLiteral="bx-question-mark"/>
-                    </graphic>
-                </Button>
-            </HBox>
-            <Separator prefWidth="218.0"/>
-            <Label styleClass="section-heading" text="Game Log"/>
-            <TextArea fx:id="gameLogArea"
-                      editable="false"
-                      focusTraversable="false"
-                      prefHeight="116.0"
-                      promptText="Game Log"
-                      styleClass="status-area side-status-area"
-                      wrapText="true"/>
-            <Label styleClass="section-heading" text="Feedback"/>
-            <TextArea fx:id="feedbackArea"
-                      editable="false"
-                      focusTraversable="false"
-                      prefHeight="92.0"
-                      promptText="Invalid action message"
-                      styleClass="error-area side-status-area"
-                      wrapText="true"/>
-        </VBox>
-    </right>
+        <center>
+            <VBox spacing="10.0" styleClass="game-center" BorderPane.alignment="CENTER">
+                <padding>
+                    <Insets bottom="8.0" left="24.0" right="14.0" top="0.0"/>
+                </padding>
 
-    <bottom>
-        <VBox spacing="6.0" styleClass="hand-panel" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets bottom="12.0" left="28.0" right="28.0" top="4.0"/>
-            </padding>
-            <Label styleClass="zone-heading" text="Your Hand"/>
-            <Pane fx:id="handPane" minHeight="154.0" prefHeight="158.0" styleClass="hand-fan-pane"/>
-        </VBox>
-    </bottom>
-</BorderPane>
+                <VBox spacing="6.0" styleClass="game-opponents-band">
+                    <HBox alignment="CENTER_LEFT" spacing="10.0">
+                        <Label styleClass="game-section-title" text="Opponents"/>
+                        <Label styleClass="game-helper-text" text="Public cards and hand counts only"/>
+                    </HBox>
+                    <ScrollPane fitToHeight="true" hbarPolicy="AS_NEEDED" prefHeight="118.0" styleClass="game-opponent-scroll" vbarPolicy="NEVER">
+                        <content>
+                            <HBox fx:id="opponentsRow" alignment="CENTER_LEFT" minHeight="100.0" spacing="10.0" styleClass="opponents-row"/>
+                        </content>
+                    </ScrollPane>
+                </VBox>
+
+                <VBox spacing="10.0" styleClass="game-main-table" VBox.vgrow="ALWAYS">
+                    <HBox alignment="CENTER_LEFT" spacing="10.0">
+                        <Label styleClass="game-section-title" text="Your Table"/>
+                        <Label styleClass="game-helper-text" text="Build 3 complete property sets to win"/>
+                    </HBox>
+
+                    <HBox alignment="CENTER" spacing="10.0" styleClass="game-board-row">
+                        <VBox alignment="CENTER" prefWidth="118.0" spacing="6.0" styleClass="game-zone-panel game-pile-panel">
+                            <Label styleClass="zone-heading" text="Draw Pile"/>
+                            <StackPane prefHeight="96.0" prefWidth="72.0" styleClass="draw-pile-card game-draw-pile-card">
+                                <Label fx:id="drawPileLabel"/>
+                            </StackPane>
+                        </VBox>
+                        <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="game-zone-panel">
+                            <Label styleClass="zone-heading" text="Your Bank"/>
+                            <FlowPane fx:id="bankZone" hgap="7.0" prefHeight="100.0" styleClass="drop-zone symbolic-drop-zone bank-drop-zone game-drop-zone" vgap="7.0"/>
+                        </VBox>
+                        <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="game-zone-panel">
+                            <Label styleClass="zone-heading" text="Discard Pile"/>
+                            <FlowPane fx:id="discardZone" hgap="7.0" prefHeight="100.0" styleClass="drop-zone discard-drop-zone game-drop-zone" vgap="7.0"/>
+                        </VBox>
+                        <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="game-zone-panel">
+                            <Label styleClass="zone-heading" text="Pending Actions"/>
+                            <FlowPane fx:id="actionZone" hgap="7.0" prefHeight="100.0" styleClass="drop-zone action-drop-zone game-drop-zone" vgap="7.0"/>
+                        </VBox>
+                    </HBox>
+
+                    <HBox alignment="CENTER" spacing="10.0" styleClass="game-board-row">
+                        <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="game-zone-panel game-small-zone">
+                            <Label styleClass="zone-heading" text="Payments"/>
+                            <FlowPane fx:id="paymentZone" hgap="7.0" prefHeight="72.0" styleClass="drop-zone symbolic-drop-zone payment-drop-zone game-drop-zone" vgap="7.0"/>
+                        </VBox>
+                        <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="game-zone-panel game-small-zone">
+                            <Label styleClass="zone-heading" text="Trade Offer"/>
+                            <FlowPane fx:id="tradeOfferZone" hgap="7.0" prefHeight="72.0" styleClass="drop-zone symbolic-drop-zone trade-drop-zone game-drop-zone" vgap="7.0"/>
+                        </VBox>
+                        <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="game-zone-panel game-small-zone">
+                            <Label styleClass="zone-heading" text="Trade Request"/>
+                            <FlowPane fx:id="tradeRequestZone" hgap="7.0" prefHeight="72.0" styleClass="drop-zone symbolic-drop-zone trade-drop-zone game-drop-zone" vgap="7.0"/>
+                        </VBox>
+                    </HBox>
+
+                    <ScrollPane fitToHeight="true" fitToWidth="true" styleClass="game-property-scroll" VBox.vgrow="ALWAYS">
+                        <GridPane hgap="8.0" styleClass="property-board game-property-board" vgap="8.0">
+                            <columnConstraints>
+                                <ColumnConstraints hgrow="ALWAYS" minWidth="116.0" percentWidth="20.0"/>
+                                <ColumnConstraints hgrow="ALWAYS" minWidth="116.0" percentWidth="20.0"/>
+                                <ColumnConstraints hgrow="ALWAYS" minWidth="116.0" percentWidth="20.0"/>
+                                <ColumnConstraints hgrow="ALWAYS" minWidth="116.0" percentWidth="20.0"/>
+                                <ColumnConstraints hgrow="ALWAYS" minWidth="116.0" percentWidth="20.0"/>
+                            </columnConstraints>
+                            <rowConstraints>
+                                <RowConstraints vgrow="ALWAYS"/>
+                                <RowConstraints vgrow="ALWAYS"/>
+                            </rowConstraints>
+                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                <Label styleClass="zone-heading property-brown" text="Brown Set (2)"/>
+                                <FlowPane fx:id="brownPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                <Label styleClass="zone-heading property-light-blue" text="Light Blue Set (3)"/>
+                                <FlowPane fx:id="lightBluePropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="2" GridPane.rowIndex="0">
+                                <Label styleClass="zone-heading property-pink" text="Pink Set (3)"/>
+                                <FlowPane fx:id="pinkPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="3" GridPane.rowIndex="0">
+                                <Label styleClass="zone-heading property-orange" text="Orange Set (3)"/>
+                                <FlowPane fx:id="orangePropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="4" GridPane.rowIndex="0">
+                                <Label styleClass="zone-heading property-red" text="Red Set (3)"/>
+                                <FlowPane fx:id="redPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                <Label styleClass="zone-heading property-yellow" text="Yellow Set (3)"/>
+                                <FlowPane fx:id="yellowPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                <Label styleClass="zone-heading property-green" text="Green Set (3)"/>
+                                <FlowPane fx:id="greenPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="2" GridPane.rowIndex="1">
+                                <Label styleClass="zone-heading property-dark-blue" text="Dark Blue Set (2)"/>
+                                <FlowPane fx:id="darkBluePropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="3" GridPane.rowIndex="1">
+                                <Label styleClass="zone-heading property-railroad" text="Railroad Set (4)"/>
+                                <FlowPane fx:id="railroadPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="4" GridPane.rowIndex="1">
+                                <Label styleClass="zone-heading property-utility" text="Utility Set (2)"/>
+                                <FlowPane fx:id="utilityPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
+                            </VBox>
+                        </GridPane>
+                    </ScrollPane>
+                </VBox>
+            </VBox>
+        </center>
+
+        <right>
+            <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="game-action-scroll" BorderPane.alignment="CENTER">
+                <content>
+                    <VBox prefWidth="270.0" spacing="10.0" styleClass="game-action-rail">
+                        <padding>
+                            <Insets bottom="10.0" left="8.0" right="24.0" top="0.0"/>
+                        </padding>
+                        <Label styleClass="game-section-title" text="Turn Actions"/>
+                        <Button fx:id="playSelectedButton" graphicTextGap="8.0" mnemonicParsing="false" onAction="#playSelectedCard" prefHeight="38.0" prefWidth="238.0" styleClass="menu-primary-button game-command-button" text="Play Selected">
+                            <graphic>
+                                <FontIcon iconLiteral="bx-play" styleClass="menu-icon-primary"/>
+                            </graphic>
+                        </Button>
+                        <Button fx:id="discardSelectedButton" graphicTextGap="8.0" mnemonicParsing="false" onAction="#discardSelectedCard" prefHeight="38.0" prefWidth="238.0" styleClass="menu-danger-button game-command-button" text="Discard Required">
+                            <graphic>
+                                <FontIcon iconLiteral="bx-trash" styleClass="menu-icon-danger"/>
+                            </graphic>
+                        </Button>
+                        <Button fx:id="endTurnButton" graphicTextGap="8.0" mnemonicParsing="false" onAction="#endTurn" prefHeight="38.0" prefWidth="238.0" styleClass="menu-outline-button game-command-button" text="End Turn">
+                            <graphic>
+                                <FontIcon iconLiteral="bx-skip-next" styleClass="menu-icon-outline"/>
+                            </graphic>
+                        </Button>
+
+                        <Separator prefWidth="238.0"/>
+                        <Label styleClass="game-section-title" text="Trade and Payment"/>
+                        <TextField fx:id="targetPlayerField" prefWidth="238.0" promptText="Optional target player id" styleClass="game-input"/>
+                        <HBox alignment="CENTER" spacing="8.0">
+                            <Button fx:id="proposeTradeButton" graphicTextGap="6.0" mnemonicParsing="false" onAction="#proposeTrade" prefWidth="115.0" styleClass="menu-primary-button game-command-button" text="Propose">
+                                <graphic>
+                                    <FontIcon iconLiteral="bx-log-in-circle" styleClass="menu-icon-primary"/>
+                                </graphic>
+                            </Button>
+                            <Button fx:id="payDebtButton" graphicTextGap="6.0" mnemonicParsing="false" onAction="#payDebt" prefWidth="115.0" styleClass="menu-secondary-button game-command-button" text="Pay Debt">
+                                <graphic>
+                                    <FontIcon iconLiteral="bx-check" styleClass="menu-icon-secondary"/>
+                                </graphic>
+                            </Button>
+                        </HBox>
+                        <HBox alignment="CENTER" spacing="8.0">
+                            <Button fx:id="acceptTradeButton" graphicTextGap="6.0" mnemonicParsing="false" onAction="#acceptTrade" prefWidth="115.0" styleClass="menu-outline-button game-command-button" text="Accept">
+                                <graphic>
+                                    <FontIcon iconLiteral="bx-check" styleClass="menu-icon-outline"/>
+                                </graphic>
+                            </Button>
+                            <Button fx:id="rejectTradeButton" graphicTextGap="6.0" mnemonicParsing="false" onAction="#rejectTrade" prefWidth="115.0" styleClass="menu-danger-button game-command-button" text="Reject">
+                                <graphic>
+                                    <FontIcon iconLiteral="bx-x" styleClass="menu-icon-danger"/>
+                                </graphic>
+                            </Button>
+                        </HBox>
+
+                        <Separator prefWidth="238.0"/>
+                        <Label styleClass="game-section-title" text="Action Response"/>
+                        <HBox alignment="CENTER" spacing="8.0">
+                            <Button fx:id="acceptActionButton" graphicTextGap="6.0" mnemonicParsing="false" onAction="#acceptAction" prefWidth="115.0" styleClass="menu-outline-button game-command-button" text="Allow">
+                                <graphic>
+                                    <FontIcon iconLiteral="bx-check" styleClass="menu-icon-outline"/>
+                                </graphic>
+                            </Button>
+                            <Button fx:id="rejectActionButton" graphicTextGap="6.0" mnemonicParsing="false" onAction="#rejectAction" prefWidth="115.0" styleClass="menu-danger-button game-command-button" text="Just Say No">
+                                <graphic>
+                                    <FontIcon iconLiteral="bx-x" styleClass="menu-icon-danger"/>
+                                </graphic>
+                            </Button>
+                        </HBox>
+
+                        <Separator prefWidth="238.0"/>
+                        <Label styleClass="game-section-title" text="Feedback"/>
+                        <TextArea fx:id="feedbackArea"
+                                  editable="false"
+                                  focusTraversable="false"
+                                  prefHeight="92.0"
+                                  promptText="Move feedback appears here."
+                                  styleClass="lobby-status-area game-feedback-area"
+                                  wrapText="true"/>
+                        <Label styleClass="game-section-title" text="Game Log"/>
+                        <TextArea fx:id="gameLogArea"
+                                  editable="false"
+                                  focusTraversable="false"
+                                  prefHeight="116.0"
+                                  promptText="Game state summary"
+                                  styleClass="lobby-status-area game-log-area"
+                                  wrapText="true"/>
+                    </VBox>
+                </content>
+            </ScrollPane>
+        </right>
+
+        <bottom>
+            <VBox spacing="7.0" styleClass="hand-panel game-hand-panel" BorderPane.alignment="CENTER">
+                <padding>
+                    <Insets bottom="16.0" left="28.0" right="28.0" top="4.0"/>
+                </padding>
+                <HBox alignment="CENTER_LEFT" spacing="12.0">
+                    <Label styleClass="game-section-title" text="Your Hand"/>
+                    <Label fx:id="selectedCardSummaryLabel" maxWidth="720.0" styleClass="game-selected-card-summary" text="Select a card to see available actions." wrapText="true" HBox.hgrow="ALWAYS"/>
+                </HBox>
+                <Pane fx:id="handPane" minHeight="148.0" prefHeight="154.0" styleClass="hand-fan-pane game-hand-fan-pane"/>
+            </VBox>
+        </bottom>
+    </BorderPane>
+</StackPane>
