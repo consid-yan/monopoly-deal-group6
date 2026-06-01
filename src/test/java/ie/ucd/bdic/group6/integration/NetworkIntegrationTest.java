@@ -119,9 +119,8 @@ class NetworkIntegrationTest {
         GameClient rejoinedPlayer2 = connectedClient();
         List<StateUpdate> rejoinedUpdates = updates(rejoinedPlayer2);
         ServerResult rejoined = rejoinedPlayer2.sendCommand(CommandType.REJOIN_SESSION, Map.of(
-                "sessionIdentity", sessionId,
-                "playerId", "player2",
-                "playerToken", player2Token
+                "sessionIdentity", sessionCode,
+                "playerName", "Player 2"
         )).get(3, TimeUnit.SECONDS);
         assertTrue(rejoined.success());
         assertEquals(player2Token, rejoined.data().get("playerToken"));

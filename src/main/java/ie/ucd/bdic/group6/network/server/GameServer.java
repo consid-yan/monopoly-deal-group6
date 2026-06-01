@@ -18,12 +18,13 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -31,6 +32,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class GameServer implements AutoCloseable {
+    private static final int PLAYER_TOKEN_BYTES = 8;
+    private static final SecureRandom TOKEN_RANDOM = new SecureRandom();
+
     private final GameController gameController;
     private final int requestedPort;
     private final Set<ClientConnection> clients = ConcurrentHashMap.newKeySet();
@@ -129,9 +133,9 @@ public class GameServer implements AutoCloseable {
         }
 
         GameResult result = execute(command);
-        String sessionId = text(result.getData().get("sessionId"));
-        String playerId = resolvePlayerId(command);
         Map<String, Object> resultData = result.getData();
+        String sessionId = text(resultData.get("sessionId"));
+        String playerId = resolvePlayerId(command, resultData);
         if (result.isSuccess()) {
             rememberSessionCode(resultData);
             resultData = withIssuedPlayerToken(command, sessionId, playerId, resultData);
@@ -163,6 +167,11 @@ public class GameServer implements AutoCloseable {
         String sessionId = authenticatedSessionId(command);
         String playerId = text(command.payload().get("playerId"));
         String playerToken = text(command.payload().get("playerToken"));
+        if (command.commandType() == CommandType.REJOIN_SESSION
+                && playerToken == null
+                && text(command.payload().get("playerName")) != null) {
+            return null;
+        }
         if (sessionId == null || playerId == null || playerToken == null) {
             return new ServerResult(command.requestId(), false, "AUTH_REQUIRED",
                     "A valid player token is required for " + command.commandType(), Map.of());
@@ -224,7 +233,13 @@ public class GameServer implements AutoCloseable {
         Map<String, String> tokens = playerTokensBySession.computeIfAbsent(
                 sessionId,
                 _ -> new ConcurrentHashMap<>());
-        return tokens.computeIfAbsent(playerId, _ -> UUID.randomUUID().toString());
+        return tokens.computeIfAbsent(playerId, _ -> newPlayerToken());
+    }
+
+    private String newPlayerToken() {
+        byte[] tokenBytes = new byte[PLAYER_TOKEN_BYTES];
+        TOKEN_RANDOM.nextBytes(tokenBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
     }
 
     private GameResult execute(ClientCommand command) {
@@ -303,13 +318,36 @@ public class GameServer implements AutoCloseable {
         }
     }
 
-    private String resolvePlayerId(ClientCommand command) {
+    private String resolvePlayerId(ClientCommand command, Map<String, Object> resultData) {
         String playerId = text(command.payload().get("playerId"));
         if (playerId != null) {
             return playerId;
         }
         if (command.commandType() == CommandType.CREATE_SESSION) {
             return text(command.payload().get("hostPlayerId"));
+        }
+        if (command.commandType() == CommandType.REJOIN_SESSION) {
+            return playerIdByName(resultData, text(command.payload().get("playerName")));
+        }
+        return null;
+    }
+
+    private String playerIdByName(Map<String, Object> resultData, String playerName) {
+        if (playerName == null) {
+            return null;
+        }
+        Object rawPlayers = resultData.get("players");
+        if (!(rawPlayers instanceof Iterable<?> players)) {
+            return null;
+        }
+        for (Object rawPlayer : players) {
+            if (!(rawPlayer instanceof Map<?, ?> player)) {
+                continue;
+            }
+            String name = text(player.get("name"));
+            if (name != null && name.equalsIgnoreCase(playerName)) {
+                return text(player.get("playerId"));
+            }
         }
         return null;
     }

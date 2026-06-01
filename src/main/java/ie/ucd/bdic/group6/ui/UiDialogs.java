@@ -58,14 +58,18 @@ final class UiDialogs {
     }
 
     static Optional<RejoinRequest> promptRejoinGame() {
-        TextField rejoinCodeField = field("Rejoin code");
+        TextField joinCodeField = field("Join code");
+        TextField playerNameField = field("Player name");
         Optional<ButtonType> result = showForm("Rejoin Session", "Reconnect with the same player identity",
-                row("Rejoin Code", rejoinCodeField));
+                row("Join Code", joinCodeField),
+                row("Player Name", playerNameField));
         if (result.isEmpty() || result.get() != ButtonType.OK) {
             return Optional.empty();
         }
         try {
-            return Optional.of(new RejoinRequest(requireText(rejoinCodeField.getText(), "Rejoin code")));
+            return Optional.of(new RejoinRequest(
+                    requireText(joinCodeField.getText(), "Join code"),
+                    requireText(playerNameField.getText(), "Player name")));
         } catch (IllegalArgumentException e) {
             showError("Invalid Rejoin Settings", e.getMessage());
             return Optional.empty();
@@ -167,7 +171,7 @@ final class UiDialogs {
 
     record JoinRequest(String joinCode, String playerName) {}
 
-    record RejoinRequest(String rejoinCode) {}
+    record RejoinRequest(String joinCode, String playerName) {}
 
     private record FormRow(String label, Node field) {}
 }

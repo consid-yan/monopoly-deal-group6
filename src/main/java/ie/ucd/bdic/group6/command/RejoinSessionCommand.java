@@ -15,4 +15,8 @@ public class RejoinSessionCommand extends AbstractCommand {
     public String getSessionIdentity() {
         return (String) payload().get("sessionIdentity");
     }
+
+    public String getPlayerName() {
+        return (String) payload().get("playerName");
+    }
 }

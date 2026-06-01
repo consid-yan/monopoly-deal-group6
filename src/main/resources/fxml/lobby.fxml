@@ -76,8 +76,6 @@
                         <TextField fx:id="playerCountField" editable="false" promptText="0 / 5" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
                         <Label styleClass="lobby-field-label" text="Join Code" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
                         <TextField fx:id="joinCodeField" editable="false" promptText="Waiting for join code" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
-                        <Label styleClass="lobby-field-label" text="Rejoin Code" GridPane.columnIndex="0" GridPane.rowIndex="4"/>
-                        <TextField fx:id="rejoinCodeField" editable="false" promptText="Waiting for rejoin code" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="4"/>
                     </GridPane>
 
                     <Separator/>

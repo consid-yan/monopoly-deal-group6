@@ -313,7 +313,6 @@ public class GameEngine implements ActionExecutor {
     @Override
     public synchronized Map<String, Object> executeRejoinSession(RejoinSessionCommand command) {
         String sessionIdentity = requireText(command.getSessionIdentity(), "sessionIdentity");
-        String playerId = requireText(command.getPlayerId(), "playerId");
         GameSession session = sessionsById.get(sessionIdentity);
         if (session == null) {
             session = sessionsByCode.get(sessionIdentity);
@@ -321,6 +320,7 @@ public class GameEngine implements ActionExecutor {
         if (session == null) {
             throw new SessionNotFoundException("No session exists for the given identity");
         }
+        String playerId = resolveRejoinPlayerId(session, command);
         requirePlayer(session, playerId);
         if (session.isDefeated(playerId)) {
             throw new InvalidGameStateException("PLAYER_FORFEITED", "This player has already forfeited the session");
@@ -882,6 +882,26 @@ public class GameEngine implements ActionExecutor {
     private Player requirePlayer(GameSession session, String playerId) {
         return session.findPlayer(playerId)
                 .orElseThrow(() -> new PlayerNotFoundException("No player exists for id " + playerId));
+    }
+
+    private String resolveRejoinPlayerId(GameSession session, RejoinSessionCommand command) {
+        String playerId = command.getPlayerId();
+        if (playerId != null && !playerId.isBlank()) {
+            return playerId;
+        }
+
+        String playerName = requireText(command.getPlayerName(), "playerName");
+        List<Player> matches = session.players().stream()
+                .filter(player -> player.name().equalsIgnoreCase(playerName.trim()))
+                .toList();
+        if (matches.isEmpty()) {
+            throw new PlayerNotFoundException("No player exists for name " + playerName);
+        }
+        if (matches.size() > 1) {
+            throw new InvalidCommandException("AMBIGUOUS_PLAYER_NAME",
+                    "More than one player is using the name " + playerName);
+        }
+        return matches.getFirst().id();
     }
 
     private Card requireCardInHand(Player player, String cardId) {

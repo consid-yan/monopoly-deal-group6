@@ -29,9 +29,6 @@ public class LobbyUI {
     private TextField joinCodeField;
 
     @FXML
-    private TextField rejoinCodeField;
-
-    @FXML
     private ListView<String> playersList;
 
     @FXML
@@ -50,7 +47,6 @@ public class LobbyUI {
         hostField.clear();
         playerCountField.clear();
         joinCodeField.clear();
-        rejoinCodeField.clear();
         playersList.setItems(FXCollections.observableArrayList());
         context.setSnapshotListener(this::render);
         context.setMessageListener(this::showStatus);
@@ -93,7 +89,6 @@ public class LobbyUI {
             hostField.clear();
             playerCountField.clear();
             joinCodeField.clear();
-            rejoinCodeField.clear();
             playersList.setItems(FXCollections.observableArrayList());
             showStatus("Connect to a session from the main menu.");
             return;
@@ -111,7 +106,6 @@ public class LobbyUI {
         hostField.setText(snapshot.playerName(snapshot.hostPlayerId()));
         playerCountField.setText(snapshot.players().size() + " / " + snapshot.maxPlayers());
         joinCodeField.setText(context.joinCode());
-        rejoinCodeField.setText(context.rejoinCode());
         playersList.setItems(FXCollections.observableArrayList(playerRows(snapshot)));
         if (startGameButton != null) {
             startGameButton.setDisable(!context.playerId().equals(snapshot.hostPlayerId()));
@@ -120,13 +114,11 @@ public class LobbyUI {
                 Session ID: %s
                 Your Player ID: %s
                 Join Code: %s
-                Rejoin Code: %s
                 Waiting for the host to start when 2 to 5 players are present.
                 """.formatted(
                 snapshot.sessionId(),
                 context.playerId(),
-                context.joinCode(),
-                context.rejoinCode()));
+                context.joinCode()));
     }
 
     private List<String> playerRows(UiSnapshot snapshot) {
