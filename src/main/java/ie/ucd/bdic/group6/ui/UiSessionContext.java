@@ -24,6 +24,9 @@ import java.util.function.Consumer;
 import javafx.application.Platform;
 
 public final class UiSessionContext implements AutoCloseable {
+    private static final int HOSTED_CLIENT_CONNECT_ATTEMPTS = 20;
+    private static final long HOSTED_CLIENT_CONNECT_DELAY_MILLIS = 50L;
+
     private final AppConfig appConfig;
 
     private volatile GameClient client;
@@ -115,7 +118,7 @@ public final class UiSessionContext implements AutoCloseable {
                 resetNetwork();
                 server = appConfig.gameServer(0);
                 server.startAsync();
-                GameClient newClient = openClient("127.0.0.1", server.port());
+                GameClient newClient = openClientWithRetry("127.0.0.1", server.port());
                 String shareableHost = resolveShareableHost();
                 hostedServer = server;
                 client = newClient;
@@ -240,14 +243,56 @@ public final class UiSessionContext implements AutoCloseable {
     }
 
     private GameClient openClient(String requestedHost, int requestedPort) throws IOException {
-        if (requestedPort < 0 || requestedPort > 65535) {
-            throw new IllegalArgumentException("Port must be between 0 and 65535");
+        String cleanHost = requireText(requestedHost, "host");
+        if (requestedPort <= 0 || requestedPort > 65535) {
+            throw new IllegalArgumentException("Port must be between 1 and 65535");
         }
         GameClient newClient = new GameClient();
         newClient.addStateUpdateListener(this::handleStateUpdate);
         newClient.addNoticeListener(this::handleNotice);
-        newClient.connect(requestedHost, requestedPort);
-        return newClient;
+        try {
+            newClient.connect(cleanHost, requestedPort);
+            return newClient;
+        } catch (IOException e) {
+            newClient.close();
+            throw new IOException(connectionFailureMessage(cleanHost, requestedPort), e);
+        } catch (RuntimeException e) {
+            newClient.close();
+            throw e;
+        }
+    }
+
+    private GameClient openClientWithRetry(String requestedHost, int requestedPort) throws IOException {
+        IOException lastFailure = null;
+        for (int attempt = 1; attempt <= HOSTED_CLIENT_CONNECT_ATTEMPTS; attempt++) {
+            try {
+                return openClient(requestedHost, requestedPort);
+            } catch (IOException e) {
+                lastFailure = e;
+                if (attempt == HOSTED_CLIENT_CONNECT_ATTEMPTS) {
+                    break;
+                }
+                waitBeforeRetry();
+            }
+        }
+        throw lastFailure == null
+                ? new IOException(connectionFailureMessage(requestedHost, requestedPort))
+                : lastFailure;
+    }
+
+    private void waitBeforeRetry() throws IOException {
+        try {
+            Thread.sleep(HOSTED_CLIENT_CONNECT_DELAY_MILLIS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for the local game server to accept connections", e);
+        }
+    }
+
+    private String connectionFailureMessage(String requestedHost, int requestedPort) {
+        return "Could not connect to " + requestedHost + ":" + requestedPort
+                + ". Make sure the game server is running and the host/port are correct. "
+                + "For Join Game, use the Join Host and Join Port shown in the host lobby.";
     }
 
     private synchronized void resetNetwork() {

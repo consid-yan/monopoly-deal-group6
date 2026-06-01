@@ -169,8 +169,8 @@ final class UiDialogs {
     private static int parsePort(String raw) {
         try {
             int port = Integer.parseInt(requireText(raw, "Port"));
-            if (port < 0 || port > 65535) {
-                throw new IllegalArgumentException("Port must be between 0 and 65535");
+            if (port <= 0 || port > 65535) {
+                throw new IllegalArgumentException("Port must be between 1 and 65535");
             }
             return port;
         } catch (NumberFormatException e) {

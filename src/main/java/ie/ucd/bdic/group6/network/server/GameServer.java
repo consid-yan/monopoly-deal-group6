@@ -13,6 +13,8 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -52,7 +54,10 @@ public class GameServer implements AutoCloseable {
         if (running.get()) {
             return;
         }
-        serverSocket = new ServerSocket(requestedPort);
+        ServerSocket socket = new ServerSocket();
+        socket.setReuseAddress(true);
+        socket.bind(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), requestedPort));
+        serverSocket = socket;
         running.set(true);
         acceptThread = new Thread(this::acceptLoop, "MonopolyDealServer-Accept");
         acceptThread.setDaemon(true);

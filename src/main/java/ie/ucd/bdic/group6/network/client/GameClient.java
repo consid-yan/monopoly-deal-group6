@@ -9,6 +9,7 @@ import ie.ucd.bdic.group6.network.protocol.StateUpdate;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Map;
 import java.util.Objects;
@@ -21,6 +22,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 public class GameClient implements AutoCloseable {
+    private static final int CONNECT_TIMEOUT_MILLIS = 3_000;
+
     private final Map<String, CompletableFuture<ServerResult>> pendingResults = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<Consumer<ServerResult>> resultListeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Consumer<StateUpdate>> stateUpdateListeners = new CopyOnWriteArrayList<>();
@@ -34,13 +37,33 @@ public class GameClient implements AutoCloseable {
         if (connected.get()) {
             return;
         }
-        socket = new Socket(Objects.requireNonNull(host, "host"), port);
-        output = new ObjectOutputStream(socket.getOutputStream());
-        output.flush();
-        var input = new ObjectInputStream(socket.getInputStream());
-        connected.set(true);
-        var gameThread = new GameThread(input, this);
-        gameThread.start();
+        if (port <= 0 || port > 65535) {
+            throw new IllegalArgumentException("Port must be between 1 and 65535");
+        }
+
+        Socket newSocket = new Socket();
+        try {
+            newSocket.connect(
+                    new InetSocketAddress(Objects.requireNonNull(host, "host"), port),
+                    CONNECT_TIMEOUT_MILLIS);
+            newSocket.setSoTimeout(CONNECT_TIMEOUT_MILLIS);
+            ObjectOutputStream newOutput = new ObjectOutputStream(newSocket.getOutputStream());
+            newOutput.flush();
+            var input = new ObjectInputStream(newSocket.getInputStream());
+            newSocket.setSoTimeout(0);
+            socket = newSocket;
+            output = newOutput;
+            connected.set(true);
+            var gameThread = new GameThread(input, this);
+            gameThread.start();
+        } catch (IOException | RuntimeException e) {
+            try {
+                newSocket.close();
+            } catch (IOException ignored) {
+                // Best-effort cleanup after a failed connection attempt.
+            }
+            throw e;
+        }
     }
 
     public boolean isConnected() {
