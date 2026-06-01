@@ -13,8 +13,12 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -26,6 +30,9 @@ import javafx.application.Platform;
 public final class UiSessionContext implements AutoCloseable {
     private static final int HOSTED_CLIENT_CONNECT_ATTEMPTS = 20;
     private static final long HOSTED_CLIENT_CONNECT_DELAY_MILLIS = 50L;
+    private static final String JOIN_CODE_PREFIX = "MDJ1-";
+    private static final String REJOIN_CODE_PREFIX = "MDR1-";
+    private static final String CODE_SEPARATOR = "\n";
 
     private final AppConfig appConfig;
 
@@ -95,6 +102,31 @@ public final class UiSessionContext implements AutoCloseable {
         return Integer.toString(port);
     }
 
+    public String joinCode() {
+        if (host.isBlank() || port <= 0 || sessionCode.isBlank()) {
+            return "";
+        }
+        return encodeConnectionCode(JOIN_CODE_PREFIX, host, Integer.toString(port), sessionCode);
+    }
+
+    public String rejoinCode() {
+        String sessionIdentity = sessionCode.isBlank() ? sessionId : sessionCode;
+        if (host.isBlank()
+                || port <= 0
+                || sessionIdentity.isBlank()
+                || playerId.isBlank()
+                || playerToken.isBlank()) {
+            return "";
+        }
+        return encodeConnectionCode(
+                REJOIN_CODE_PREFIX,
+                host,
+                Integer.toString(port),
+                sessionIdentity,
+                playerId,
+                playerToken);
+    }
+
     public void setSnapshotListener(Consumer<UiSnapshot> listener) {
         snapshotListener = listener == null ? _ -> {
         } : listener;
@@ -141,42 +173,39 @@ public final class UiSessionContext implements AutoCloseable {
         )));
     }
 
-    public CompletableFuture<ServerResult> joinSession(
-            String requestedHost,
-            int requestedPort,
-            String requestedSessionCode,
-            String requestedPlayerName) {
-        String newHost = requireText(requestedHost, "host");
-        String newSessionCode = requireText(requestedSessionCode, "session code");
-        String newPlayerName = requireText(requestedPlayerName, "player name");
-        String newPlayerId = generatePlayerId(newPlayerName);
-        return connectAs(newHost, requestedPort, newPlayerId, newPlayerName, "")
-                .thenCompose(ignored -> sendCommand(CommandType.JOIN_SESSION, Map.of(
-                        "sessionCode", newSessionCode,
-                        "playerId", newPlayerId,
-                        "playerName", newPlayerName
-                )));
+    public CompletableFuture<ServerResult> joinSession(String requestedJoinCode, String requestedPlayerName) {
+        try {
+            JoinCode joinCode = parseJoinCode(requestedJoinCode);
+            String newPlayerName = requireText(requestedPlayerName, "player name");
+            String newPlayerId = generatePlayerId(newPlayerName);
+            return connectAs(joinCode.host(), joinCode.port(), newPlayerId, newPlayerName, "")
+                    .thenCompose(ignored -> sendCommand(CommandType.JOIN_SESSION, Map.of(
+                            "sessionCode", joinCode.sessionCode(),
+                            "playerId", newPlayerId,
+                            "playerName", newPlayerName
+                    )));
+        } catch (RuntimeException e) {
+            return failedFuture(e);
+        }
     }
 
-    public CompletableFuture<ServerResult> rejoinSession(
-            String requestedHost,
-            int requestedPort,
-            String sessionIdentity,
-            String requestedPlayerId,
-            String requestedPlayerToken) {
-        String rejoinPlayerId = requireText(requestedPlayerId, "player id");
-        String rejoinPlayerToken = requireText(requestedPlayerToken, "player token");
-        return connectAs(
-                requireText(requestedHost, "host"),
-                requestedPort,
-                rejoinPlayerId,
-                rejoinPlayerId,
-                rejoinPlayerToken)
-                .thenCompose(ignored -> sendCommand(CommandType.REJOIN_SESSION, Map.of(
-                        "sessionIdentity", requireText(sessionIdentity, "session identity"),
-                        "playerId", rejoinPlayerId,
-                        "playerToken", rejoinPlayerToken
-                )));
+    public CompletableFuture<ServerResult> rejoinSession(String requestedRejoinCode) {
+        try {
+            RejoinCode rejoinCode = parseRejoinCode(requestedRejoinCode);
+            return connectAs(
+                    rejoinCode.host(),
+                    rejoinCode.port(),
+                    rejoinCode.playerId(),
+                    rejoinCode.playerId(),
+                    rejoinCode.playerToken())
+                    .thenCompose(ignored -> sendCommand(CommandType.REJOIN_SESSION, Map.of(
+                            "sessionIdentity", rejoinCode.sessionIdentity(),
+                            "playerId", rejoinCode.playerId(),
+                            "playerToken", rejoinCode.playerToken()
+                    )));
+        } catch (RuntimeException e) {
+            return failedFuture(e);
+        }
     }
 
     public CompletableFuture<ServerResult> sendCommand(CommandType commandType, Map<String, Object> payload) {
@@ -292,7 +321,7 @@ public final class UiSessionContext implements AutoCloseable {
     private String connectionFailureMessage(String requestedHost, int requestedPort) {
         return "Could not connect to " + requestedHost + ":" + requestedPort
                 + ". Make sure the game server is running and the host/port are correct. "
-                + "For Join Game, use the Join Host and Join Port shown in the host lobby.";
+                + "For Join Game, use the Join Code shown in the host lobby.";
     }
 
     private synchronized void resetNetwork() {
@@ -372,6 +401,87 @@ public final class UiSessionContext implements AutoCloseable {
         String token = text(data.get("playerToken"));
         if (token != null) {
             playerToken = token;
+        }
+    }
+
+    private CompletableFuture<ServerResult> failedFuture(RuntimeException error) {
+        CompletableFuture<ServerResult> failed = new CompletableFuture<>();
+        failed.completeExceptionally(error);
+        return failed;
+    }
+
+    private String encodeConnectionCode(String prefix, String... values) {
+        String payload = String.join(CODE_SEPARATOR, values);
+        return prefix + Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(payload.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private JoinCode parseJoinCode(String rawCode) {
+        String code = requireText(rawCode, "join code");
+        if (code.startsWith(JOIN_CODE_PREFIX)) {
+            List<String> parts = decodeConnectionCode(code, JOIN_CODE_PREFIX, "Join code");
+            if (parts.size() == 3) {
+                return new JoinCode(
+                        requireText(parts.get(0), "join host"),
+                        parseCodePort(parts.get(1)),
+                        requireText(parts.get(2), "session code"));
+            }
+        }
+        String[] legacyParts = code.split(":", 3);
+        if (legacyParts.length == 3) {
+            return new JoinCode(
+                    requireText(legacyParts[0], "join host"),
+                    parseCodePort(legacyParts[1]),
+                    requireText(legacyParts[2], "session code"));
+        }
+        throw new IllegalArgumentException("Join code is invalid. Use the Join Code shown in the host lobby.");
+    }
+
+    private RejoinCode parseRejoinCode(String rawCode) {
+        String code = requireText(rawCode, "rejoin code");
+        if (code.startsWith(REJOIN_CODE_PREFIX)) {
+            List<String> parts = decodeConnectionCode(code, REJOIN_CODE_PREFIX, "Rejoin code");
+            if (parts.size() == 5) {
+                return new RejoinCode(
+                        requireText(parts.get(0), "rejoin host"),
+                        parseCodePort(parts.get(1)),
+                        requireText(parts.get(2), "session identity"),
+                        requireText(parts.get(3), "player id"),
+                        requireText(parts.get(4), "player token"));
+            }
+        }
+        String[] legacyParts = code.split(":", 5);
+        if (legacyParts.length == 5) {
+            return new RejoinCode(
+                    requireText(legacyParts[0], "rejoin host"),
+                    parseCodePort(legacyParts[1]),
+                    requireText(legacyParts[2], "session identity"),
+                    requireText(legacyParts[3], "player id"),
+                    requireText(legacyParts[4], "player token"));
+        }
+        throw new IllegalArgumentException("Rejoin code is invalid. Use the Rejoin Code shown in the lobby.");
+    }
+
+    private List<String> decodeConnectionCode(String code, String prefix, String label) {
+        try {
+            String encodedPayload = code.substring(prefix.length());
+            String payload = new String(Base64.getUrlDecoder().decode(encodedPayload), StandardCharsets.UTF_8);
+            return Arrays.asList(payload.split(CODE_SEPARATOR, -1));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(label + " is invalid.", e);
+        }
+    }
+
+    private int parseCodePort(String rawPort) {
+        try {
+            int parsedPort = Integer.parseInt(requireText(rawPort, "port"));
+            if (parsedPort <= 0 || parsedPort > 65535) {
+                throw new IllegalArgumentException("Port must be between 1 and 65535");
+            }
+            return parsedPort;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Port must be a number", e);
         }
     }
 
@@ -478,6 +588,10 @@ public final class UiSessionContext implements AutoCloseable {
         }
         return value.trim();
     }
+
+    private record JoinCode(String host, int port, String sessionCode) {}
+
+    private record RejoinCode(String host, int port, String sessionIdentity, String playerId, String playerToken) {}
 
     @Override
     public void close() {

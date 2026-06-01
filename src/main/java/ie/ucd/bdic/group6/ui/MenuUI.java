@@ -22,19 +22,14 @@ public class MenuUI {
     @FXML
     private void joinGame() {
         UiDialogs.promptJoinGame().ifPresent(request ->
-                context.joinSession(request.host(), request.port(), request.sessionCode(), request.playerName())
+                context.joinSession(request.joinCode(), request.playerName())
                         .whenComplete(this::openNextScreen));
     }
 
     @FXML
     private void rejoinSession() {
         UiDialogs.promptRejoinGame().ifPresent(request ->
-                context.rejoinSession(
-                                request.host(),
-                                request.port(),
-                                request.sessionIdentity(),
-                                request.playerId(),
-                                request.playerToken())
+                context.rejoinSession(request.rejoinCode())
                         .whenComplete(this::openNextScreen));
     }
 
