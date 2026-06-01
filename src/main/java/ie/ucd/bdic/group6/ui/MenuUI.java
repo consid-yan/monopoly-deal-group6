@@ -29,7 +29,12 @@ public class MenuUI {
     @FXML
     private void rejoinSession() {
         UiDialogs.promptRejoinGame().ifPresent(request ->
-                context.rejoinSession(request.host(), request.port(), request.sessionIdentity(), request.playerId())
+                context.rejoinSession(
+                                request.host(),
+                                request.port(),
+                                request.sessionIdentity(),
+                                request.playerId(),
+                                request.playerToken())
                         .whenComplete(this::openNextScreen));
     }
 

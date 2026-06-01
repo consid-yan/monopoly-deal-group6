@@ -16,10 +16,12 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -30,6 +32,8 @@ public class GameServer implements AutoCloseable {
     private final GameController gameController;
     private final int requestedPort;
     private final Set<ClientConnection> clients = ConcurrentHashMap.newKeySet();
+    private final Map<String, Map<String, String>> playerTokensBySession = new ConcurrentHashMap<>();
+    private final Map<String, String> sessionIdByCode = new ConcurrentHashMap<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     private ServerSocket serverSocket;
@@ -113,25 +117,109 @@ public class GameServer implements AutoCloseable {
     }
 
     private void handleCommand(ClientConnection connection, ClientCommand command) {
+        ServerResult authFailure = authenticate(command);
+        if (authFailure != null) {
+            connection.send(authFailure);
+            return;
+        }
+
         GameResult result = execute(command);
+        String sessionId = text(result.getData().get("sessionId"));
+        String playerId = resolvePlayerId(command);
+        Map<String, Object> resultData = result.getData();
+        if (result.isSuccess()) {
+            rememberSessionCode(resultData);
+            resultData = withIssuedPlayerToken(command, sessionId, playerId, resultData);
+        }
         ServerResult serverResult = new ServerResult(
                 command.requestId(),
                 result.isSuccess(),
                 result.getCode(),
                 result.getMessage(),
-                result.getData());
+                resultData);
         connection.send(serverResult);
 
         if (!result.isSuccess()) {
             return;
         }
 
-        String sessionId = text(result.getData().get("sessionId"));
-        String playerId = resolvePlayerId(command);
         if (sessionId != null && playerId != null) {
             bind(connection, sessionId, playerId);
             broadcastSessionState(sessionId);
         }
+    }
+
+    private ServerResult authenticate(ClientCommand command) {
+        if (command.commandType() == CommandType.CREATE_SESSION
+                || command.commandType() == CommandType.JOIN_SESSION) {
+            return null;
+        }
+
+        String sessionId = authenticatedSessionId(command);
+        String playerId = text(command.payload().get("playerId"));
+        String playerToken = text(command.payload().get("playerToken"));
+        if (sessionId == null || playerId == null || playerToken == null) {
+            return new ServerResult(command.requestId(), false, "AUTH_REQUIRED",
+                    "A valid player token is required for " + command.commandType(), Map.of());
+        }
+
+        String expectedToken = playerTokensBySession
+                .getOrDefault(sessionId, Map.of())
+                .get(playerId);
+        if (!playerToken.equals(expectedToken)) {
+            return new ServerResult(command.requestId(), false, "UNAUTHORIZED_PLAYER",
+                    "Player identity could not be verified", Map.of());
+        }
+        return null;
+    }
+
+    private String authenticatedSessionId(ClientCommand command) {
+        if (command.commandType() == CommandType.REJOIN_SESSION) {
+            String sessionIdentity = text(command.payload().get("sessionIdentity"));
+            if (sessionIdentity == null) {
+                return null;
+            }
+            return sessionIdByCode.getOrDefault(sessionIdentity, sessionIdentity);
+        }
+        return text(command.payload().get("sessionId"));
+    }
+
+    private void rememberSessionCode(Map<String, Object> data) {
+        String sessionId = text(data.get("sessionId"));
+        String sessionCode = text(data.get("sessionCode"));
+        if (sessionId != null && sessionCode != null) {
+            sessionIdByCode.put(sessionCode, sessionId);
+        }
+    }
+
+    private Map<String, Object> withIssuedPlayerToken(
+            ClientCommand command,
+            String sessionId,
+            String playerId,
+            Map<String, Object> data) {
+        if (sessionId == null || playerId == null) {
+            return data;
+        }
+
+        String playerToken = switch (command.commandType()) {
+            case CREATE_SESSION, JOIN_SESSION -> issuePlayerToken(sessionId, playerId);
+            case REJOIN_SESSION -> playerTokensBySession.getOrDefault(sessionId, Map.of()).get(playerId);
+            default -> null;
+        };
+        if (playerToken == null) {
+            return data;
+        }
+
+        Map<String, Object> enriched = new LinkedHashMap<>(data);
+        enriched.put("playerToken", playerToken);
+        return enriched;
+    }
+
+    private String issuePlayerToken(String sessionId, String playerId) {
+        Map<String, String> tokens = playerTokensBySession.computeIfAbsent(
+                sessionId,
+                _ -> new ConcurrentHashMap<>());
+        return tokens.computeIfAbsent(playerId, _ -> UUID.randomUUID().toString());
     }
 
     private GameResult execute(ClientCommand command) {

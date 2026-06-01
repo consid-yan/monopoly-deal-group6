@@ -26,6 +26,12 @@ public class LobbyUI {
     private TextField playerCountField;
 
     @FXML
+    private TextField joinHostField;
+
+    @FXML
+    private TextField joinPortField;
+
+    @FXML
     private ListView<String> playersList;
 
     @FXML
@@ -43,6 +49,8 @@ public class LobbyUI {
         sessionCodeField.clear();
         hostField.clear();
         playerCountField.clear();
+        joinHostField.clear();
+        joinPortField.clear();
         playersList.setItems(FXCollections.observableArrayList());
         context.setSnapshotListener(this::render);
         context.setMessageListener(this::showStatus);
@@ -84,6 +92,8 @@ public class LobbyUI {
             sessionCodeField.clear();
             hostField.clear();
             playerCountField.clear();
+            joinHostField.clear();
+            joinPortField.clear();
             playersList.setItems(FXCollections.observableArrayList());
             showStatus("Connect to a session from the main menu.");
             return;
@@ -100,6 +110,8 @@ public class LobbyUI {
         sessionCodeField.setText(snapshot.sessionCode());
         hostField.setText(snapshot.playerName(snapshot.hostPlayerId()));
         playerCountField.setText(snapshot.players().size() + " / " + snapshot.maxPlayers());
+        joinHostField.setText(context.joinHost());
+        joinPortField.setText(context.joinPort());
         playersList.setItems(FXCollections.observableArrayList(playerRows(snapshot)));
         if (startGameButton != null) {
             startGameButton.setDisable(!context.playerId().equals(snapshot.hostPlayerId()));
@@ -107,8 +119,16 @@ public class LobbyUI {
         MessageUI.show(statusArea, """
                 Session ID: %s
                 Your Player ID: %s
+                Your Player Token: %s
+                Join Host: %s
+                Join Port: %s
                 Waiting for the host to start when 2 to 5 players are present.
-                """.formatted(snapshot.sessionId(), context.playerId()));
+                """.formatted(
+                snapshot.sessionId(),
+                context.playerId(),
+                context.playerToken(),
+                context.joinHost(),
+                context.joinPort()));
     }
 
     private List<String> playerRows(UiSnapshot snapshot) {
