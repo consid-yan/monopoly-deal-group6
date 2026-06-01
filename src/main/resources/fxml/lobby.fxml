@@ -74,6 +74,10 @@
                         <TextField fx:id="hostField" editable="false" promptText="Waiting for host" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
                         <Label styleClass="lobby-field-label" text="Player Count" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
                         <TextField fx:id="playerCountField" editable="false" promptText="0 / 5" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+                        <Label styleClass="lobby-field-label" text="Join Host" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+                        <TextField fx:id="joinHostField" editable="false" promptText="Waiting for host address" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
+                        <Label styleClass="lobby-field-label" text="Join Port" GridPane.columnIndex="0" GridPane.rowIndex="4"/>
+                        <TextField fx:id="joinPortField" editable="false" promptText="Waiting for port" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="4"/>
                     </GridPane>
 
                     <Separator/>
@@ -82,7 +86,7 @@
                             <Font name="System Bold" size="15.0"/>
                         </font>
                     </Label>
-                    <ListView fx:id="playersList" prefHeight="232.0" prefWidth="456.0" styleClass="lobby-player-list" VBox.vgrow="ALWAYS">
+                    <ListView fx:id="playersList" prefHeight="184.0" prefWidth="456.0" styleClass="lobby-player-list" VBox.vgrow="ALWAYS">
                         <placeholder>
                             <Label text="Waiting for players to join"/>
                         </placeholder>

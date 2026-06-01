@@ -9,6 +9,11 @@ import ie.ucd.bdic.group6.network.protocol.StateUpdate;
 import ie.ucd.bdic.group6.network.server.GameServer;
 
 import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -31,6 +36,7 @@ public final class UiSessionContext implements AutoCloseable {
     private volatile int port;
     private volatile String playerId = "";
     private volatile String playerName = "";
+    private volatile String playerToken = "";
     private volatile String sessionId = "";
     private volatile String sessionCode = "";
     private volatile boolean connected;
@@ -51,6 +57,10 @@ public final class UiSessionContext implements AutoCloseable {
         return playerName;
     }
 
+    public String playerToken() {
+        return playerToken;
+    }
+
     public String sessionId() {
         return sessionId;
     }
@@ -69,6 +79,17 @@ public final class UiSessionContext implements AutoCloseable {
             return host + ":" + port;
         }
         return "Disconnected";
+    }
+
+    public String joinHost() {
+        return host;
+    }
+
+    public String joinPort() {
+        if (port <= 0) {
+            return "";
+        }
+        return Integer.toString(port);
     }
 
     public void setSnapshotListener(Consumer<UiSnapshot> listener) {
@@ -95,9 +116,10 @@ public final class UiSessionContext implements AutoCloseable {
                 server = appConfig.gameServer(0);
                 server.startAsync();
                 GameClient newClient = openClient("127.0.0.1", server.port());
+                String shareableHost = resolveShareableHost();
                 hostedServer = server;
                 client = newClient;
-                host = "127.0.0.1";
+                host = shareableHost;
                 port = server.port();
                 playerId = newPlayerId;
                 playerName = newPlayerName;
@@ -125,7 +147,7 @@ public final class UiSessionContext implements AutoCloseable {
         String newSessionCode = requireText(requestedSessionCode, "session code");
         String newPlayerName = requireText(requestedPlayerName, "player name");
         String newPlayerId = generatePlayerId(newPlayerName);
-        return connectAs(newHost, requestedPort, newPlayerId, newPlayerName)
+        return connectAs(newHost, requestedPort, newPlayerId, newPlayerName, "")
                 .thenCompose(ignored -> sendCommand(CommandType.JOIN_SESSION, Map.of(
                         "sessionCode", newSessionCode,
                         "playerId", newPlayerId,
@@ -137,16 +159,20 @@ public final class UiSessionContext implements AutoCloseable {
             String requestedHost,
             int requestedPort,
             String sessionIdentity,
-            String requestedPlayerId) {
+            String requestedPlayerId,
+            String requestedPlayerToken) {
         String rejoinPlayerId = requireText(requestedPlayerId, "player id");
+        String rejoinPlayerToken = requireText(requestedPlayerToken, "player token");
         return connectAs(
                 requireText(requestedHost, "host"),
                 requestedPort,
                 rejoinPlayerId,
-                rejoinPlayerId)
+                rejoinPlayerId,
+                rejoinPlayerToken)
                 .thenCompose(ignored -> sendCommand(CommandType.REJOIN_SESSION, Map.of(
                         "sessionIdentity", requireText(sessionIdentity, "session identity"),
-                        "playerId", rejoinPlayerId
+                        "playerId", rejoinPlayerId,
+                        "playerToken", rejoinPlayerToken
                 )));
     }
 
@@ -158,7 +184,7 @@ public final class UiSessionContext implements AutoCloseable {
             failed.whenComplete((_, error) -> notifyError(error));
             return failed;
         }
-        CompletableFuture<ServerResult> future = currentClient.sendCommand(commandType, payload);
+        CompletableFuture<ServerResult> future = currentClient.sendCommand(commandType, withPlayerToken(payload));
         future.whenComplete((result, error) -> {
             if (error != null) {
                 notifyError(error);
@@ -173,6 +199,9 @@ public final class UiSessionContext implements AutoCloseable {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("sessionId", sessionId);
         payload.put("playerId", playerId);
+        if (!playerToken.isBlank()) {
+            payload.put("playerToken", playerToken);
+        }
         return payload;
     }
 
@@ -183,10 +212,16 @@ public final class UiSessionContext implements AutoCloseable {
         sessionCode = "";
         playerId = "";
         playerName = "";
+        playerToken = "";
         notifySnapshot(latestSnapshot);
     }
 
-    private CompletableFuture<Void> connectAs(String requestedHost, int requestedPort, String newPlayerId, String newPlayerName) {
+    private CompletableFuture<Void> connectAs(
+            String requestedHost,
+            int requestedPort,
+            String newPlayerId,
+            String newPlayerName,
+            String newPlayerToken) {
         return CompletableFuture.runAsync(() -> {
             try {
                 resetNetwork();
@@ -196,6 +231,7 @@ public final class UiSessionContext implements AutoCloseable {
                 port = requestedPort;
                 playerId = newPlayerId;
                 playerName = newPlayerName;
+                playerToken = newPlayerToken == null ? "" : newPlayerToken;
                 connected = true;
             } catch (IOException | RuntimeException e) {
                 throw new CompletionException(e);
@@ -216,6 +252,7 @@ public final class UiSessionContext implements AutoCloseable {
 
     private synchronized void resetNetwork() {
         connected = false;
+        playerToken = "";
         GameClient currentClient = client;
         client = null;
         if (currentClient != null) {
@@ -241,6 +278,7 @@ public final class UiSessionContext implements AutoCloseable {
             return;
         }
         if (result.success()) {
+            rememberPlayerToken(result.data());
             if (result.data() != null && !result.data().isEmpty()) {
                 updateSnapshot(result.data());
             }
@@ -269,6 +307,80 @@ public final class UiSessionContext implements AutoCloseable {
             sessionCode = snapshot.sessionCode();
         }
         notifySnapshot(snapshot);
+    }
+
+    private Map<String, Object> withPlayerToken(Map<String, Object> payload) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        if (payload != null) {
+            copy.putAll(payload);
+        }
+        if (!playerToken.isBlank()) {
+            copy.putIfAbsent("playerToken", playerToken);
+        }
+        return copy;
+    }
+
+    private void rememberPlayerToken(Map<String, Object> data) {
+        if (data == null) {
+            return;
+        }
+        String token = text(data.get("playerToken"));
+        if (token != null) {
+            playerToken = token;
+        }
+    }
+
+    private String resolveShareableHost() {
+        String fallback = null;
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces != null && interfaces.hasMoreElements()) {
+                NetworkInterface networkInterface = interfaces.nextElement();
+                if (!isUsableNetworkInterface(networkInterface)) {
+                    continue;
+                }
+                Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress address = addresses.nextElement();
+                    if (isShareableIpv4(address)) {
+                        if (address.isSiteLocalAddress()) {
+                            return address.getHostAddress();
+                        }
+                        if (fallback == null) {
+                            fallback = address.getHostAddress();
+                        }
+                    }
+                }
+            }
+
+            InetAddress localHost = InetAddress.getLocalHost();
+            if (isShareableIpv4(localHost)) {
+                return localHost.getHostAddress();
+            }
+        } catch (IOException ignored) {
+            // Fall back to loopback for single-machine play.
+        }
+        if (fallback != null) {
+            return fallback;
+        }
+        return "127.0.0.1";
+    }
+
+    private boolean isUsableNetworkInterface(NetworkInterface networkInterface) {
+        try {
+            return networkInterface.isUp()
+                    && !networkInterface.isLoopback()
+                    && !networkInterface.isVirtual();
+        } catch (SocketException e) {
+            return false;
+        }
+    }
+
+    private boolean isShareableIpv4(InetAddress address) {
+        return address instanceof Inet4Address
+                && !address.isLoopbackAddress()
+                && !address.isLinkLocalAddress()
+                && !address.isAnyLocalAddress();
     }
 
     private void notifySnapshot(UiSnapshot snapshot) {
@@ -305,6 +417,14 @@ public final class UiSessionContext implements AutoCloseable {
             normalized = "player";
         }
         return normalized + "-" + UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    private String text(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = value.toString().trim();
+        return text.isEmpty() ? null : text;
     }
 
     private String requireText(String value, String label) {

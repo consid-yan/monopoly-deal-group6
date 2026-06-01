@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -66,8 +67,10 @@ class NetworkIntegrationTest {
         assertTrue(created.success());
         String sessionId = text(created.data(), "sessionId");
         String sessionCode = text(created.data(), "sessionCode");
+        String hostToken = text(created.data(), "playerToken");
         assertNotNull(sessionId);
         assertNotNull(sessionCode);
+        assertNotNull(hostToken);
         assertEquals("host", created.data().get("hostPlayerId"));
         assertEquals(2, created.data().get("maxPlayers"));
 
@@ -86,6 +89,8 @@ class NetworkIntegrationTest {
                 "playerName", "Player 2"
         )).get(3, TimeUnit.SECONDS);
         assertTrue(joined.success());
+        String player2Token = text(joined.data(), "playerToken");
+        assertNotNull(player2Token);
         await(hostUpdates, update -> update.sessionId().equals(sessionId)
                 && players(update).size() == 2);
         await(player2Updates, update -> update.sessionId().equals(sessionId)
@@ -93,7 +98,8 @@ class NetworkIntegrationTest {
 
         ServerResult started = host.sendCommand(CommandType.START_GAME, Map.of(
                 "sessionId", sessionId,
-                "playerId", "host"
+                "playerId", "host",
+                "playerToken", hostToken
         )).get(3, TimeUnit.SECONDS);
         assertTrue(started.success());
 
@@ -114,9 +120,11 @@ class NetworkIntegrationTest {
         List<StateUpdate> rejoinedUpdates = updates(rejoinedPlayer2);
         ServerResult rejoined = rejoinedPlayer2.sendCommand(CommandType.REJOIN_SESSION, Map.of(
                 "sessionIdentity", sessionId,
-                "playerId", "player2"
+                "playerId", "player2",
+                "playerToken", player2Token
         )).get(3, TimeUnit.SECONDS);
         assertTrue(rejoined.success());
+        assertEquals(player2Token, rejoined.data().get("playerToken"));
 
         StateUpdate rejoinedState = await(rejoinedUpdates, activeUpdate(sessionId, "player2"));
         assertNotNull(rejoinedState);
@@ -146,18 +154,22 @@ class NetworkIntegrationTest {
         )).get(3, TimeUnit.SECONDS);
         String sessionId = text(created.data(), "sessionId");
         String sessionCode = text(created.data(), "sessionCode");
+        String hostToken = text(created.data(), "playerToken");
         assertTrue(created.success());
 
         assertNotNull(sessionCode);
-        assertTrue(player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
+        ServerResult joined = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
                 "sessionCode", sessionCode,
                 "playerId", "player2",
                 "playerName", "Player 2"
-        )).get(3, TimeUnit.SECONDS).success());
+        )).get(3, TimeUnit.SECONDS);
+        assertTrue(joined.success());
         assertNotNull(sessionId);
+        assertNotNull(hostToken);
         assertTrue(host.sendCommand(CommandType.START_GAME, Map.of(
                 "sessionId", sessionId,
-                "playerId", "host"
+                "playerId", "host",
+                "playerToken", hostToken
         )).get(3, TimeUnit.SECONDS).success());
         await(hostUpdates, activeUpdate(sessionId, "host"));
 
@@ -173,6 +185,58 @@ class NetworkIntegrationTest {
         assertEquals("host", finished.data().get("winnerPlayerId"));
         assertEquals(List.of("player2"), finished.data().get("forfeitedPlayerIds"));
         assertEquals("DEFEATED", player(finished, "player2").get("playerStatus"));
+    }
+
+    @Test
+    void serverRejectsCommandsWhenPlayerTokenIsMissingOrWrong() throws Exception {
+        server = new AppConfig().gameServer(0);
+        server.startAsync();
+
+        GameClient host = connectedClient();
+        GameClient player2 = connectedClient();
+
+        ServerResult created = host.sendCommand(CommandType.CREATE_SESSION, Map.of(
+                "hostPlayerId", "host",
+                "playerName", "Host",
+                "maxPlayers", 2
+        )).get(3, TimeUnit.SECONDS);
+        assertTrue(created.success());
+        String sessionId = text(created.data(), "sessionId");
+        String sessionCode = text(created.data(), "sessionCode");
+        String hostToken = text(created.data(), "playerToken");
+        assertNotNull(sessionId);
+        assertNotNull(sessionCode);
+        assertNotNull(hostToken);
+
+        ServerResult missingToken = host.sendCommand(CommandType.START_GAME, Map.of(
+                "sessionId", sessionId,
+                "playerId", "host"
+        )).get(3, TimeUnit.SECONDS);
+        assertFalse(missingToken.success());
+        assertEquals("AUTH_REQUIRED", missingToken.code());
+
+        ServerResult joined = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
+                "sessionCode", sessionCode,
+                "playerId", "player2",
+                "playerName", "Player 2"
+        )).get(3, TimeUnit.SECONDS);
+        assertTrue(joined.success());
+        String player2Token = text(joined.data(), "playerToken");
+        assertNotNull(player2Token);
+
+        ServerResult spoofedHost = player2.sendCommand(CommandType.START_GAME, Map.of(
+                "sessionId", sessionId,
+                "playerId", "host",
+                "playerToken", player2Token
+        )).get(3, TimeUnit.SECONDS);
+        assertFalse(spoofedHost.success());
+        assertEquals("UNAUTHORIZED_PLAYER", spoofedHost.code());
+
+        ServerResult legitimateStart = host.sendCommand(CommandType.START_GAME, withToken(Map.of(
+                "sessionId", sessionId,
+                "playerId", "host"
+        ), hostToken)).get(3, TimeUnit.SECONDS);
+        assertTrue(legitimateStart.success());
     }
 
     private GameClient connectedClient() throws IOException {
@@ -192,6 +256,12 @@ class NetworkIntegrationTest {
         List<StateUpdate> updates = new CopyOnWriteArrayList<>();
         client.addStateUpdateListener(updates::add);
         return updates;
+    }
+
+    private Map<String, Object> withToken(Map<String, Object> payload, String playerToken) {
+        Map<String, Object> copy = new LinkedHashMap<>(payload);
+        copy.put("playerToken", playerToken);
+        return copy;
     }
 
     private Predicate<StateUpdate> activeUpdate(String sessionId, String playerId) {

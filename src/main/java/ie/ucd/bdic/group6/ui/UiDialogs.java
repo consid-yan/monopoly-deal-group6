@@ -23,6 +23,7 @@ final class UiDialogs {
     static Optional<NewGameRequest> promptNewGame() {
         TextField playerNameField = field("Player name");
         TextField maxPlayersField = field("Number from 2 to 5");
+        maxPlayersField.setText("3");
         Optional<ButtonType> result = showForm("New Game", "Create a hosted multiplayer session",
                 row("Player Name", playerNameField),
                 row("Max Players (2-5)", maxPlayersField));
@@ -43,6 +44,7 @@ final class UiDialogs {
         TextField portField = field("Server port");
         TextField sessionCodeField = field("Session code");
         TextField playerNameField = field("Player name");
+        hostField.setText("127.0.0.1");
         Optional<ButtonType> result = showForm("Join Game", "Connect to an existing session",
                 row("Host", hostField),
                 row("Port", portField),
@@ -68,11 +70,14 @@ final class UiDialogs {
         TextField portField = field("Server port");
         TextField sessionIdentityField = field("Session id or code");
         TextField playerIdField = field("Prior player id");
+        TextField playerTokenField = field("Prior player token");
+        hostField.setText("127.0.0.1");
         Optional<ButtonType> result = showForm("Rejoin Session", "Reconnect with the same player identity",
                 row("Host", hostField),
                 row("Port", portField),
                 row("Session", sessionIdentityField),
-                row("Player ID", playerIdField));
+                row("Player ID", playerIdField),
+                row("Player Token", playerTokenField));
         if (result.isEmpty() || result.get() != ButtonType.OK) {
             return Optional.empty();
         }
@@ -81,7 +86,8 @@ final class UiDialogs {
                     requireText(hostField.getText(), "Host"),
                     parsePort(portField.getText()),
                     requireText(sessionIdentityField.getText(), "Session"),
-                    requireText(playerIdField.getText(), "Player ID")));
+                    requireText(playerIdField.getText(), "Player ID"),
+                    requireText(playerTokenField.getText(), "Player token")));
         } catch (IllegalArgumentException e) {
             showError("Invalid Rejoin Settings", e.getMessage());
             return Optional.empty();
@@ -195,7 +201,7 @@ final class UiDialogs {
 
     record JoinRequest(String host, int port, String sessionCode, String playerName) {}
 
-    record RejoinRequest(String host, int port, String sessionIdentity, String playerId) {}
+    record RejoinRequest(String host, int port, String sessionIdentity, String playerId, String playerToken) {}
 
     private record FormRow(String label, Node field) {}
 }
