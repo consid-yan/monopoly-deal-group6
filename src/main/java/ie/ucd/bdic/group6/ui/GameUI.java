@@ -4,6 +4,7 @@ import ie.ucd.bdic.group6.command.CommandType;
 
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Pos;
@@ -17,11 +18,6 @@ public class GameUI {
     private static final double CARD_HEIGHT = 128;
     private static final double COMPACT_CARD_WIDTH = 64;
     private static final double COMPACT_CARD_HEIGHT = 88;
-    private static final double HAND_TOP_Y = 20;
-    private static final double HAND_HOVER_Y = 2;
-    private static final double HAND_MIN_STEP = 28;
-    private static final double HAND_MAX_STEP = 52;
-    private static final double HAND_HOVER_SPREAD = 30;
 
     private final UiSessionContext context;
     private final Map<String, Node> cardNodes = new LinkedHashMap<>();
@@ -40,8 +36,6 @@ public class GameUI {
     @FXML
     private TextField targetPlayerField;
     @FXML
-    private Label drawPileLabel;
-    @FXML
     private Label deckSummaryLabel;
     @FXML
     private Label discardPileSummaryLabel;
@@ -50,7 +44,7 @@ public class GameUI {
     @FXML
     private HBox opponentsRow;
     @FXML
-    private Pane handPane;
+    private HBox handCardsHBox;
     @FXML
     private FlowPane bankZone;
     @FXML
@@ -114,11 +108,9 @@ public class GameUI {
     private void initialize() {
         targetPlayerField.clear();
         targetPlayerField.setPromptText("Optional target player id");
-        handPane.widthProperty().addListener((_, _, _) -> layoutHand(null));
         context.setSnapshotListener(this::render);
         context.setMessageListener(this::showFeedback);
         render(context.latestSnapshot());
-        Platform.runLater(() -> layoutHand(null));
     }
 
     @FXML
@@ -304,7 +296,6 @@ public class GameUI {
                 + snapshot.actionsRemaining() + " remaining");
         identityField.setText(snapshot.playerName(context.playerId()) + " (" + context.playerId() + ")");
         connectionField.setText(context.connectionLabel());
-        drawPileLabel.setText("DRAW\n" + snapshot.deckSize());
         setLabelText(deckSummaryLabel, snapshot.deckSize() + " cards");
         setLabelText(discardPileSummaryLabel, snapshot.discardSize() + " cards");
 
@@ -328,10 +319,9 @@ public class GameUI {
 
         for (UiSnapshot.CardView card : snapshot.currentPlayerHand()) {
             Node node = createCardNode(card, false, true);
-            node.setManaged(false);
             cardNodes.put(card.id(), node);
             handCardIds.add(card.id());
-            handPane.getChildren().add(node);
+            handCardsHBox.getChildren().add(node);
         }
     }
 
@@ -764,10 +754,16 @@ public class GameUI {
         Label title = new Label(card.title());
         title.getStyleClass().add("card-title");
         title.setWrapText(true);
+        title.setMaxWidth(CARD_WIDTH - 14);
+        title.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+        title.setTextOverrun(javafx.scene.control.OverrunStyle.CLIP);
 
         Label detail = new Label(cardDetail(card));
         detail.getStyleClass().add("card-detail");
         detail.setWrapText(true);
+        detail.setMaxWidth(CARD_WIDTH - 14);
+        detail.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+        detail.setTextOverrun(javafx.scene.control.OverrunStyle.CLIP);
 
         cardBox.getChildren().addAll(colorBand, header, art, title, detail);
         applyCardSize(cardBox, compact);
@@ -801,23 +797,15 @@ public class GameUI {
     }
 
     private void clearTable() {
-        List.of(bankZone, actionZone, paymentZone, tradeOfferZone, tradeRequestZone, discardZone,
-                        brownPropertyZone, lightBluePropertyZone, pinkPropertyZone, orangePropertyZone,
-                        redPropertyZone, yellowPropertyZone, greenPropertyZone, darkBluePropertyZone,
-                        railroadPropertyZone, utilityPropertyZone)
-                .forEach(zone -> {
-                    if (zone != null) {
-                        zone.getChildren().clear();
-                    }
-                });
-        if (handPane != null) {
-            handPane.getChildren().clear();
+        Stream.concat(
+                propertyZones().values().stream(),
+                Stream.of(bankZone, actionZone, paymentZone, tradeOfferZone, tradeRequestZone, discardZone)
+        ).filter(Objects::nonNull).forEach(zone -> zone.getChildren().clear());
+        if (handCardsHBox != null) {
+            handCardsHBox.getChildren().clear();
         }
         if (opponentsRow != null) {
             opponentsRow.getChildren().clear();
-        }
-        if (drawPileLabel != null) {
-            drawPileLabel.setText("DRAW\n0");
         }
         setLabelText(deckSummaryLabel, "0 cards");
         setLabelText(discardPileSummaryLabel, "0 cards");
@@ -967,53 +955,24 @@ public class GameUI {
     }
 
     private void layoutHand(Integer hoveredIndex) {
-        if (handPane == null) {
+        // HBox handles horizontal layout automatically.
+        // Only manage card ordering and hover styling here.
+        if (handCardsHBox == null) {
             return;
         }
         List<Node> orderedNodes = handCardIds.stream()
                 .map(cardNodes::get)
                 .filter(java.util.Objects::nonNull)
                 .toList();
-        if (!handPane.getChildren().equals(orderedNodes)) {
-            handPane.getChildren().setAll(orderedNodes);
+        if (!handCardsHBox.getChildren().equals(orderedNodes)) {
+            handCardsHBox.getChildren().setAll(orderedNodes);
         }
 
-        int count = orderedNodes.size();
-        if (count == 0) {
-            return;
-        }
-
-        double width = handPane.getWidth() > 0 ? handPane.getWidth() : handPane.getPrefWidth();
-        if (width <= 0) {
-            width = 760;
-        }
-        double availableForSteps = Math.max(0, width - CARD_WIDTH - 28);
-        double step = count == 1 ? 0 : availableForSteps / (count - 1);
-        step = Math.clamp(step, HAND_MIN_STEP, HAND_MAX_STEP);
-
-        boolean hasHover = hoveredIndex != null && hoveredIndex >= 0 && hoveredIndex < count;
-        double spread = hasHover ? Math.min(HAND_HOVER_SPREAD, step * 0.8) : 0;
-        double totalWidth = CARD_WIDTH + (count - 1) * step + (hasHover ? spread * 2 : 0);
-        double startX = Math.max(10, (width - totalWidth) / 2);
-
-        for (int i = 0; i < count; i++) {
+        for (int i = 0; i < orderedNodes.size(); i++) {
             Node node = orderedNodes.get(i);
-            double x = startX + i * step;
-            if (hasHover && i < hoveredIndex) {
-                x -= spread;
-            } else if (hasHover && i > hoveredIndex) {
-                x += spread;
-            }
-            boolean hovered = hasHover && i == hoveredIndex;
-            node.setLayoutX(x);
-            node.setLayoutY(hovered ? HAND_HOVER_Y : HAND_TOP_Y);
-            node.setManaged(false);
+            boolean hovered = hoveredIndex != null && i == hoveredIndex;
             applyCardSize(node, false);
             toggleStyle(node, "hand-card-hovered", hovered);
-            node.toFront();
-        }
-        if (hasHover) {
-            orderedNodes.get(hoveredIndex).toFront();
         }
     }
 
@@ -1121,9 +1080,9 @@ public class GameUI {
                     + colors.get(1) + " 50%, " + colors.get(1) + " 100%)";
         }
         if ("ACTION".equals(card.type())) {
-            return "#a61d24";
+            return "#6b1a1e";
         }
-        return "#23845b";
+        return "#1a7a4a";
     }
 
     private String propertyCss(String color) {

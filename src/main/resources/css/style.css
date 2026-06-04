@@ -1,28 +1,37 @@
 /*
- * App stylesheet layered over AtlantaFX PrimerDark.
- * Keep this file focused on Monopoly Deal branding and screen composition;
- * standard controls should inherit their base styling from AtlantaFX.
+ * Monopoly Deal — Deep Green Felt Table Theme
+ *
+ * Visual identity:
+ *   - Deep green felt table background (casino/card-table feel)
+ *   - Paper-white cards with dark ink text
+ *   - Warm gold accent colour throughout
+ *   - Clear player zones with subtle borders
+ *   - Simple, flat-ish shadows — no complex animations
+ *
+ * Layered over AtlantaFX PrimerDark for baseline control styling.
  */
 
+/* ── Global screen backgrounds ─────────────────────────────────────────── */
 .root-screen {
     -fx-font-family: "System";
-    -fx-background-color: linear-gradient(to bottom, #163f34, -color-bg-default 72%);
+    -fx-background-color: radial-gradient(center 50% 40%, radius 85%, #1a5c38 0%, #0e3b24 72%);
 }
 
 .lobby-screen,
 .game-screen,
 .help-screen,
 .result-screen {
-    -fx-background-color: linear-gradient(to bottom, #163f34, -color-bg-default 72%);
+    -fx-background-color: radial-gradient(center 50% 40%, radius 85%, #1a5c38 0%, #0e3b24 72%);
 }
 
+/* ── Shared typography / banners ───────────────────────────────────────── */
 .menu-title,
 .title-banner {
-    -fx-text-fill: white;
+    -fx-text-fill: #fafaf2;
     -fx-font-weight: bold;
-    -fx-background-color: #a61d24;
+    -fx-background-color: #6b1a1e;
     -fx-background-radius: 8;
-    -fx-border-color: #d9b34c;
+    -fx-border-color: #c8a84e;
     -fx-border-radius: 8;
     -fx-border-width: 1.2;
     -fx-padding: 9 24 9 24;
@@ -35,18 +44,19 @@
 
 .menu-subtitle,
 .section-heading {
-    -fx-text-fill: -color-fg-default;
+    -fx-text-fill: #e8e4d4;
     -fx-font-weight: bold;
 }
 
+/* ── Panels ────────────────────────────────────────────────────────────── */
 .menu-note,
 .status-label,
 .surface-panel,
 .hud-bar,
 .menu-actions {
-    -fx-background-color: -color-bg-subtle;
+    -fx-background-color: rgba(10, 42, 25, 0.72);
     -fx-background-radius: 8;
-    -fx-border-color: -color-border-default;
+    -fx-border-color: rgba(200, 168, 78, 0.30);
     -fx-border-radius: 8;
     -fx-border-width: 1;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 10, 0.16, 0, 2);
@@ -64,20 +74,21 @@
 }
 
 .status-label {
-    -fx-background-color: #23845b;
-    -fx-text-fill: white;
+    -fx-background-color: #1a7a4a;
+    -fx-text-fill: #fafaf2;
     -fx-font-weight: bold;
 }
 
 .winner-label {
-    -fx-text-fill: #f0c657;
+    -fx-text-fill: #d4b86a;
     -fx-font-weight: bold;
 }
 
 .separator .line {
-    -fx-border-color: -color-border-default;
+    -fx-border-color: rgba(200, 168, 78, 0.25);
 }
 
+/* ── Shared buttons (non-menu screens) ─────────────────────────────────── */
 .primary-button,
 .secondary-button,
 .danger-button,
@@ -90,40 +101,40 @@
 }
 
 .primary-button {
-    -fx-background-color: #a61d24;
-    -fx-border-color: #d9b34c;
-    -fx-text-fill: white;
+    -fx-background-color: #6b1a1e;
+    -fx-border-color: #c8a84e;
+    -fx-text-fill: #fafaf2;
 }
 
 .secondary-button {
-    -fx-background-color: -color-bg-subtle;
-    -fx-border-color: -color-border-default;
-    -fx-text-fill: -color-fg-default;
+    -fx-background-color: rgba(10, 42, 25, 0.70);
+    -fx-border-color: rgba(200, 168, 78, 0.30);
+    -fx-text-fill: #e8e4d4;
 }
 
 .gold-button {
-    -fx-background-color: #d9b34c;
-    -fx-border-color: #f0c657;
-    -fx-text-fill: #17110b;
+    -fx-background-color: #c8a84e;
+    -fx-border-color: #d4b86a;
+    -fx-text-fill: #0a2a19;
 }
 
 .danger-button {
-    -fx-background-color: #7e1f24;
-    -fx-border-color: #d9b34c;
-    -fx-text-fill: white;
+    -fx-background-color: #5a1519;
+    -fx-border-color: #c8a84e;
+    -fx-text-fill: #fafaf2;
 }
 
 .primary-button:hover,
 .danger-button:hover {
-    -fx-background-color: #b5262e;
+    -fx-background-color: #7e1f24;
 }
 
 .secondary-button:hover {
-    -fx-background-color: rgba(255, 255, 255, 0.08);
+    -fx-background-color: rgba(10, 42, 25, 0.88);
 }
 
 .gold-button:hover {
-    -fx-background-color: #f0c657;
+    -fx-background-color: #d4b86a;
 }
 
 .primary-button:pressed,
@@ -135,34 +146,34 @@
 
 .primary-button .ikonli-font-icon,
 .danger-button .ikonli-font-icon {
-    -fx-icon-color: white;
+    -fx-icon-color: #fafaf2;
 }
 
 .secondary-button .ikonli-font-icon {
-    -fx-icon-color: -color-fg-default;
+    -fx-icon-color: #e8e4d4;
 }
 
 .gold-button .ikonli-font-icon {
-    -fx-icon-color: #17110b;
+    -fx-icon-color: #0a2a19;
 }
 
 .ikonli-font-icon {
     -fx-icon-size: 17;
-    -fx-icon-color: -color-fg-default;
+    -fx-icon-color: #e8e4d4;
 }
 
 /*
- * Menu screen adapted from the HTML/CSS mockup.
+ * Menu screen — central lobby card design over green felt.
  */
 .menu-screen-root {
-    -fx-background-color: radial-gradient(center 50% 38%, radius 76%, #1c3420 0%, #0c1015 100%);
+    -fx-background-color: radial-gradient(center 50% 38%, radius 76%, #1a5c38 0%, #0e3b24 100%);
 }
 
 .menu-bg-pattern {
     -fx-background-color:
-        linear-gradient(from 0% 0% to 100% 100%, rgba(255, 255, 255, 0.040) 0%, transparent 36%, transparent 100%),
-        linear-gradient(from 100% 0% to 0% 100%, rgba(255, 255, 255, 0.030) 0%, transparent 36%, transparent 100%),
-        radial-gradient(center 50% 0%, radius 55%, rgba(212, 160, 23, 0.045) 0%, transparent 100%);
+        linear-gradient(from 0% 0% to 100% 100%, rgba(255, 255, 255, 0.035) 0%, transparent 36%, transparent 100%),
+        linear-gradient(from 100% 0% to 0% 100%, rgba(255, 255, 255, 0.025) 0%, transparent 36%, transparent 100%),
+        radial-gradient(center 50% 0%, radius 55%, rgba(200, 168, 78, 0.055) 0%, transparent 100%);
     -fx-opacity: 0.72;
 }
 
@@ -170,7 +181,7 @@
     -fx-font-family: "Georgia";
     -fx-font-size: 162px;
     -fx-font-weight: bold;
-    -fx-text-fill: rgba(212, 160, 23, 0.11);
+    -fx-text-fill: rgba(200, 168, 78, 0.10);
 }
 
 .menu-content {
@@ -183,10 +194,10 @@
 
 .menu-actions-panel {
     -fx-background-color:
-        linear-gradient(from 0% 0% to 0% 100%, rgba(212, 160, 23, 0.10) 0%, transparent 9%),
-        linear-gradient(from 0% 0% to 0% 100%, rgba(255, 255, 255, 0.070) 0%, rgba(255, 255, 255, 0.018) 100%);
+        linear-gradient(from 0% 0% to 0% 100%, rgba(200, 168, 78, 0.10) 0%, transparent 9%),
+        linear-gradient(from 0% 0% to 0% 100%, rgba(255, 255, 255, 0.065) 0%, rgba(255, 255, 255, 0.016) 100%);
     -fx-background-radius: 6;
-    -fx-border-color: rgba(212, 160, 23, 0.48);
+    -fx-border-color: rgba(200, 168, 78, 0.48);
     -fx-border-radius: 6;
     -fx-border-width: 1.5;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.80), 88, 0, 0, 28);
@@ -200,36 +211,36 @@
 .menu-logo-title {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
-    -fx-effect: dropshadow(gaussian, rgba(212, 160, 23, 0.52), 36, 0.08, 0, 5);
+    -fx-effect: dropshadow(gaussian, rgba(200, 168, 78, 0.52), 36, 0.08, 0, 5);
     -fx-font-family: "Georgia";
     -fx-font-size: 80px;
     -fx-font-weight: bold;
     -fx-padding: 0 0 8 0;
-    -fx-text-fill: #d4a017;
+    -fx-text-fill: #c8a84e;
 }
 
 .menu-logo-subtitle {
     -fx-font-family: "System";
     -fx-font-size: 11px;
     -fx-font-weight: normal;
-    -fx-text-fill: rgba(255, 255, 255, 0.44);
+    -fx-text-fill: rgba(250, 250, 242, 0.44);
 }
 
 .menu-tagline {
     -fx-font-family: "System";
     -fx-font-size: 11px;
     -fx-font-style: italic;
-    -fx-text-fill: rgba(212, 160, 23, 0.42);
+    -fx-text-fill: rgba(200, 168, 78, 0.44);
 }
 
 .divider-line .line {
-    -fx-border-color: transparent transparent rgba(212, 160, 23, 0.46) transparent;
+    -fx-border-color: transparent transparent rgba(200, 168, 78, 0.46) transparent;
     -fx-border-width: 0 0 1 0;
 }
 
 .divider-symbol {
     -fx-font-size: 11px;
-    -fx-text-fill: rgba(212, 160, 23, 0.80);
+    -fx-text-fill: rgba(200, 168, 78, 0.80);
 }
 
 .menu-button-list {
@@ -256,91 +267,91 @@
 }
 
 .menu-primary-button {
-    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #dfab1a, #c49312);
-    -fx-border-color: rgba(255, 220, 100, 0.50);
-    -fx-text-fill: #0d1117;
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #d4b86a, #b8982e);
+    -fx-border-color: rgba(230, 200, 120, 0.50);
+    -fx-text-fill: #0a2a19;
 }
 
 .menu-primary-button:hover {
-    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #f0be24, #d4a017);
-    -fx-effect: dropshadow(gaussian, rgba(212, 160, 23, 0.55), 20, 0, 0, 4);
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #e2ca80, #c8a84e);
+    -fx-effect: dropshadow(gaussian, rgba(200, 168, 78, 0.50), 20, 0, 0, 4);
     -fx-translate-y: -1;
 }
 
 .menu-primary-button:pressed {
-    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #b88c10, #a87e0c);
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #a08028, #8b6e20);
     -fx-effect: none;
     -fx-translate-y: 0;
 }
 
 .menu-secondary-button {
-    -fx-background-color: rgba(255, 255, 255, 0.065);
-    -fx-border-color: rgba(255, 255, 255, 0.15);
-    -fx-text-fill: rgba(255, 255, 255, 0.80);
+    -fx-background-color: rgba(10, 42, 25, 0.58);
+    -fx-border-color: rgba(200, 168, 78, 0.24);
+    -fx-text-fill: rgba(250, 250, 242, 0.82);
 }
 
 .menu-secondary-button:hover {
-    -fx-background-color: rgba(255, 255, 255, 0.11);
-    -fx-border-color: rgba(255, 255, 255, 0.26);
+    -fx-background-color: rgba(10, 42, 25, 0.82);
+    -fx-border-color: rgba(200, 168, 78, 0.40);
     -fx-translate-y: -1;
 }
 
 .menu-secondary-button:pressed {
-    -fx-background-color: rgba(255, 255, 255, 0.04);
+    -fx-background-color: rgba(10, 42, 25, 0.92);
     -fx-translate-y: 0;
 }
 
 .menu-outline-button {
     -fx-background-color: transparent;
-    -fx-border-color: rgba(212, 160, 23, 0.50);
-    -fx-text-fill: #d4a017;
+    -fx-border-color: rgba(200, 168, 78, 0.50);
+    -fx-text-fill: #c8a84e;
 }
 
 .menu-outline-button:hover {
-    -fx-background-color: rgba(212, 160, 23, 0.10);
-    -fx-border-color: rgba(212, 160, 23, 0.82);
+    -fx-background-color: rgba(200, 168, 78, 0.10);
+    -fx-border-color: rgba(200, 168, 78, 0.82);
     -fx-translate-y: -1;
 }
 
 .menu-outline-button:pressed {
-    -fx-background-color: rgba(212, 160, 23, 0.04);
+    -fx-background-color: rgba(200, 168, 78, 0.04);
     -fx-translate-y: 0;
 }
 
 .menu-danger-button {
-    -fx-background-color: rgba(180, 40, 40, 0.15);
-    -fx-border-color: rgba(200, 60, 60, 0.34);
-    -fx-text-fill: rgba(255, 130, 110, 0.92);
+    -fx-background-color: rgba(140, 30, 30, 0.20);
+    -fx-border-color: rgba(180, 50, 50, 0.38);
+    -fx-text-fill: rgba(255, 160, 140, 0.90);
 }
 
 .menu-danger-button:hover {
-    -fx-background-color: rgba(180, 40, 40, 0.30);
-    -fx-border-color: rgba(220, 70, 70, 0.52);
+    -fx-background-color: rgba(140, 30, 30, 0.36);
+    -fx-border-color: rgba(200, 60, 60, 0.56);
     -fx-translate-y: -1;
 }
 
 .menu-danger-button:pressed {
-    -fx-background-color: rgba(180, 40, 40, 0.10);
+    -fx-background-color: rgba(140, 30, 30, 0.14);
     -fx-translate-y: 0;
 }
 
 .menu-icon-primary {
-    -fx-icon-color: #0d1117;
+    -fx-icon-color: #0a2a19;
     -fx-icon-size: 18;
 }
 
 .menu-icon-secondary {
-    -fx-icon-color: rgba(255, 255, 255, 0.62);
+    -fx-icon-color: rgba(250, 250, 242, 0.62);
     -fx-icon-size: 18;
 }
 
 .menu-icon-outline {
-    -fx-icon-color: #d4a017;
+    -fx-icon-color: #c8a84e;
     -fx-icon-size: 18;
 }
 
 .menu-icon-danger {
-    -fx-icon-color: rgba(255, 130, 110, 0.82);
+    -fx-icon-color: rgba(255, 160, 140, 0.82);
     -fx-icon-size: 18;
 }
 
@@ -350,18 +361,18 @@
     -fx-effect: none;
     -fx-font-size: 12px;
     -fx-padding: 0;
-    -fx-text-fill: rgba(255, 255, 255, 0.30);
+    -fx-text-fill: rgba(250, 250, 242, 0.32);
 }
 
 /*
- * How-to-play screen uses the same card-table language as the menu.
+ * How-to-play & Lobby — card-table screens using same green-felt language.
  */
 .help-screen-root {
-    -fx-background-color: radial-gradient(center 50% 40%, radius 72%, #1a2e1a 0%, #0d1117 100%);
+    -fx-background-color: radial-gradient(center 50% 40%, radius 72%, #1a5c38 0%, #0e3b24 100%);
 }
 
 .lobby-screen-root {
-    -fx-background-color: radial-gradient(center 50% 40%, radius 72%, #1a2e1a 0%, #0d1117 100%);
+    -fx-background-color: radial-gradient(center 50% 40%, radius 72%, #1a5c38 0%, #0e3b24 100%);
 }
 
 .lobby-content {
@@ -375,25 +386,25 @@
 .lobby-logo-title {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
-    -fx-effect: dropshadow(gaussian, rgba(212, 160, 23, 0.36), 24, 0, 0, 3);
+    -fx-effect: dropshadow(gaussian, rgba(200, 168, 78, 0.36), 24, 0, 0, 3);
     -fx-font-family: "Georgia";
     -fx-font-size: 54px;
     -fx-font-weight: bold;
     -fx-padding: 0;
-    -fx-text-fill: #d4a017;
+    -fx-text-fill: #c8a84e;
 }
 
 .lobby-logo-subtitle {
     -fx-font-family: "System";
     -fx-font-size: 12px;
     -fx-font-weight: normal;
-    -fx-text-fill: rgba(255, 255, 255, 0.35);
+    -fx-text-fill: rgba(250, 250, 242, 0.36);
 }
 
 .lobby-panel {
-    -fx-background-color: linear-gradient(from 0% 0% to 100% 100%, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.025) 100%);
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 100%, rgba(10, 42, 25, 0.64) 0%, rgba(10, 42, 25, 0.48) 100%);
     -fx-background-radius: 4;
-    -fx-border-color: rgba(212, 160, 23, 0.25);
+    -fx-border-color: rgba(200, 168, 78, 0.30);
     -fx-border-radius: 4;
     -fx-border-width: 1;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.68), 70, 0, 0, 22);
@@ -401,53 +412,53 @@
 }
 
 .lobby-section-title {
-    -fx-text-fill: #d4a017;
+    -fx-text-fill: #c8a84e;
     -fx-font-size: 15px;
     -fx-font-weight: bold;
 }
 
 .lobby-field-label {
-    -fx-text-fill: rgba(255, 255, 255, 0.72);
+    -fx-text-fill: rgba(250, 250, 242, 0.72);
     -fx-font-size: 13px;
 }
 
 .lobby-readonly-field {
-    -fx-background-color: rgba(13, 17, 23, 0.58);
-    -fx-border-color: rgba(255, 255, 255, 0.12);
+    -fx-background-color: rgba(10, 42, 25, 0.64);
+    -fx-border-color: rgba(200, 168, 78, 0.18);
     -fx-border-radius: 3;
     -fx-background-radius: 3;
-    -fx-text-fill: rgba(255, 255, 255, 0.84);
-    -fx-prompt-text-fill: rgba(255, 255, 255, 0.30);
+    -fx-text-fill: rgba(250, 250, 242, 0.84);
+    -fx-prompt-text-fill: rgba(250, 250, 242, 0.32);
 }
 
 .lobby-player-list {
-    -fx-background-color: rgba(13, 17, 23, 0.56);
-    -fx-border-color: rgba(212, 160, 23, 0.25);
+    -fx-background-color: rgba(10, 42, 25, 0.62);
+    -fx-border-color: rgba(200, 168, 78, 0.30);
     -fx-border-radius: 3;
     -fx-background-radius: 3;
 }
 
 .lobby-player-list .list-cell {
     -fx-background-color: transparent;
-    -fx-text-fill: rgba(255, 255, 255, 0.76);
+    -fx-text-fill: rgba(250, 250, 242, 0.78);
 }
 
 .lobby-player-list .list-cell:filled:hover {
-    -fx-background-color: rgba(255, 255, 255, 0.06);
+    -fx-background-color: rgba(250, 250, 242, 0.06);
 }
 
 .lobby-status-area,
 .lobby-status-area .content {
-    -fx-background-color: rgba(13, 17, 23, 0.56);
-    -fx-border-color: rgba(35, 132, 91, 0.58);
+    -fx-background-color: rgba(10, 42, 25, 0.62);
+    -fx-border-color: rgba(26, 122, 74, 0.58);
     -fx-border-radius: 3;
     -fx-background-radius: 3;
-    -fx-text-fill: rgba(255, 255, 255, 0.76);
-    -fx-prompt-text-fill: rgba(255, 255, 255, 0.28);
+    -fx-text-fill: rgba(250, 250, 242, 0.78);
+    -fx-prompt-text-fill: rgba(250, 250, 242, 0.30);
 }
 
 .lobby-panel .separator .line {
-    -fx-border-color: transparent transparent rgba(212, 160, 23, 0.22) transparent;
+    -fx-border-color: transparent transparent rgba(200, 168, 78, 0.24) transparent;
     -fx-border-width: 0 0 1 0;
 }
 
@@ -462,25 +473,25 @@
 .help-logo-title {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
-    -fx-effect: dropshadow(gaussian, rgba(212, 160, 23, 0.36), 24, 0, 0, 3);
+    -fx-effect: dropshadow(gaussian, rgba(200, 168, 78, 0.36), 24, 0, 0, 3);
     -fx-font-family: "Georgia";
     -fx-font-size: 54px;
     -fx-font-weight: bold;
     -fx-padding: 0;
-    -fx-text-fill: #d4a017;
+    -fx-text-fill: #c8a84e;
 }
 
 .help-logo-subtitle {
     -fx-font-family: "System";
     -fx-font-size: 12px;
     -fx-font-weight: normal;
-    -fx-text-fill: rgba(255, 255, 255, 0.35);
+    -fx-text-fill: rgba(250, 250, 242, 0.36);
 }
 
 .help-guide-panel {
-    -fx-background-color: linear-gradient(from 0% 0% to 100% 100%, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.025) 100%);
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 100%, rgba(10, 42, 25, 0.64) 0%, rgba(10, 42, 25, 0.48) 100%);
     -fx-background-radius: 4;
-    -fx-border-color: rgba(212, 160, 23, 0.25);
+    -fx-border-color: rgba(200, 168, 78, 0.30);
     -fx-border-radius: 4;
     -fx-border-width: 1;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.68), 70, 0, 0, 22);
@@ -497,28 +508,28 @@
 }
 
 .help-screen-root .help-rule-pane {
-    -fx-text-fill: rgba(255, 255, 255, 0.78);
+    -fx-text-fill: rgba(250, 250, 242, 0.80);
 }
 
 .help-screen-root .help-rule-pane > .title {
-    -fx-background-color: rgba(255, 255, 255, 0.06);
+    -fx-background-color: rgba(10, 42, 25, 0.56);
     -fx-background-radius: 3 3 0 0;
-    -fx-border-color: rgba(212, 160, 23, 0.32);
+    -fx-border-color: rgba(200, 168, 78, 0.36);
     -fx-border-radius: 3 3 0 0;
     -fx-border-width: 1 1 0 1;
     -fx-padding: 9 12 9 12;
 }
 
 .help-screen-root .help-rule-pane > .title > .text {
-    -fx-fill: #d4a017;
+    -fx-fill: #c8a84e;
     -fx-font-size: 14px;
     -fx-font-weight: bold;
 }
 
 .help-screen-root .help-rule-pane > .content {
-    -fx-background-color: rgba(13, 17, 23, 0.56);
+    -fx-background-color: rgba(10, 42, 25, 0.48);
     -fx-background-radius: 0 0 3 3;
-    -fx-border-color: rgba(255, 255, 255, 0.10);
+    -fx-border-color: rgba(200, 168, 78, 0.16);
     -fx-border-radius: 0 0 3 3;
     -fx-border-width: 0 1 1 1;
     -fx-padding: 12;
@@ -537,12 +548,12 @@
 }
 
 .help-rule-text {
-    -fx-text-fill: rgba(255, 255, 255, 0.74);
-    -fx-fill: rgba(255, 255, 255, 0.74);
+    -fx-text-fill: rgba(250, 250, 242, 0.74);
+    -fx-fill: rgba(250, 250, 242, 0.74);
 }
 
 .help-rule-key {
-    -fx-fill: rgba(255, 255, 255, 0.88);
+    -fx-fill: rgba(250, 250, 242, 0.88);
     -fx-font-weight: bold;
 }
 
@@ -567,17 +578,18 @@
     -fx-effect: none;
     -fx-font-size: 12px;
     -fx-padding: 0;
-    -fx-text-fill: rgba(255, 255, 255, 0.28);
+    -fx-text-fill: rgba(250, 250, 242, 0.30);
 }
 
+/* ── General controls ──────────────────────────────────────────────────── */
 .titled-pane {
-    -fx-text-fill: -color-fg-default;
+    -fx-text-fill: #e8e4d4;
 }
 
 .titled-pane > .title {
-    -fx-background-color: -color-bg-subtle;
+    -fx-background-color: rgba(10, 42, 25, 0.64);
     -fx-background-radius: 8 8 0 0;
-    -fx-border-color: -color-border-default;
+    -fx-border-color: rgba(200, 168, 78, 0.25);
     -fx-border-radius: 8 8 0 0;
     -fx-border-width: 1 1 0 1;
     -fx-padding: 8 12 8 12;
@@ -585,31 +597,31 @@
 
 .property-set-panel > .title,
 .money-panel > .title {
-    -fx-border-color: #23845b -color-border-default -color-border-default -color-border-default;
+    -fx-border-color: #1a7a4a rgba(200, 168, 78, 0.25) rgba(200, 168, 78, 0.25) rgba(200, 168, 78, 0.25);
     -fx-border-width: 3 1 0 1;
 }
 
 .player-panel > .title,
 .action-panel > .title {
-    -fx-border-color: #a61d24 -color-border-default -color-border-default -color-border-default;
+    -fx-border-color: #6b1a1e rgba(200, 168, 78, 0.25) rgba(200, 168, 78, 0.25) rgba(200, 168, 78, 0.25);
     -fx-border-width: 3 1 0 1;
 }
 
 .section-panel > .title,
 .card-panel > .title {
-    -fx-border-color: #d9b34c -color-border-default -color-border-default -color-border-default;
+    -fx-border-color: #c8a84e rgba(200, 168, 78, 0.25) rgba(200, 168, 78, 0.25) rgba(200, 168, 78, 0.25);
     -fx-border-width: 3 1 0 1;
 }
 
 .titled-pane > .title > .text {
-    -fx-fill: -color-fg-default;
+    -fx-fill: #e8e4d4;
     -fx-font-weight: bold;
 }
 
 .titled-pane > .content {
-    -fx-background-color: -color-bg-inset;
+    -fx-background-color: rgba(10, 42, 25, 0.44);
     -fx-background-radius: 0 0 8 8;
-    -fx-border-color: -color-border-default;
+    -fx-border-color: rgba(200, 168, 78, 0.25);
     -fx-border-radius: 0 0 8 8;
     -fx-border-width: 0 1 1 1;
     -fx-padding: 10;
@@ -623,7 +635,7 @@
 }
 
 .list-view .placeholder .label {
-    -fx-text-fill: -color-fg-muted;
+    -fx-text-fill: #b8b098;
     -fx-font-style: italic;
 }
 
@@ -632,22 +644,22 @@
 }
 
 .list-view .list-cell:filled:selected {
-    -fx-background-color: #d9b34c;
-    -fx-text-fill: #17110b;
+    -fx-background-color: #c8a84e;
+    -fx-text-fill: #0a2a19;
 }
 
 .status-area,
 .status-area .content {
-    -fx-background-color: rgba(35, 132, 91, 0.22);
-    -fx-text-fill: -color-fg-default;
-    -fx-border-color: #23845b;
+    -fx-background-color: rgba(26, 122, 74, 0.24);
+    -fx-text-fill: #e8e4d4;
+    -fx-border-color: #1a7a4a;
 }
 
 .error-area,
 .error-area .content {
-    -fx-background-color: rgba(166, 29, 36, 0.20);
-    -fx-text-fill: -color-fg-default;
-    -fx-border-color: #a61d24;
+    -fx-background-color: rgba(107, 26, 30, 0.24);
+    -fx-text-fill: #e8e4d4;
+    -fx-border-color: #6b1a1e;
 }
 
 .side-status-area {
@@ -655,14 +667,14 @@
 }
 
 .winner-field {
-    -fx-background-color: rgba(217, 179, 76, 0.18);
-    -fx-border-color: #d9b34c;
+    -fx-background-color: rgba(200, 168, 78, 0.18);
+    -fx-border-color: #c8a84e;
     -fx-border-width: 1.5;
     -fx-border-radius: 7;
     -fx-background-radius: 7;
     -fx-font-size: 16px;
     -fx-font-weight: bold;
-    -fx-text-fill: #f0c657;
+    -fx-text-fill: #d4b86a;
 }
 
 .help-screen .scroll-pane,
@@ -673,14 +685,15 @@
 
 .help-screen .titled-pane > .content .label,
 .game-screen .action-panel .label {
-    -fx-text-fill: -color-fg-default;
+    -fx-text-fill: #e8e4d4;
     -fx-line-spacing: 3;
 }
 
+/* ── Cards — paper-white with dark-ink text ───────────────────────────── */
 .hand-card {
-    -fx-background-color: -color-bg-inset;
+    -fx-background-color: rgba(10, 42, 25, 0.48);
     -fx-background-radius: 8;
-    -fx-border-color: -color-border-default;
+    -fx-border-color: rgba(200, 168, 78, 0.22);
     -fx-border-radius: 8;
     -fx-border-width: 1;
     -fx-padding: 8;
@@ -691,9 +704,9 @@
 }
 
 .tabletop-board {
-    -fx-background-color: linear-gradient(to bottom, #0f5d3e, #0a3d2c);
+    -fx-background-color: linear-gradient(to bottom, #165632, #0e3b24);
     -fx-background-radius: 8;
-    -fx-border-color: rgba(217, 179, 76, 0.62);
+    -fx-border-color: rgba(200, 168, 78, 0.52);
     -fx-border-radius: 8;
     -fx-border-width: 1.4;
     -fx-padding: 10;
@@ -705,30 +718,17 @@
 .opponent-seat,
 .pile-panel,
 .property-slot {
-    -fx-background-color: rgba(9, 22, 18, 0.44);
+    -fx-background-color: rgba(10, 42, 25, 0.52);
     -fx-background-radius: 8;
-    -fx-border-color: rgba(255, 255, 255, 0.11);
+    -fx-border-color: rgba(200, 168, 78, 0.18);
     -fx-border-radius: 8;
     -fx-border-width: 1;
     -fx-padding: 8;
-}
-
-.symbolic-panel {
-    -fx-padding: 6;
 }
 
 .hand-panel {
-    -fx-background-color: rgba(11, 34, 31, 0.72);
-    -fx-border-color: rgba(217, 179, 76, 0.48);
-}
-
-.hand-fan-pane {
-    -fx-background-color: linear-gradient(to bottom, rgba(255, 255, 255, 0.055), rgba(0, 0, 0, 0.16));
-    -fx-background-radius: 8;
-    -fx-border-color: rgba(217, 179, 76, 0.34);
-    -fx-border-radius: 8;
-    -fx-border-width: 1;
-    -fx-padding: 8;
+    -fx-background-color: rgba(10, 42, 25, 0.72);
+    -fx-border-color: rgba(200, 168, 78, 0.42);
 }
 
 .opponent-hand-backs {
@@ -738,7 +738,7 @@
 }
 
 .zone-heading {
-    -fx-text-fill: -color-fg-default;
+    -fx-text-fill: #fafaf2;
     -fx-font-weight: bold;
     -fx-font-size: 12px;
     -fx-padding: 2 7 2 7;
@@ -746,120 +746,80 @@
 }
 
 .zone-caption {
-    -fx-text-fill: -color-fg-muted;
+    -fx-text-fill: #b8b098;
     -fx-font-size: 11px;
 }
 
 .drop-zone {
-    -fx-background-color: rgba(255, 255, 255, 0.055);
+    -fx-background-color: rgba(250, 250, 242, 0.045);
     -fx-background-radius: 7;
-    -fx-border-color: rgba(255, 255, 255, 0.18);
+    -fx-border-color: rgba(200, 168, 78, 0.22);
     -fx-border-radius: 7;
     -fx-border-style: dashed;
     -fx-border-width: 1.1;
     -fx-padding: 7;
 }
 
-.compact-drop-zone {
-    -fx-padding: 5;
-}
-
 .symbolic-drop-zone {
     -fx-min-height: 96;
     -fx-pref-height: 96;
-    -fx-background-color: rgba(255, 255, 255, 0.045);
-    -fx-border-color: rgba(217, 179, 76, 0.50);
+    -fx-background-color: rgba(250, 250, 242, 0.035);
+    -fx-border-color: rgba(200, 168, 78, 0.45);
 }
 
 .hand-drop-zone {
-    -fx-background-color: rgba(255, 255, 255, 0.075);
-    -fx-border-color: rgba(217, 179, 76, 0.42);
+    -fx-background-color: rgba(250, 250, 242, 0.065);
+    -fx-border-color: rgba(200, 168, 78, 0.38);
 }
 
 .bank-drop-zone {
-    -fx-border-color: rgba(35, 132, 91, 0.78);
+    -fx-border-color: rgba(26, 122, 74, 0.72);
 }
 
 .property-drop-zone {
-    -fx-border-color: rgba(255, 255, 255, 0.22);
+    -fx-border-color: rgba(200, 168, 78, 0.28);
 }
 
 .action-drop-zone,
 .discard-drop-zone {
-    -fx-border-color: rgba(166, 29, 36, 0.75);
+    -fx-border-color: rgba(107, 26, 30, 0.68);
 }
 
 .payment-drop-zone,
 .trade-drop-zone {
-    -fx-border-color: rgba(217, 179, 76, 0.68);
-}
-
-.drop-zone-valid {
-    -fx-background-color: rgba(217, 179, 76, 0.16);
-    -fx-border-color: #f0c657;
-    -fx-border-style: solid;
-    -fx-effect: dropshadow(gaussian, rgba(240, 198, 87, 0.28), 12, 0.24, 0, 0);
-}
-
-.drop-zone-invalid {
-    -fx-background-color: rgba(166, 29, 36, 0.20);
-    -fx-border-color: #d83240;
-    -fx-border-style: solid;
-}
-
-.table-scroll,
-.table-scroll > .viewport {
-    -fx-background-color: transparent;
+    -fx-border-color: rgba(200, 168, 78, 0.60);
 }
 
 .property-board {
     -fx-padding: 1;
 }
 
-.draw-pile-card {
-    -fx-background-color: linear-gradient(to bottom, #a61d24, #641016);
-    -fx-background-radius: 7;
-    -fx-border-color: #d9b34c;
-    -fx-border-radius: 7;
-    -fx-border-width: 1.5;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 10, 0.2, 0, 3);
-}
-
-.draw-pile-card .label {
-    -fx-text-fill: white;
-    -fx-font-weight: bold;
-    -fx-text-alignment: center;
-}
-
+/* ── Deal cards — paper-white ──────────────────────────────────────────── */
 .deal-card {
-    -fx-background-color: #fff5d8;
+    -fx-background-color: #fafaf2;
     -fx-background-radius: 7;
-    -fx-border-color: #17110b;
+    -fx-border-color: #c8ad78;
     -fx-border-radius: 7;
     -fx-border-width: 1.25;
     -fx-padding: 5;
     -fx-cursor: open-hand;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.26), 8, 0.2, 0, 2);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.20), 8, 0.2, 0, 2);
 }
 
 .deal-card:hover {
     -fx-translate-y: -1;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.34), 12, 0.22, 0, 3);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.28), 12, 0.22, 0, 3);
 }
 
 .hand-card-hovered {
     -fx-scale-x: 1.04;
     -fx-scale-y: 1.04;
-    -fx-effect: dropshadow(gaussian, rgba(240, 198, 87, 0.48), 14, 0.26, 0, 3);
+    -fx-effect: dropshadow(gaussian, rgba(200, 168, 78, 0.48), 14, 0.26, 0, 3);
 }
 
 .deal-card-selected {
-    -fx-border-color: #f0c657;
+    -fx-border-color: #c8a84e;
     -fx-border-width: 2;
-}
-
-.deal-card-dragging {
-    -fx-opacity: 0.58;
 }
 
 .compact-deal-card {
@@ -867,18 +827,19 @@
 }
 
 .deal-card-money {
-    -fx-background-color: #effbe9;
+    -fx-background-color: #f0f7e8;
 }
 
 .deal-card-property,
 .deal-card-property-wild {
-    -fx-background-color: #fff7de;
+    -fx-background-color: #faf7ec;
 }
 
 .deal-card-action {
-    -fx-background-color: #fff1ef;
+    -fx-background-color: #faf0f0;
 }
 
+/* ── Card internal elements ────────────────────────────────────────────── */
 .card-color-band {
     -fx-min-height: 9;
     -fx-pref-height: 9;
@@ -893,15 +854,15 @@
 }
 
 .card-type-label {
-    -fx-text-fill: #17110b;
+    -fx-text-fill: #1a1208;
     -fx-font-size: 8.5px;
     -fx-font-weight: bold;
 }
 
 .card-value-badge {
-    -fx-background-color: #17110b;
+    -fx-background-color: #1a1208;
     -fx-background-radius: 9;
-    -fx-text-fill: white;
+    -fx-text-fill: #fafaf2;
     -fx-font-size: 8px;
     -fx-font-weight: bold;
     -fx-padding: 2 4 2 4;
@@ -911,9 +872,9 @@
     -fx-min-height: 38;
     -fx-pref-height: 38;
     -fx-max-height: 38;
-    -fx-background-color: rgba(23, 17, 11, 0.08);
+    -fx-background-color: rgba(26, 18, 8, 0.06);
     -fx-background-radius: 5;
-    -fx-border-color: rgba(23, 17, 11, 0.22);
+    -fx-border-color: rgba(26, 18, 8, 0.18);
     -fx-border-radius: 5;
     -fx-border-style: dashed;
     -fx-border-width: 1;
@@ -926,7 +887,7 @@
 }
 
 .card-art-text {
-    -fx-text-fill: rgba(23, 17, 11, 0.48);
+    -fx-text-fill: rgba(26, 18, 8, 0.44);
     -fx-font-size: 8px;
     -fx-font-weight: bold;
     -fx-text-alignment: center;
@@ -937,14 +898,14 @@
 }
 
 .card-title {
-    -fx-text-fill: #17110b;
+    -fx-text-fill: #1a1208;
     -fx-font-size: 10px;
     -fx-font-weight: bold;
     -fx-text-alignment: center;
 }
 
 .card-detail {
-    -fx-text-fill: #4b4030;
+    -fx-text-fill: #6b5e40;
     -fx-font-size: 8px;
     -fx-text-alignment: center;
 }
@@ -959,6 +920,7 @@
     -fx-font-size: 6px;
 }
 
+/* ── Card backs (opponent hand) ────────────────────────────────────────── */
 .card-back {
     -fx-min-width: 21;
     -fx-pref-width: 21;
@@ -966,16 +928,16 @@
     -fx-min-height: 30;
     -fx-pref-height: 30;
     -fx-max-height: 30;
-    -fx-background-color: linear-gradient(to bottom, #b5262e, #6c1118);
+    -fx-background-color: linear-gradient(to bottom, #7e1f24, #4a1016);
     -fx-background-radius: 4;
-    -fx-border-color: #d9b34c;
+    -fx-border-color: #c8a84e;
     -fx-border-radius: 4;
     -fx-border-width: 1;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.24), 4, 0.2, 0, 1);
 }
 
 .opponent-hand-count {
-    -fx-text-fill: -color-fg-muted;
+    -fx-text-fill: #b8b098;
     -fx-font-size: 11px;
     -fx-font-weight: bold;
     -fx-padding: 0 0 0 4;
@@ -1031,12 +993,9 @@
     -fx-text-fill: #17110b;
 }
 
-/*
- * Redesigned gameplay screen: aligned with the Menu/Lobby visual language while
- * keeping the game table dense enough for active play.
- */
+/* ── Game screen — green felt tabletop ─────────────────────────────────── */
 .game-screen-root {
-    -fx-background-color: radial-gradient(center 50% 40%, radius 72%, #1a2e1a 0%, #0d1117 100%);
+    -fx-background-color: radial-gradient(center 50% 40%, radius 72%, #1a5c38 0%, #0e3b24 100%);
 }
 
 .game-shell {
@@ -1052,17 +1011,17 @@
 .game-logo-title {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
-    -fx-effect: dropshadow(gaussian, rgba(212, 160, 23, 0.36), 24, 0, 0, 3);
+    -fx-effect: dropshadow(gaussian, rgba(200, 168, 78, 0.36), 24, 0, 0, 3);
     -fx-font-family: "Georgia";
     -fx-font-size: 36px;
     -fx-font-weight: bold;
     -fx-padding: 0;
-    -fx-text-fill: #d4a017;
+    -fx-text-fill: #c8a84e;
 }
 
 .game-logo-subtitle {
     -fx-font-size: 12px;
-    -fx-text-fill: rgba(255, 255, 255, 0.36);
+    -fx-text-fill: rgba(250, 250, 242, 0.36);
 }
 
 .game-status-strip,
@@ -1070,9 +1029,9 @@
 .game-main-table,
 .game-action-rail,
 .game-hand-panel {
-    -fx-background-color: linear-gradient(from 0% 0% to 100% 100%, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.024) 100%);
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 100%, rgba(10, 42, 25, 0.58) 0%, rgba(10, 42, 25, 0.38) 100%);
     -fx-background-radius: 4;
-    -fx-border-color: rgba(212, 160, 23, 0.24);
+    -fx-border-color: rgba(200, 168, 78, 0.28);
     -fx-border-radius: 4;
     -fx-border-width: 1;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.48), 34, 0, 0, 12);
@@ -1083,9 +1042,9 @@
 }
 
 .game-stat-chip {
-    -fx-background-color: rgba(13, 17, 23, 0.42);
+    -fx-background-color: rgba(10, 42, 25, 0.56);
     -fx-background-radius: 4;
-    -fx-border-color: rgba(255, 255, 255, 0.08);
+    -fx-border-color: rgba(200, 168, 78, 0.14);
     -fx-border-radius: 4;
     -fx-border-width: 1;
     -fx-padding: 6 8 6 8;
@@ -1094,15 +1053,15 @@
 .game-stat-label {
     -fx-font-size: 10px;
     -fx-font-weight: bold;
-    -fx-text-fill: rgba(212, 160, 23, 0.78);
+    -fx-text-fill: rgba(200, 168, 78, 0.82);
 }
 
 .game-stat-value {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
     -fx-padding: 0;
-    -fx-text-fill: rgba(255, 255, 255, 0.86);
-    -fx-prompt-text-fill: rgba(255, 255, 255, 0.30);
+    -fx-text-fill: rgba(250, 250, 242, 0.88);
+    -fx-prompt-text-fill: rgba(250, 250, 242, 0.32);
     -fx-font-size: 12px;
     -fx-font-weight: bold;
 }
@@ -1110,33 +1069,37 @@
 .game-stat-readout {
     -fx-font-size: 12px;
     -fx-font-weight: bold;
-    -fx-text-fill: rgba(255, 255, 255, 0.86);
+    -fx-text-fill: rgba(250, 250, 242, 0.88);
 }
 
 .game-section-title {
     -fx-font-size: 14px;
     -fx-font-weight: bold;
-    -fx-text-fill: #d4a017;
+    -fx-text-fill: #c8a84e;
 }
 
 .game-helper-text,
 .game-selected-card-summary {
     -fx-font-size: 11px;
-    -fx-text-fill: rgba(255, 255, 255, 0.38);
+    -fx-text-fill: rgba(250, 250, 242, 0.40);
 }
 
 .game-selected-card-summary {
-    -fx-background-color: rgba(13, 17, 23, 0.34);
+    -fx-background-color: rgba(10, 42, 25, 0.48);
     -fx-background-radius: 4;
-    -fx-border-color: rgba(255, 255, 255, 0.07);
+    -fx-border-color: rgba(200, 168, 78, 0.14);
     -fx-border-radius: 4;
     -fx-border-width: 1;
     -fx-padding: 5 8 5 8;
 }
 
-.game-opponents-band,
+.game-opponents-band {
+    -fx-padding: 10;
+}
+
 .game-main-table {
     -fx-padding: 10;
+    -fx-min-height: 440;
 }
 
 .game-opponent-scroll,
@@ -1144,7 +1107,9 @@
 .game-action-scroll,
 .game-action-scroll > .viewport,
 .game-property-scroll,
-.game-property-scroll > .viewport {
+.game-property-scroll > .viewport,
+.game-table-scroll,
+.game-table-scroll > .viewport {
     -fx-background-color: transparent;
 }
 
@@ -1154,7 +1119,7 @@
 
 .game-action-rail .separator .line,
 .game-main-table .separator .line {
-    -fx-border-color: transparent transparent rgba(212, 160, 23, 0.20) transparent;
+    -fx-border-color: transparent transparent rgba(200, 168, 78, 0.22) transparent;
     -fx-border-width: 0 0 1 0;
 }
 
@@ -1169,12 +1134,12 @@
 }
 
 .game-input {
-    -fx-background-color: rgba(13, 17, 23, 0.56);
-    -fx-border-color: rgba(255, 255, 255, 0.12);
+    -fx-background-color: rgba(10, 42, 25, 0.62);
+    -fx-border-color: rgba(200, 168, 78, 0.22);
     -fx-border-radius: 3;
     -fx-background-radius: 3;
-    -fx-text-fill: rgba(255, 255, 255, 0.84);
-    -fx-prompt-text-fill: rgba(255, 255, 255, 0.30);
+    -fx-text-fill: rgba(250, 250, 242, 0.86);
+    -fx-prompt-text-fill: rgba(250, 250, 242, 0.32);
 }
 
 .game-feedback-area,
@@ -1186,25 +1151,17 @@
 
 .game-zone-panel,
 .game-property-slot {
-    -fx-background-color: rgba(13, 17, 23, 0.40);
+    -fx-background-color: rgba(10, 42, 25, 0.50);
     -fx-background-radius: 4;
-    -fx-border-color: rgba(255, 255, 255, 0.09);
+    -fx-border-color: rgba(200, 168, 78, 0.16);
     -fx-border-radius: 4;
     -fx-border-width: 1;
     -fx-padding: 7;
 }
 
-.game-pile-panel {
-    -fx-border-color: rgba(212, 160, 23, 0.22);
-}
-
-.game-draw-pile-card {
-    -fx-background-radius: 6;
-    -fx-border-radius: 6;
-}
 
 .game-drop-zone {
-    -fx-background-color: rgba(255, 255, 255, 0.040);
+    -fx-background-color: rgba(250, 250, 242, 0.035);
     -fx-background-radius: 4;
     -fx-border-radius: 4;
     -fx-padding: 6;
@@ -1227,24 +1184,16 @@
 
 .game-hand-panel {
     -fx-background-color:
-        linear-gradient(from 0% 0% to 0% 100%, rgba(212, 160, 23, 0.085) 0%, transparent 12%),
-        linear-gradient(from 0% 0% to 100% 100%, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.020) 100%);
-    -fx-border-color: rgba(212, 160, 23, 0.36);
+        linear-gradient(from 0% 0% to 0% 100%, rgba(200, 168, 78, 0.09) 0%, transparent 12%),
+        linear-gradient(from 0% 0% to 100% 100%, rgba(10, 42, 25, 0.52) 0%, rgba(10, 42, 25, 0.34) 100%);
+    -fx-border-color: rgba(200, 168, 78, 0.40);
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.58), 36, 0, 0, 12);
 }
 
-.game-hand-fan-pane {
-    -fx-background-color: rgba(13, 17, 23, 0.48);
-    -fx-background-radius: 4;
-    -fx-border-color: rgba(212, 160, 23, 0.28);
-    -fx-border-radius: 4;
-    -fx-border-width: 1;
-}
-
 .game-screen-root .opponent-seat {
-    -fx-background-color: rgba(13, 17, 23, 0.48);
+    -fx-background-color: rgba(10, 42, 25, 0.56);
     -fx-background-radius: 4;
-    -fx-border-color: rgba(212, 160, 23, 0.18);
+    -fx-border-color: rgba(200, 168, 78, 0.24);
     -fx-border-radius: 4;
     -fx-border-width: 1;
     -fx-effect: none;
@@ -1254,7 +1203,7 @@
 .game-screen-root .opponent-seat .zone-heading {
     -fx-background-color: transparent;
     -fx-padding: 0;
-    -fx-text-fill: rgba(255, 255, 255, 0.86);
+    -fx-text-fill: rgba(250, 250, 242, 0.88);
 }
 
 .game-screen-root .opponent-hand-backs {
@@ -1272,9 +1221,9 @@
 }
 
 .property-row-chip {
-    -fx-background-color: rgba(255, 255, 255, 0.045);
+    -fx-background-color: rgba(250, 250, 242, 0.040);
     -fx-background-radius: 3;
-    -fx-border-color: rgba(255, 255, 255, 0.10);
+    -fx-border-color: rgba(200, 168, 78, 0.16);
     -fx-border-radius: 3;
     -fx-border-width: 1;
     -fx-padding: 4;
@@ -1285,16 +1234,36 @@
 }
 
 .opponent-public-chip {
-    -fx-background-color: rgba(255, 255, 255, 0.060);
+    -fx-background-color: rgba(250, 250, 242, 0.055);
     -fx-background-radius: 3;
-    -fx-border-color: rgba(255, 255, 255, 0.10);
+    -fx-border-color: rgba(200, 168, 78, 0.16);
     -fx-border-radius: 3;
     -fx-border-width: 1;
     -fx-font-size: 10px;
     -fx-padding: 3 5 3 5;
-    -fx-text-fill: rgba(255, 255, 255, 0.68);
+    -fx-text-fill: rgba(250, 250, 242, 0.70);
 }
 
 .game-screen-root .zone-caption {
-    -fx-text-fill: rgba(255, 255, 255, 0.48);
+    -fx-text-fill: rgba(250, 250, 242, 0.50);
+}
+
+/* ── Outer scroll wrapper for game screen ───────────────────────────────── */
+.game-outer-scroll,
+.game-outer-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+/* ── Hand scroll pane ──────────────────────────────────────────────────── */
+.hand-scroll-pane,
+.hand-scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+.hand-cards-box {
+    -fx-background-color: rgba(10, 42, 25, 0.56);
+    -fx-background-radius: 4;
+    -fx-border-color: rgba(200, 168, 78, 0.30);
+    -fx-border-radius: 4;
+    -fx-border-width: 1;
 }
