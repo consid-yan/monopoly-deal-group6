@@ -19,14 +19,21 @@ public class GameThread extends Thread {
 
     @Override
     public void run() {
+        System.out.println("[Client] Message reader thread started, waiting for server messages...");
         try {
             while (client.isConnected()) {
-                client.handleMessage(input.readObject());
+                Object message = input.readObject();
+                System.out.println("[Client] Received message from server: " + message.getClass().getSimpleName());
+                client.handleMessage(message);
             }
         } catch (EOFException | SocketException ignored) {
+            System.out.println("[Client] Connection closed by server");
             client.handleDisconnect(null);
         } catch (IOException | ClassNotFoundException e) {
+            System.err.println("[Client] ❌ Failed to read message from server");
             client.handleDisconnect(e);
+        } finally {
+            System.out.println("[Client] Message reader thread exited");
         }
     }
 }

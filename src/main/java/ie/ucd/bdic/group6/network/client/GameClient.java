@@ -31,16 +31,46 @@ public class GameClient implements AutoCloseable {
     private ObjectOutputStream output;
 
     public synchronized void connect(String host, int port) throws IOException {
+        System.out.println("[Client] Connecting to server: " + host + ":" + port);
+
         if (connected.get()) {
+            System.out.println("[Client] ⚠️  Client already connected, skip duplicate connection");
             return;
         }
-        socket = new Socket(Objects.requireNonNull(host, "host"), port);
-        output = new ObjectOutputStream(socket.getOutputStream());
-        output.flush();
-        var input = new ObjectInputStream(socket.getInputStream());
-        connected.set(true);
-        var gameThread = new GameThread(input, this);
-        gameThread.start();
+
+        try {
+            socket = new Socket(Objects.requireNonNull(host, "host"), port);
+            System.out.println("[Client] ✅ TCP connection established successfully");
+
+            output = new ObjectOutputStream(socket.getOutputStream());
+            output.flush();
+            System.out.println("[Client] ✅ Output stream initialized");
+
+            var input = new ObjectInputStream(socket.getInputStream());
+            System.out.println("[Client] ✅ Input stream initialized");
+
+            connected.set(true);
+            var gameThread = new GameThread(input, this);
+            gameThread.start();
+            System.out.println("[Client] ✅ Message reading thread started");
+
+        } catch (IOException e) {
+            System.err.println("[Client] ❌ Failed to connect to server");
+            System.err.println("   Target address: " + host + ":" + port);
+            System.err.println("   Error type: " + e.getClass().getSimpleName());
+            System.err.println("   Error message: " + e.getMessage());
+
+            if (e.getMessage().contains("Connection refused")) {
+                System.err.println("   🔍 Troubleshoot: Server not started, wrong port, inbound connection blocked by firewall");
+            } else if (e.getMessage().contains("Connection timed out")) {
+                System.err.println("   🔍 Troubleshoot: Network unreachable, incorrect IP, outbound connection blocked by firewall");
+            } else if (e.getMessage().contains("No route to host")) {
+                System.err.println("   🔍 Troubleshoot: Server offline, not in same LAN, invalid IP address");
+            }
+
+            closeSocket();
+            throw e;
+        }
     }
 
     public boolean isConnected() {
@@ -49,21 +79,29 @@ public class GameClient implements AutoCloseable {
 
     public CompletableFuture<ServerResult> sendCommand(CommandType commandType, Map<String, Object> payload) {
         Objects.requireNonNull(commandType, "commandType");
+        System.out.println("[Client] Sending command: " + commandType);
+
         if (!connected.get()) {
             CompletableFuture<ServerResult> failed = new CompletableFuture<>();
             failed.completeExceptionally(new IllegalStateException("Client is not connected"));
+            System.err.println("[Client] ❌ Failed to send command: Client is offline");
             return failed;
         }
 
         String requestId = UUID.randomUUID().toString();
         CompletableFuture<ServerResult> future = new CompletableFuture<>();
         pendingResults.put(requestId, future);
+
         try {
             send(new ClientCommand(requestId, commandType, payload));
+            System.out.println("[Client] ✅ Command sent successfully, Request ID: " + requestId);
         } catch (IOException e) {
             pendingResults.remove(requestId);
             future.completeExceptionally(e);
+            System.err.println("[Client] ❌ Command send failed: " + e.getMessage());
+            e.printStackTrace();
         }
+
         return future;
     }
 
@@ -118,12 +156,28 @@ public class GameClient implements AutoCloseable {
         if (!connected.getAndSet(false)) {
             return;
         }
+
+        System.out.println("\n[Client] ⚠️  Disconnected from server");
+        if (cause != null) {
+            System.err.println("[Client] ❌ Disconnect reason: " + cause.getClass().getSimpleName() + " - " + cause.getMessage());
+            cause.printStackTrace();
+
+            if (cause instanceof ClassNotFoundException) {
+                System.err.println("   🔍 Troubleshoot: Version mismatch between client and server, incompatible serialized class");
+            } else if (cause instanceof java.io.InvalidClassException) {
+                System.err.println("   🔍 Troubleshoot: SerialVersionUID mismatch or modified class structure");
+            }
+        } else {
+            System.out.println("[Client] ℹ️  Normal connection closure");
+        }
+
         CancellationException cancellation = new CancellationException("Client disconnected");
         if (cause != null) {
             cancellation.initCause(cause);
         }
         pendingResults.forEach((_, future) -> future.completeExceptionally(cancellation));
         pendingResults.clear();
+
         if (cause != null) {
             ServerNotice notice = new ServerNotice("CONNECTION_CLOSED", cause.getMessage(), Map.of());
             noticeListeners.forEach(listener -> listener.accept(notice));
