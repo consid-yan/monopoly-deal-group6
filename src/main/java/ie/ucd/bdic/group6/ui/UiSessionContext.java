@@ -109,33 +109,101 @@ public final class UiSessionContext implements AutoCloseable {
     public CompletableFuture<ServerResult> createHostedSession(String requestedPlayerName, int maxPlayers) {
         String newPlayerName = requireText(requestedPlayerName, "player name");
         String newPlayerId = generatePlayerId(newPlayerName);
+
+        System.out.println("\n[1/5] Starting creation of hosted game session, player name: " + newPlayerName + ", player ID: " + newPlayerId);
+
         return CompletableFuture.supplyAsync(() -> {
             GameServer server = null;
             try {
+                System.out.println("[2/5] Resetting network state...");
                 resetNetwork();
-                server = appConfig.gameServer(0);
+                System.out.println("✅ Network state reset completed");
+
+                System.out.println("[3/5] Starting game server, attempting to bind port 8888...");
+                server = appConfig.gameServer(8888);
                 server.startAsync();
-                GameClient newClient = openClient("127.0.0.1", server.port());
+
+                int actualPort = server.port();
+                String serverBindAddress = "0.0.0.0";
+                System.out.println("✅ Server started successfully!");
+                System.out.println("   Bind address: " + serverBindAddress + " (0.0.0.0 listens on all network adapters)");
+                System.out.println("   Actual listening port: " + actualPort);
+
                 String shareableHost = resolveShareableHost();
+                System.out.println("✅ Resolved local LAN IP: " + shareableHost);
+                System.out.println("\n📢 Connection address for other players: " + shareableHost + ":" + actualPort);
+                System.out.println("📢 Local connection address: 127.0.0.1:" + actualPort + "\n");
+
+                System.out.println("[4/5] Creating local client and connecting to server...");
+                GameClient newClient = openClient("127.0.0.1", actualPort);
+                System.out.println("✅ Local client connected to server successfully");
+
+                // Assign shared variables
                 hostedServer = server;
                 client = newClient;
                 host = shareableHost;
-                port = server.port();
+                port = actualPort;
                 playerId = newPlayerId;
                 playerName = newPlayerName;
                 connected = true;
+                System.out.println("✅ Local session status initialized");
+
                 return null;
-            } catch (IOException | RuntimeException e) {
+            } catch (IOException e) {
+                System.err.println("\n❌ Failed to start server: IO Exception");
+                System.err.println("   Error message: " + e.getMessage());
+                System.err.println("   Possible reasons: port 8888 occupied, insufficient permissions, firewall block");
+                e.printStackTrace();
+
                 if (server != null) {
-                    server.stop();
+                    try {
+                        server.stop();
+                        System.out.println("✅ Attempted to shut down leftover server process");
+                    } catch (Exception ex) {
+                        System.err.println("⚠️  Failed to close leftover server: " + ex.getMessage());
+                    }
                 }
-                throw new CompletionException(e);
+                throw new CompletionException("Failed to start server: " + e.getMessage(), e);
+            } catch (RuntimeException e) {
+                System.err.println("\n❌ Failed to start server: Runtime Exception");
+                System.err.println("   Error message: " + e.getMessage());
+                e.printStackTrace();
+
+                if (server != null) {
+                    try {
+                        server.stop();
+                    } catch (Exception ex) {
+                        // ignore
+                    }
+                }
+                throw new CompletionException("Failed to start server: " + e.getMessage(), e);
             }
-        }).thenCompose(ignored -> sendCommand(CommandType.CREATE_SESSION, Map.of(
-                "hostPlayerId", newPlayerId,
-                "playerName", newPlayerName,
-                "maxPlayers", maxPlayers
-        )));
+        }).thenCompose(ignored -> {
+            System.out.println("[5/5] Sending create session command to server...");
+            return sendCommand(CommandType.CREATE_SESSION, Map.of(
+                    "hostPlayerId", newPlayerId,
+                    "playerName", newPlayerName,
+                    "maxPlayers", maxPlayers
+            )).whenComplete((result, throwable) -> {
+                if (throwable != null) {
+                    System.err.println("\n❌ Failed to create game session");
+                    System.err.println("   Error message: " + throwable.getMessage());
+                    System.err.println("   Possible reasons: no server response, serialization failure, invalid command format");
+                    throwable.printStackTrace();
+                } else {
+                    if (result.success()) {
+                        System.out.println("\n✅ Game session created successfully!");
+                        System.out.println("   Session ID: " + result.data().get("sessionId"));
+                        System.out.println("   Session Code: " + result.data().get("sessionCode"));
+                        System.out.println("🎉 Ready to invite other players to join!\n");
+                    } else {
+                        System.err.println("\n❌ Server rejected session creation");
+                        System.err.println("   Error Code: " + result.code());
+                        System.err.println("   Error Message: " + result.message());
+                    }
+                }
+            });
+        });
     }
 
     public CompletableFuture<ServerResult> joinSession(
@@ -330,40 +398,47 @@ public final class UiSessionContext implements AutoCloseable {
         }
     }
 
+    /**
+     * Correctly get local LAN IPv4 address (exclude loopback, virtual adapters, VPN adapters)
+     * Fix issue returning 127.0.0.1 which blocks cross-device connection
+     */
     private String resolveShareableHost() {
-        String fallback = null;
         try {
             Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-            while (interfaces != null && interfaces.hasMoreElements()) {
-                NetworkInterface networkInterface = interfaces.nextElement();
-                if (!isUsableNetworkInterface(networkInterface)) {
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface ni = interfaces.nextElement();
+
+                // Skip loopback, virtual and disabled network interfaces
+                if (ni.isLoopback() || ni.isVirtual() || !ni.isUp()) {
                     continue;
                 }
-                Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+
+                // Skip common virtual adapters: Docker, VMware, VirtualBox, WSL
+                String interfaceName = ni.getName().toLowerCase();
+                if (interfaceName.contains("docker")
+                        || interfaceName.contains("vmnet")
+                        || interfaceName.contains("vbox")
+                        || interfaceName.contains("wsl")) {
+                    continue;
+                }
+
+                Enumeration<InetAddress> addresses = ni.getInetAddresses();
                 while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    if (isShareableIpv4(address)) {
-                        if (address.isSiteLocalAddress()) {
-                            return address.getHostAddress();
-                        }
-                        if (fallback == null) {
-                            fallback = address.getHostAddress();
-                        }
+                    InetAddress addr = addresses.nextElement();
+
+                    // Only pick valid IPv4, skip IPv6 and loopback
+                    if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
+                        return addr.getHostAddress();
                     }
                 }
             }
 
-            InetAddress localHost = InetAddress.getLocalHost();
-            if (isShareableIpv4(localHost)) {
-                return localHost.getHostAddress();
-            }
-        } catch (IOException ignored) {
-            // Fall back to loopback for single-machine play.
+            // Fallback to loopback if no valid LAN IP found (local-only access)
+            System.err.println("⚠️  No valid LAN IP found, local connection only");
+            return "127.0.0.1";
+        } catch (SocketException e) {
+            throw new RuntimeException("Failed to resolve local host IP", e);
         }
-        if (fallback != null) {
-            return fallback;
-        }
-        return "127.0.0.1";
     }
 
     private boolean isUsableNetworkInterface(NetworkInterface networkInterface) {
