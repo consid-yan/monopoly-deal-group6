@@ -12,15 +12,13 @@
 <?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<StackPane prefHeight="760.0" prefWidth="1180.0"
-           styleClass="game-screen-root"
+<StackPane styleClass="game-screen-root"
            xmlns="http://javafx.com/javafx/25.0.2"
            xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="ie.ucd.bdic.group6.ui.GameUI">
@@ -36,7 +34,7 @@
         </StackPane.margin>
     </Label>
 
-    <BorderPane maxHeight="744.0" maxWidth="1168.0" styleClass="game-shell" StackPane.alignment="CENTER">
+    <BorderPane styleClass="game-shell" StackPane.alignment="CENTER">
         <top>
             <VBox spacing="10.0" styleClass="game-header" BorderPane.alignment="CENTER">
                 <padding>
@@ -113,7 +111,7 @@
                         <Label styleClass="game-section-title" text="Opponents"/>
                         <Label styleClass="game-helper-text" text="Public cards and hand counts only"/>
                     </HBox>
-                    <ScrollPane fitToHeight="true" hbarPolicy="AS_NEEDED" prefHeight="118.0" styleClass="game-opponent-scroll" vbarPolicy="NEVER">
+                    <ScrollPane fitToWidth="true" hbarPolicy="AS_NEEDED" minHeight="100.0" prefHeight="130.0" styleClass="game-opponent-scroll" vbarPolicy="NEVER">
                         <content>
                             <HBox fx:id="opponentsRow" alignment="CENTER_LEFT" minHeight="100.0" spacing="10.0" styleClass="opponents-row"/>
                         </content>
@@ -126,13 +124,13 @@
                         <Label styleClass="game-helper-text" text="Build 3 complete property sets to win"/>
                     </HBox>
 
+                    <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="game-table-scroll" VBox.vgrow="ALWAYS">
+                        <VBox spacing="10.0" styleClass="game-table-content">
+                            <padding>
+                                <Insets bottom="2.0" left="2.0" right="2.0" top="2.0"/>
+                            </padding>
+
                     <HBox alignment="CENTER" spacing="10.0" styleClass="game-board-row">
-                        <VBox alignment="CENTER" prefWidth="118.0" spacing="6.0" styleClass="game-zone-panel game-pile-panel">
-                            <Label styleClass="zone-heading" text="Draw Pile"/>
-                            <StackPane prefHeight="96.0" prefWidth="72.0" styleClass="draw-pile-card game-draw-pile-card">
-                                <Label fx:id="drawPileLabel"/>
-                            </StackPane>
-                        </VBox>
                         <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="game-zone-panel">
                             <Label styleClass="zone-heading" text="Your Bank"/>
                             <FlowPane fx:id="bankZone" hgap="7.0" prefHeight="100.0" styleClass="drop-zone symbolic-drop-zone bank-drop-zone game-drop-zone" vgap="7.0"/>
@@ -216,6 +214,8 @@
                                 <FlowPane fx:id="utilityPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
                             </VBox>
                         </GridPane>
+                    </ScrollPane>
+                        </VBox>
                     </ScrollPane>
                 </VBox>
             </VBox>
@@ -319,7 +319,13 @@
                     <Label styleClass="game-section-title" text="Your Hand"/>
                     <Label fx:id="selectedCardSummaryLabel" maxWidth="720.0" styleClass="game-selected-card-summary" text="Select a card to see available actions." wrapText="true" HBox.hgrow="ALWAYS"/>
                 </HBox>
-                <Pane fx:id="handPane" minHeight="148.0" prefHeight="154.0" styleClass="hand-fan-pane game-hand-fan-pane"/>
+                <ScrollPane fx:id="handScrollPane" fitToHeight="true" hbarPolicy="AS_NEEDED" minHeight="150.0" prefHeight="170.0" styleClass="hand-scroll-pane" vbarPolicy="NEVER">
+                    <HBox fx:id="handCardsHBox" alignment="CENTER_LEFT" minHeight="130.0" spacing="8.0" styleClass="hand-cards-box">
+                        <padding>
+                            <Insets bottom="4.0" left="4.0" right="4.0" top="4.0"/>
+                        </padding>
+                    </HBox>
+                </ScrollPane>
             </VBox>
         </bottom>
     </BorderPane>

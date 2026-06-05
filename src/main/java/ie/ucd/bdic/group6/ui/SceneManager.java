@@ -10,13 +10,15 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
 public final class SceneManager {
 
-    private static final double DEFAULT_WIDTH = 1120;
-    private static final double DEFAULT_HEIGHT = 720;
+    private static final double DEFAULT_WIDTH = 1280;
+    private static final double DEFAULT_HEIGHT = 900;
     private static final String MENU_FXML = "menu.fxml";
     private static final String LOBBY_FXML = "lobby.fxml";
     private static final String GAME_FXML = "game.fxml";
@@ -39,8 +41,8 @@ public final class SceneManager {
         stage.setTitle("Monopoly Deal");
         stage.getIcons().setAll(new Image(Objects.requireNonNull(SceneManager.class.getResource(APP_ICON))
                 .toExternalForm()));
-        stage.setMinWidth(1024);
-        stage.setMinHeight(680);
+        stage.setMinWidth(1100);
+        stage.setMinHeight(750);
         showMenu();
     }
 
@@ -106,13 +108,29 @@ public final class SceneManager {
             FXMLLoader loader = new FXMLLoader(SceneManager.class.getResource("/fxml/" + fxmlName));
             loader.setControllerFactory(SceneManager::createController);
             Parent root = loader.load();
+
+            // Wrap game screen in an outer ScrollPane so the entire content
+            // scrolls as one unit when the window is too small.
+            if (GAME_FXML.equals(fxmlName)) {
+                ScrollPane outerScroll = new ScrollPane(root);
+                outerScroll.setFitToWidth(true);
+                outerScroll.setFitToHeight(true);
+                outerScroll.setPannable(true);
+                outerScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+                outerScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+                outerScroll.getStyleClass().add("game-outer-scroll");
+                root = outerScroll;
+            }
+
             Scene scene = stage.getScene();
             if (scene == null) {
                 scene = new Scene(root, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+                scene.setFill(Color.web("#0e3b24"));
                 scene.getStylesheets().setAll(UiTheme.appStylesheet());
                 stage.setScene(scene);
             } else {
                 scene.setRoot(root);
+                scene.setFill(Color.web("#0e3b24"));
                 if (!scene.getStylesheets().contains(UiTheme.appStylesheet())) {
                     scene.getStylesheets().setAll(UiTheme.appStylesheet());
                 }
