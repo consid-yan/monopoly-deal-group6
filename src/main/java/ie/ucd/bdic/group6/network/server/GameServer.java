@@ -117,8 +117,15 @@ public class GameServer implements AutoCloseable {
     }
 
     private void handleCommand(ClientConnection connection, ClientCommand command) {
+        String clientIp = connection.socket.getInetAddress().getHostAddress();
+
         ServerResult authFailure = authenticate(command);
         if (authFailure != null) {
+            System.err.println("[SERVER] ❌ Client[" + clientIp + "] authentication failed");
+            System.err.println("   Error Code：" + authFailure.code());
+            System.err.println("   Message：" + authFailure.message());
+            System.err.println("   🔍 Troubleshoot: Player token expired, session missing or illegal request");
+
             connection.send(authFailure);
             return;
         }
@@ -227,7 +234,16 @@ public class GameServer implements AutoCloseable {
             ControllerRequest request = new ControllerRequest(command.payload());
             return switch (command.commandType()) {
                 case CREATE_SESSION -> gameController.createSession(request);
-                case JOIN_SESSION -> gameController.joinSession(request);
+                case JOIN_SESSION -> {
+                    GameResult result = gameController.joinSession(request);
+                    if (!result.isSuccess()) {
+                        System.err.println("[SERVER] ❌ Failed to join game session");
+                        System.err.println("   Error Code：" + result.getCode());
+                        System.err.println("   Message：" + result.getMessage());
+                        System.err.println("   🔍 Troubleshoot: Wrong session code, full room or game already started");
+                    }
+                    yield result;
+                }
                 case START_GAME -> gameController.startGame(request);
                 case PLAY_CARD -> gameController.playCard(request);
                 case PAY_DEBT -> gameController.payDebt(request);
@@ -354,22 +370,55 @@ public class GameServer implements AutoCloseable {
 
         @Override
         public void run() {
+            String clientIp = socket.getInetAddress().getHostAddress();
+            int clientPort = socket.getPort();
+            System.out.println("\n[SERVER] 📡 New client incoming: " + clientIp + ":" + clientPort);
+
             try {
                 while (running.get() && open.get()) {
                     Object message = input.readObject();
                     if (message instanceof ClientCommand command) {
+                        System.out.println("[SERVER] ✅ Received command from [" + clientIp + "]: " + command.commandType());
+
+                        // Log JOIN_SESSION action for room entry tracking
+                        if (command.commandType() == CommandType.JOIN_SESSION) {
+                            System.out.println("[SERVER] ℹ️  Client[" + clientIp + "] is attempting to join game session");
+                        }
+
                         handleCommand(this, command);
                     } else {
+                        System.err.println("[SERVER] ❌ Client[" + clientIp + "] sent invalid message type: " + message.getClass().getName());
                         send(new ServerNotice("INVALID_MESSAGE",
                                 "Server expected a ClientCommand", Map.of()));
                     }
                 }
-            } catch (EOFException | SocketException ignored) {
-                // Normal client disconnect.
-            } catch (IOException | ClassNotFoundException e) {
+            } catch (EOFException e) {
+                System.out.println("[SERVER] ℹ️  Client[" + clientIp + "] disconnected normally");
+            } catch (SocketException e) {
+                if (e.getMessage().contains("Connection reset")) {
+                    System.err.println("[SERVER] ❌ Client[" + clientIp + "] abnormal disconnect: connection reset by peer");
+                    System.err.println("   🔍 Possible reason: Client forced shutdown, network drop or firewall cut connection");
+                } else {
+                    System.out.println("[SERVER] ℹ️  Client[" + clientIp + "] disconnected");
+                }
+            } catch (IOException e) {
+                System.err.println("[SERVER] ❌ Communication error with client[" + clientIp + "]");
+                System.err.println("   Exception Type：" + e.getClass().getSimpleName());
+                System.err.println("   Message：" + e.getMessage());
+
+                if (e.getMessage().contains("invalid type code") || e instanceof java.io.StreamCorruptedException) {
+                    System.err.println("   🔍 Troubleshoot: Version mismatch between client and server or incompatible serialization");
+                }
+
+                e.printStackTrace();
                 if (open.get()) {
                     send(new ServerNotice("CONNECTION_ERROR", e.getMessage(), Map.of()));
                 }
+            } catch (ClassNotFoundException e) {
+                System.err.println("[SERVER] ❌ Unrecognized object received from client[" + clientIp + "]");
+                System.err.println("   Message：" + e.getMessage());
+                System.err.println("   🔍 Troubleshoot: Client/server version inconsistency or missing serialized class");
+                e.printStackTrace();
             } finally {
                 String closedSessionId = sessionId;
                 String closedPlayerId = playerId;
@@ -377,12 +426,16 @@ public class GameServer implements AutoCloseable {
                         && !replaced
                         && closedSessionId != null
                         && closedPlayerId != null;
+
                 close();
                 clients.remove(this);
+
                 if (shouldMarkDisconnected && hasBoundConnection(closedSessionId, closedPlayerId)) {
                     shouldMarkDisconnected = false;
                 }
+
                 if (shouldMarkDisconnected) {
+                    System.out.println("[SERVER] ℹ️  Player[" + closedPlayerId + "] left session[" + closedSessionId + "]");
                     GameResult result = gameController.playerDisconnected(new ControllerRequest(Map.of(
                             "sessionId", closedSessionId,
                             "playerId", closedPlayerId
@@ -391,6 +444,8 @@ public class GameServer implements AutoCloseable {
                         broadcastSessionState(closedSessionId);
                     }
                 }
+
+                System.out.println("[SERVER] ✅ Connection cleanup finished for [" + clientIp + "]\n");
             }
         }
 
