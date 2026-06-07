@@ -128,7 +128,7 @@ public class GameEngine implements ActionExecutor {
         requireNotDefeated(session, playerId);
         Card card = requireCardInHand(player, cardId);
         int actionCost = actionCost(command, card);
-        requireActionsAvailable(turnManager, actionCost);
+        actionRule.requireActionsAvailable(turnManager, actionCost);
         PlayMode playMode = resolvePlayMode(command, card);
         switch (playMode) {
             case BANK -> playBankCard(player, card);
@@ -360,15 +360,6 @@ public class GameEngine implements ActionExecutor {
             return 2;
         }
         return 1;
-    }
-
-    private void requireActionsAvailable(TurnManager turnManager, int requiredActions) {
-        if (turnManager.actionsRemaining() < requiredActions) {
-            throw new InvalidGameStateException(
-                    "ACTION_LIMIT_REACHED",
-                    "This play requires " + requiredActions + " action(s) but only "
-                            + turnManager.actionsRemaining() + " remain");
-        }
     }
 
     private boolean isRentAction(ActionType actionType) {
@@ -943,6 +934,7 @@ public class GameEngine implements ActionExecutor {
             throw new InvalidCommandException("INVALID_PLAY_MODE", "Only action cards can be played as actions");
         }
 
+        actionRule.validatePlayableAsAction(actionCard.actionType());
         switch (actionCard.actionType()) {
             case PASS_GO -> {
                 discardActionFromHand(player, actionCard, activeGame);
@@ -960,12 +952,8 @@ public class GameEngine implements ActionExecutor {
             case SLY_DEAL -> executeSlyDeal(command, session, player, actionCard, activeGame);
             case FORCED_DEAL -> executeForcedDeal(command, session, player, actionCard, activeGame);
             case DEAL_BREAKER -> executeDealBreaker(command, session, player, actionCard, activeGame);
-            case JUST_SAY_NO -> throw new GameException(
-                    "JUST_SAY_NO_RESPONSE_ONLY",
-                    "Just Say No can only be played through respond action");
-            case DOUBLE_THE_RENT -> throw new GameException(
-                    "UNSUPPORTED_ACTION",
-                    "Double The Rent must be paired with a rent card");
+            case JUST_SAY_NO, DOUBLE_THE_RENT ->
+                    throw new IllegalStateException("validatePlayableAsAction should have rejected " + actionCard.actionType());
         }
     }
 
@@ -976,9 +964,7 @@ public class GameEngine implements ActionExecutor {
             ActionCard actionCard,
             ActiveGameState activeGame) {
         String targetPlayerId = requireText(command.getTargetPlayerId(), "targetPlayerId");
-        if (player.id().equals(targetPlayerId)) {
-            throw new GameException("INVALID_TARGET_PLAYER", "Debt Collector cannot target yourself");
-        }
+        actionRule.validateDebtCollector(player, targetPlayerId);
         requirePlayer(session, targetPlayerId);
         requireNotDefeated(session, targetPlayerId);
         discardActionFromHand(player, actionCard, activeGame);
@@ -1001,9 +987,7 @@ public class GameEngine implements ActionExecutor {
                 .filter(playerId -> !session.isDefeated(playerId))
                 .toList();
         debtorIds.forEach(playerId -> requirePlayer(session, playerId));
-        if (debtorIds.isEmpty()) {
-            throw new GameException("NO_TARGET_PLAYERS", "Birthday requires at least one target player");
-        }
+        actionRule.validateItsMyBirthday(debtorIds);
         discardActionFromHand(player, actionCard, activeGame);
         activeGame.addPendingAction(PendingAction.builder()
                 .actorPlayerId(player.id())
@@ -1022,17 +1006,13 @@ public class GameEngine implements ActionExecutor {
             ActiveGameState activeGame) {
         PropertyColor rentColor = resolveRentColor(command, player, actionCard);
         int rentM = PropertyRentSupport.maxRentForAnchor(player.propertyBoard(), rentColor);
-        if (rentM <= 0) {
-            throw new GameException("NO_RENTABLE_PROPERTY", "No rentable set for " + rentColor);
-        }
+        actionRule.validateRentAmount(rentColor, rentM);
         ActionCard doubleRent = resolveDoubleRentCard(command, player);
         if (doubleRent != null) {
             rentM *= 2;
         }
         List<Player> targets = resolveRentTargets(command, session, player, actionCard, activeGame);
-        if (targets.isEmpty()) {
-            throw new GameException("NO_TARGET_PLAYERS", "Rent requires at least one target player");
-        }
+        actionRule.validateRentTargets(targets);
         discardActionFromHand(player, actionCard, activeGame);
         if (doubleRent != null) {
             discardActionFromHand(player, doubleRent, activeGame);
@@ -1055,18 +1035,13 @@ public class GameEngine implements ActionExecutor {
             ActionCard actionCard,
             ActiveGameState activeGame) {
         String targetPlayerId = requireText(command.getTargetPlayerId(), "targetPlayerId");
-        if (player.id().equals(targetPlayerId)) {
-            throw new GameException("INVALID_TARGET_PLAYER", "Sly Deal cannot target yourself");
-        }
         Player target = requirePlayer(session, targetPlayerId);
         requireNotDefeated(session, targetPlayerId);
         String targetCardId = requireText(command.getTargetCardId(), "targetCardId");
         Card targetCard = findPropertyCardLocation(target, targetCardId)
                 .orElseThrow(() -> new GameException("CARD_NOT_TRADEABLE", "Target property card not found"))
                 .card();
-        if (!target.propertyBoard().canRemoveCardForSteal(targetCard)) {
-            throw new GameException("CANNOT_STEAL_FROM_COMPLETE_SET", "Sly Deal cannot steal from a complete set");
-        }
+        actionRule.validateSlyDeal(player, target, targetCard);
         discardActionFromHand(player, actionCard, activeGame);
         activeGame.addPendingAction(PendingAction.builder()
                 .actorPlayerId(player.id())
@@ -1084,9 +1059,6 @@ public class GameEngine implements ActionExecutor {
             ActionCard actionCard,
             ActiveGameState activeGame) {
         String targetPlayerId = requireText(command.getTargetPlayerId(), "targetPlayerId");
-        if (player.id().equals(targetPlayerId)) {
-            throw new GameException("INVALID_TARGET_PLAYER", "Forced Deal cannot target yourself");
-        }
         Player target = requirePlayer(session, targetPlayerId);
         requireNotDefeated(session, targetPlayerId);
         String offeredCardId = requireText(command.getOfferedCardId(), "offeredCardId");
@@ -1097,10 +1069,7 @@ public class GameEngine implements ActionExecutor {
         Card requested = findPropertyCardLocation(target, requestedCardId)
                 .orElseThrow(() -> new GameException("CARD_NOT_TRADEABLE", "Requested property card not found"))
                 .card();
-        if (!player.propertyBoard().canRemoveCardForSteal(offered)
-                || !target.propertyBoard().canRemoveCardForSteal(requested)) {
-            throw new GameException("CANNOT_STEAL_FROM_COMPLETE_SET", "Forced Deal cannot swap cards from complete sets");
-        }
+        actionRule.validateForcedDeal(player, target, offered, requested);
         discardActionFromHand(player, actionCard, activeGame);
         activeGame.addPendingAction(PendingAction.builder()
                 .actorPlayerId(player.id())
@@ -1119,17 +1088,12 @@ public class GameEngine implements ActionExecutor {
             ActionCard actionCard,
             ActiveGameState activeGame) {
         String targetPlayerId = requireText(command.getTargetPlayerId(), "targetPlayerId");
-        if (player.id().equals(targetPlayerId)) {
-            throw new GameException("INVALID_TARGET_PLAYER", "Deal Breaker cannot target yourself");
-        }
         Player target = requirePlayer(session, targetPlayerId);
         requireNotDefeated(session, targetPlayerId);
         String rowId = requireText(command.getTargetPropertyRowId(), "targetPropertyRowId");
         PropertySet row = target.findPropertyRow(rowId)
                 .orElseThrow(() -> new GameException("PROPERTY_ROW_NOT_FOUND", "Target property row not found"));
-        if (!row.isComplete()) {
-            throw new GameException("NO_COMPLETE_SET", "Deal Breaker requires a complete target set");
-        }
+        actionRule.validateDealBreaker(player, target, row);
         discardActionFromHand(player, actionCard, activeGame);
         activeGame.addPendingAction(PendingAction.builder()
                 .actorPlayerId(player.id())
@@ -1146,6 +1110,7 @@ public class GameEngine implements ActionExecutor {
             ActionCard actionCard,
             ActiveGameState activeGame) {
         PropertySet targetRow = resolveImprovementRow(command, player);
+        actionRule.validateImprovementTarget(targetRow, actionCard.actionType());
         OperationResult<ActionCard> spent = actionCard.actionType() == ActionType.HOUSE
                 ? player.trySpendHouseCardOnRow(actionCard, targetRow)
                 : player.trySpendHotelCardOnRow(actionCard, targetRow);
@@ -1159,19 +1124,15 @@ public class GameEngine implements ActionExecutor {
             return null;
         }
         Card card = requireCardInHand(player, doubleRentCardId);
-        if (!(card instanceof ActionCard actionCard) || actionCard.actionType() != ActionType.DOUBLE_THE_RENT) {
-            throw new GameException("DOUBLE_RENT_REQUIRED", "doubleRentCardId must identify a Double The Rent card");
-        }
-        return actionCard;
+        actionRule.validateDoubleRentCard(card);
+        return (ActionCard) card;
     }
 
     private PropertyColor resolveRentColor(PlayCardCommand command, Player player, ActionCard actionCard) {
         String rawColor = command.getPropertyColor();
         if (rawColor != null && !rawColor.isBlank()) {
             PropertyColor color = parsePropertyColor(rawColor);
-            if (actionCard.actionType() != ActionType.WILD_RENT && !actionCard.rentColorOptions().contains(color)) {
-                throw new InvalidCommandException("INVALID_RENT_COLOR", "Rent card cannot charge " + color);
-            }
+            actionRule.validateRentColorForCard(actionCard, color);
             return color;
         }
 
@@ -1179,14 +1140,7 @@ public class GameEngine implements ActionExecutor {
                 .filter(color -> actionCard.actionType() == ActionType.WILD_RENT
                         || actionCard.rentColorOptions().contains(color))
                 .toList();
-        if (availableColors.isEmpty()) {
-            throw new GameException("NO_RENTABLE_PROPERTY", "No rentable property matches this rent card");
-        }
-        if (availableColors.size() > 1) {
-            throw new InvalidCommandException(
-                    "PROPERTY_COLOR_REQUIRED",
-                    "propertyColor is required when multiple rents apply");
-        }
+        actionRule.validateInferableRentColors(availableColors);
         return availableColors.getFirst();
     }
 
@@ -1199,9 +1153,7 @@ public class GameEngine implements ActionExecutor {
         String targetPlayerId = command.getTargetPlayerId();
         if (actionCard.actionType() == ActionType.WILD_RENT) {
             targetPlayerId = requireText(targetPlayerId, "targetPlayerId");
-            if (targetPlayerId.equals(player.id())) {
-                throw new GameException("INVALID_TARGET_PLAYER", "Rent cannot target yourself");
-            }
+            actionRule.validateWildRentTarget(player, targetPlayerId);
             requireNotDefeated(session, targetPlayerId);
             return List.of(requirePlayer(session, targetPlayerId));
         }
