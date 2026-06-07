@@ -46,14 +46,8 @@
                                 <Font name="Georgia Bold" size="36.0"/>
                             </font>
                         </Label>
-                        <Label styleClass="game-logo-subtitle" text="Gameplay Table"/>
                     </VBox>
                     <HBox alignment="CENTER_RIGHT" spacing="8.0">
-                        <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#backToLobby" prefHeight="36.0" prefWidth="106.0" styleClass="menu-secondary-button game-nav-button" text="Lobby">
-                            <graphic>
-                                <FontIcon iconLiteral="bx-log-in-circle" styleClass="menu-icon-secondary"/>
-                            </graphic>
-                        </Button>
                         <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#openHowToPlay" prefHeight="36.0" prefWidth="106.0" styleClass="menu-outline-button game-nav-button" text="Rules">
                             <graphic>
                                 <FontIcon iconLiteral="bx-question-mark" styleClass="menu-icon-outline"/>
@@ -84,8 +78,8 @@
                         <TextField fx:id="identityField" editable="false" focusTraversable="false" promptText="Player" styleClass="game-stat-value"/>
                     </VBox>
                     <VBox spacing="3.0" styleClass="game-stat-chip" GridPane.columnIndex="3" GridPane.rowIndex="0">
-                        <Label styleClass="game-stat-label" text="Connection"/>
-                        <TextField fx:id="connectionField" editable="false" focusTraversable="false" promptText="Status" styleClass="game-stat-value"/>
+                        <Label styleClass="game-stat-label" text="Room Code"/>
+                        <TextField fx:id="roomCodeField" editable="false" focusTraversable="false" promptText="Room code" styleClass="game-stat-value"/>
                     </VBox>
                     <VBox spacing="3.0" styleClass="game-stat-chip" GridPane.columnIndex="4" GridPane.rowIndex="0">
                         <Label styleClass="game-stat-label" text="Deck"/>
@@ -108,7 +102,6 @@
                 <VBox spacing="6.0" styleClass="game-opponents-band">
                     <HBox alignment="CENTER_LEFT" spacing="10.0">
                         <Label styleClass="game-section-title" text="Opponents"/>
-                        <Label styleClass="game-helper-text" text="Public cards and hand counts only"/>
                     </HBox>
                     <ScrollPane fitToWidth="true" hbarPolicy="AS_NEEDED" minHeight="100.0" prefHeight="130.0" styleClass="game-opponent-scroll" vbarPolicy="NEVER">
                         <content>
@@ -137,7 +130,6 @@
                     <VBox spacing="6.0" styleClass="game-zone-panel clean-property-panel" VBox.vgrow="ALWAYS">
                         <HBox alignment="CENTER_LEFT" spacing="10.0">
                             <Label styleClass="zone-heading" text="Properties"/>
-                            <Label styleClass="game-helper-text" text="Only active property rows are shown"/>
                         </HBox>
                         <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" styleClass="game-property-scroll" VBox.vgrow="ALWAYS">
                             <FlowPane fx:id="propertyRowsZone" hgap="10.0" minHeight="150.0" styleClass="property-board clean-property-rows" vgap="10.0">

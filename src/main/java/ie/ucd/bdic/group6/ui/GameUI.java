@@ -33,7 +33,7 @@ public class GameUI {
     @FXML
     private TextField identityField;
     @FXML
-    private TextField connectionField;
+    private TextField roomCodeField;
     @FXML
     private Label deckSummaryLabel;
     @FXML
@@ -229,11 +229,6 @@ public class GameUI {
     }
 
     @FXML
-    private void backToLobby() {
-        SceneManager.showLobby();
-    }
-
-    @FXML
     private void openHowToPlay() {
         SceneManager.showHowToPlay();
     }
@@ -263,8 +258,8 @@ public class GameUI {
         activePlayerField.setText(snapshot.playerName(snapshot.activePlayerId()));
         turnStatusField.setText("Actions " + snapshot.actionsUsed() + " used / "
                 + snapshot.actionsRemaining() + " remaining");
-        identityField.setText(snapshot.playerName(context.playerId()) + " (" + context.playerId() + ")");
-        connectionField.setText(context.connectionLabel());
+        identityField.setText(snapshot.playerName(context.playerId()));
+        roomCodeField.setText(context.roomCode());
         setLabelText(deckSummaryLabel, snapshot.deckSize() + " cards");
         setLabelText(discardPileSummaryLabel, snapshot.discardSize() + " cards");
 

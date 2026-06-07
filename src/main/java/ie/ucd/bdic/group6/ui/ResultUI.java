@@ -7,6 +7,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -24,9 +25,6 @@ public class ResultUI {
     private ListView<String> playerSummaryList;
 
     @FXML
-    private ListView<String> forfeitList;
-
-    @FXML
     private TextArea finalResultArea;
 
     public ResultUI(GameSessionCoordinator context) {
@@ -38,7 +36,6 @@ public class ResultUI {
         winnerField.clear();
         completedSetsField.clear();
         playerSummaryList.setItems(FXCollections.observableArrayList());
-        forfeitList.setItems(FXCollections.observableArrayList());
         MessageUI.clear(finalResultArea);
         context.setSnapshotListener(this::render);
         context.setMessageListener(message -> MessageUI.show(finalResultArea, message));
@@ -76,9 +73,25 @@ public class ResultUI {
         winnerField.setText(winner == null ? snapshot.winnerPlayerId() : winner.displayName());
         completedSetsField.setText((winner == null ? 0 : winner.completedSetCount()) + " full sets");
         playerSummaryList.setItems(FXCollections.observableArrayList(playerSummaries(snapshot)));
-        forfeitList.setItems(FXCollections.observableArrayList(forfeitRows(snapshot)));
-        MessageUI.show(finalResultArea, winnerField.getText()
-                + " won the session. Gameplay has terminated and further game actions are rejected.");
+        MessageUI.showLines(finalResultArea, matchSummaryLines(snapshot, winner));
+    }
+
+    private List<String> matchSummaryLines(UiSnapshot snapshot, UiSnapshot.PlayerView winner) {
+        int completedSets = winner == null ? 0 : winner.completedSetCount();
+        int bankTotalValueM = winner == null ? 0 : winner.bankTotalValueM();
+        String winnerName = winner == null ? snapshot.winnerPlayerId() : winner.displayName();
+
+        List<String> lines = new ArrayList<>();
+        lines.add(winnerName + " wins by completing " + completedSets + " full property sets.");
+        lines.add("Final score: " + completedSets + " full sets, Bank $" + bankTotalValueM + "M.");
+        if (snapshot.forfeitedPlayerIds().isEmpty()) {
+            lines.add("No players forfeited.");
+        } else {
+            lines.add("Forfeits: " + String.join(", ", snapshot.forfeitedPlayerIds().stream()
+                    .map(snapshot::playerName)
+                    .toList()));
+        }
+        return lines;
     }
 
     private List<String> playerSummaries(UiSnapshot snapshot) {
@@ -89,15 +102,6 @@ public class ResultUI {
                         + " - " + player.completedSetCount() + " full sets"
                         + " - Bank $" + player.bankTotalValueM() + "M"
                         + " - " + player.playerStatus())
-                .toList();
-    }
-
-    private List<String> forfeitRows(UiSnapshot snapshot) {
-        if (snapshot.forfeitedPlayerIds().isEmpty()) {
-            return List.of("No disconnect forfeits");
-        }
-        return snapshot.forfeitedPlayerIds().stream()
-                .map(playerId -> snapshot.playerName(playerId) + " - Forfeit")
                 .toList();
     }
 }

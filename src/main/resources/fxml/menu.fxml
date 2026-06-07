@@ -91,7 +91,7 @@
                     </graphic>
                 </Button>
                 <Button graphicTextGap="12.0" mnemonicParsing="false" onAction="#rejoinSession" prefHeight="48.0"
-                        prefWidth="380.0" styleClass="menu-outline-button" text="Rejoin Session">
+                        prefWidth="380.0" styleClass="menu-outline-button" text="Reconnect">
                     <graphic>
                         <FontIcon iconLiteral="bx-reset" styleClass="menu-icon-outline"/>
                     </graphic>
@@ -110,7 +110,7 @@
                 </Button>
             </VBox>
 
-            <Label styleClass="menu-player-note" text="2 &#8211; 5 players">
+            <Label styleClass="menu-player-note" text="Supports 2 &#8211; 5 players">
                 <font>
                     <Font size="12.0"/>
                 </font>
