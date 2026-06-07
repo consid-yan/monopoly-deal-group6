@@ -68,16 +68,14 @@
                             <ColumnConstraints minWidth="120.0" prefWidth="132.0"/>
                             <ColumnConstraints hgrow="ALWAYS" minWidth="220.0"/>
                         </columnConstraints>
-                        <Label styleClass="lobby-field-label" text="Session Code" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-                        <TextField fx:id="sessionCodeField" editable="false" promptText="Waiting for session code" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
-                        <Label styleClass="lobby-field-label" text="Host" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-                        <TextField fx:id="hostField" editable="false" promptText="Waiting for host" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
-                        <Label styleClass="lobby-field-label" text="Player Count" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
-                        <TextField fx:id="playerCountField" editable="false" promptText="0 / 5" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
-                        <Label styleClass="lobby-field-label" text="Join Host" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
-                        <TextField fx:id="joinHostField" editable="false" promptText="Waiting for host address" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
-                        <Label styleClass="lobby-field-label" text="Join Port" GridPane.columnIndex="0" GridPane.rowIndex="4"/>
-                        <TextField fx:id="joinPortField" editable="false" promptText="Waiting for port" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="4"/>
+                        <Label styleClass="lobby-field-label" text="Room Code" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                        <TextField fx:id="roomCodeField" editable="false" promptText="Waiting for room code" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+                        <Label styleClass="lobby-field-label" text="Join Host" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                        <TextField fx:id="joinHostField" editable="false" promptText="Waiting for host address" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+                        <Label styleClass="lobby-field-label" text="Host" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+                        <TextField fx:id="hostField" editable="false" promptText="Waiting for host" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+                        <Label styleClass="lobby-field-label" text="Player Count" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+                        <TextField fx:id="playerCountField" editable="false" promptText="0 / 5" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
                     </GridPane>
 
                     <Separator/>
@@ -116,11 +114,16 @@
                     </Button>
 
                     <Separator prefWidth="260.0"/>
+
                     <Label styleClass="lobby-section-title" text="Status">
                         <font>
                             <Font name="System Bold" size="15.0"/>
                         </font>
+                        <VBox.margin>
+                            <Insets top="24.0"/>
+                        </VBox.margin>
                     </Label>
+
                     <TextArea fx:id="statusArea"
                               editable="false"
                               focusTraversable="false"
@@ -128,12 +131,11 @@
                               prefWidth="260.0"
                               promptText="Lobby messages and validation feedback will appear here."
                               styleClass="lobby-status-area"
-                              wrapText="true"/>
-                    <Label styleClass="help-note" text="A game can start only with 2-5 players." textAlignment="CENTER" wrapText="true">
-                        <font>
-                            <Font size="12.0"/>
-                        </font>
-                    </Label>
+                              wrapText="true">
+                        <VBox.margin>
+                            <Insets top="8.0"/>
+                        </VBox.margin>
+                    </TextArea>
                 </VBox>
             </HBox>
         </VBox>

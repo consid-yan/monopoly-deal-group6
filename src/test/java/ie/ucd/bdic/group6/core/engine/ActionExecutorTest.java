@@ -20,6 +20,13 @@ import ie.ucd.bdic.group6.core.card.Deck;
 import ie.ucd.bdic.group6.core.card.MoneyCard;
 import ie.ucd.bdic.group6.core.card.PropertyCard;
 import ie.ucd.bdic.group6.core.property.PropertyColor;
+import ie.ucd.bdic.group6.core.snapshot.CardSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.PendingActionSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.PendingDebtSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.PendingTradeSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.PlayerStateSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.PropertyRowSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.SessionSnapshot;
 import ie.ucd.bdic.group6.exception.GameException;
 import org.junit.jupiter.api.Test;
 
@@ -42,22 +49,22 @@ class ActionExecutorTest {
     @Test
     void createJoinStartHappyPath() {
         GameEngine engine = engineWithDrawOrder(moneyCards("c", 20));
-        Map<String, Object> created = createSession(engine, "host", 5);
+        SessionSnapshot created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        String sessionCode = text(created, "sessionCode");
+        String roomCode = text(created, "roomCode");
 
         engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                "sessionCode", sessionCode,
+                "roomCode", roomCode,
                 "playerId", "player2"
         )));
-        Map<String, Object> started = startGame(engine, sessionId, "host");
+        SessionSnapshot started = startGame(engine, sessionId, "host");
 
-        assertEquals("ACTIVE", started.get("status"));
-        assertEquals("host", started.get("activePlayerId"));
-        assertEquals(3, started.get("actionsRemaining"));
+        assertEquals("ACTIVE", started.status());
+        assertEquals("host", started.activePlayerId());
+        assertEquals(3, started.actionsRemaining());
         assertEquals(7, currentPlayerHand(started).size());
-        assertEquals(7, playerSummary(started, "host").get("handCount"));
-        assertEquals(5, playerSummary(started, "player2").get("handCount"));
+        assertEquals(7, playerSummary(started, "host").handCount());
+        assertEquals(5, playerSummary(started, "player2").handCount());
     }
 
     @Test
@@ -69,9 +76,9 @@ class ActionExecutorTest {
         assertEquals("INVALID_PLAYER_COUNT", tooFew.getErrorCode());
 
         GameEngine nonHostEngine = new GameEngine();
-        Map<String, Object> created = createSession(nonHostEngine, "host", 5);
+        SessionSnapshot created = createSession(nonHostEngine, "host", 5);
         nonHostEngine.executeJoinSession(new JoinSessionCommand(Map.of(
-                "sessionCode", text(created, "sessionCode"),
+                "roomCode", text(created, "roomCode"),
                 "playerId", "player2"
         )));
         GameException nonHost = assertThrows(GameException.class,
@@ -82,23 +89,23 @@ class ActionExecutorTest {
     @Test
     void joinSessionRejectsDuplicateAndFullLobby() {
         GameEngine engine = new GameEngine();
-        Map<String, Object> created = createSession(engine, "host", 2);
-        String sessionCode = text(created, "sessionCode");
+        SessionSnapshot created = createSession(engine, "host", 2);
+        String roomCode = text(created, "roomCode");
 
         GameException duplicate = assertThrows(GameException.class,
                 () -> engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                        "sessionCode", sessionCode,
+                        "roomCode", roomCode,
                         "playerId", "host"
                 ))));
         assertEquals("PLAYER_ALREADY_JOINED", duplicate.getErrorCode());
 
         engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                "sessionCode", sessionCode,
+                "roomCode", roomCode,
                 "playerId", "player2"
         )));
         GameException full = assertThrows(GameException.class,
                 () -> engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                        "sessionCode", sessionCode,
+                        "roomCode", roomCode,
                         "playerId", "player3"
                 ))));
         assertEquals("SESSION_FULL", full.getErrorCode());
@@ -107,19 +114,19 @@ class ActionExecutorTest {
     @Test
     void turnOrderCyclesByListIndex() {
         GameEngine engine = engineWithDrawOrder(moneyCards("c", 40));
-        Map<String, Object> created = createSession(engine, "host", 5);
+        SessionSnapshot created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        String sessionCode = text(created, "sessionCode");
-        join(engine, sessionCode, "player2");
-        join(engine, sessionCode, "player3");
+        String roomCode = text(created, "roomCode");
+        join(engine, roomCode, "player2");
+        join(engine, roomCode, "player3");
         startGame(engine, sessionId, "host");
 
-        Map<String, Object> afterHost = endTurn(engine, sessionId, "host");
-        assertEquals("player2", afterHost.get("activePlayerId"));
-        Map<String, Object> afterPlayer2 = endTurn(engine, sessionId, "player2");
-        assertEquals("player3", afterPlayer2.get("activePlayerId"));
-        Map<String, Object> afterPlayer3 = endTurn(engine, sessionId, "player3");
-        assertEquals("host", afterPlayer3.get("activePlayerId"));
+        SessionSnapshot afterHost = endTurn(engine, sessionId, "host");
+        assertEquals("player2", afterHost.activePlayerId());
+        SessionSnapshot afterPlayer2 = endTurn(engine, sessionId, "player2");
+        assertEquals("player3", afterPlayer2.activePlayerId());
+        SessionSnapshot afterPlayer3 = endTurn(engine, sessionId, "player3");
+        assertEquals("host", afterPlayer3.activePlayerId());
     }
 
     @Test
@@ -127,17 +134,17 @@ class ActionExecutorTest {
         MoneyCard banked = money("bank-me", 5);
         StartedGame game = startedGameWithHostCards(List.of(banked), moneyCards("fill", 20));
 
-        Map<String, Object> afterPlay = game.engine().executePlayCard(new PlayCardCommand(Map.of(
+        SessionSnapshot afterPlay = game.engine().executePlayCard(new PlayCardCommand(Map.of(
                 "sessionId", game.sessionId(),
                 "playerId", "host",
                 "cardId", banked.id(),
                 "playMode", "BANK"
         )));
 
-        Map<String, Object> host = playerSummary(afterPlay, "host");
-        assertEquals(1, afterPlay.get("actionsUsed"));
-        assertEquals(6, host.get("handCount"));
-        assertEquals(5, host.get("bankTotalValueM"));
+        PlayerStateSnapshot host = playerSummary(afterPlay, "host");
+        assertEquals(1, afterPlay.actionsUsed());
+        assertEquals(6, host.handCount());
+        assertEquals(5, host.bankTotalValueM());
         assertEquals(banked.id(), cardIds(bankCards(host)).getFirst());
     }
 
@@ -146,16 +153,16 @@ class ActionExecutorTest {
         PropertyCard red = property("red-1", PropertyColor.RED);
         StartedGame game = startedGameWithHostCards(List.of(red), moneyCards("fill", 20));
 
-        Map<String, Object> afterPlay = game.engine().executePlayCard(new PlayCardCommand(Map.of(
+        SessionSnapshot afterPlay = game.engine().executePlayCard(new PlayCardCommand(Map.of(
                 "sessionId", game.sessionId(),
                 "playerId", "host",
                 "cardId", red.id()
         )));
 
-        Map<String, Object> host = playerSummary(afterPlay, "host");
-        Map<String, Object> row = propertyRows(host).getFirst();
-        assertEquals(1, afterPlay.get("actionsUsed"));
-        assertEquals("RED", row.get("anchorColor"));
+        PlayerStateSnapshot host = playerSummary(afterPlay, "host");
+        PropertyRowSnapshot row = propertyRows(host).getFirst();
+        assertEquals(1, afterPlay.actionsUsed());
+        assertEquals("RED", row.anchorColor());
         assertEquals(List.of(red.id()), cardIds(rowCards(row)));
     }
 
@@ -166,15 +173,15 @@ class ActionExecutorTest {
         MoneyCard drawnTwo = money("draw-2", 2);
         StartedGame game = startedGameWithHostCards(List.of(passGo), List.of(drawnOne, drawnTwo));
 
-        Map<String, Object> afterPlay = game.engine().executePlayCard(new PlayCardCommand(Map.of(
+        SessionSnapshot afterPlay = game.engine().executePlayCard(new PlayCardCommand(Map.of(
                 "sessionId", game.sessionId(),
                 "playerId", "host",
                 "cardId", passGo.id()
         )));
 
-        assertEquals(1, afterPlay.get("actionsUsed"));
-        assertEquals(1, afterPlay.get("discardSize"));
-        assertEquals(8, playerSummary(afterPlay, "host").get("handCount"));
+        assertEquals(1, afterPlay.actionsUsed());
+        assertEquals(1, afterPlay.discardSize());
+        assertEquals(8, playerSummary(afterPlay, "host").handCount());
         assertFalse(cardIds(currentPlayerHand(afterPlay)).contains(passGo.id()));
         assertTrue(cardIds(currentPlayerHand(afterPlay)).containsAll(List.of(drawnOne.id(), drawnTwo.id())));
     }
@@ -201,47 +208,47 @@ class ActionExecutorTest {
                 money("extra-3", 1),
                 money("extra-4", 1)
         ));
-        Map<String, Object> created = createSession(engine, "host", 5);
+        SessionSnapshot created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
 
         endTurn(engine, sessionId, "host");
         playAs(engine, sessionId, "player2", payment.id());
         endTurn(engine, sessionId, "player2");
-        Map<String, Object> afterDebt = engine.executePlayCard(new PlayCardCommand(Map.of(
+        SessionSnapshot afterDebt = engine.executePlayCard(new PlayCardCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "host",
                 "cardId", debtCollector.id(),
                 "targetPlayerId", "player2"
         )));
 
-        Map<String, Object> pendingAction = pendingActions(afterDebt).getFirst();
-        assertEquals("DEBT_COLLECTOR", pendingAction.get("actionType"));
+        PendingActionSnapshot pendingAction = pendingActions(afterDebt).getFirst();
+        assertEquals("DEBT_COLLECTOR", pendingAction.actionType());
         assertTrue(pendingDebts(afterDebt).isEmpty());
 
-        Map<String, Object> afterResponse = engine.executeRespondAction(new RespondActionCommand(Map.of(
+        SessionSnapshot afterResponse = engine.executeRespondAction(new RespondActionCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "player2",
-                "actionId", pendingAction.get("actionId"),
+                "actionId", pendingAction.actionId(),
                 "accepted", true
         )));
 
-        Map<String, Object> debt = pendingDebts(afterResponse).getFirst();
-        assertEquals("host", debt.get("creditorPlayerId"));
-        assertEquals("player2", debt.get("debtorPlayerId"));
-        assertEquals(5, debt.get("amountM"));
+        PendingDebtSnapshot debt = pendingDebts(afterResponse).getFirst();
+        assertEquals("host", debt.creditorPlayerId());
+        assertEquals("player2", debt.debtorPlayerId());
+        assertEquals(5, debt.amountM());
 
-        Map<String, Object> afterPay = engine.executePayDebt(new PayDebtCommand(Map.of(
+        SessionSnapshot afterPay = engine.executePayDebt(new PayDebtCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "player2",
-                "debtId", debt.get("debtId"),
+                "debtId", debt.debtId(),
                 "paymentCardIds", List.of(payment.id())
         )));
 
         assertTrue(pendingDebts(afterPay).isEmpty());
-        assertEquals(5, playerSummary(afterPay, "host").get("bankTotalValueM"));
-        assertEquals(0, playerSummary(afterPay, "player2").get("bankTotalValueM"));
+        assertEquals(5, playerSummary(afterPay, "host").bankTotalValueM());
+        assertEquals(0, playerSummary(afterPay, "player2").bankTotalValueM());
     }
 
     @Test
@@ -262,20 +269,20 @@ class ActionExecutorTest {
                 money("host-start-1", 1),
                 money("host-start-2", 1)
         ));
-        Map<String, Object> created = createSession(engine, "host", 5);
+        SessionSnapshot created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
 
-        Map<String, Object> pending = engine.executePlayCard(new PlayCardCommand(Map.of(
+        SessionSnapshot pending = engine.executePlayCard(new PlayCardCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "host",
                 "cardId", debtCollector.id(),
                 "targetPlayerId", "player2"
         )));
-        String actionId = (String) pendingActions(pending).getFirst().get("actionId");
+        String actionId = pendingActions(pending).getFirst().actionId();
 
-        Map<String, Object> rejected = engine.executeRespondAction(new RespondActionCommand(Map.of(
+        SessionSnapshot rejected = engine.executeRespondAction(new RespondActionCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "player2",
                 "actionId", actionId,
@@ -285,7 +292,7 @@ class ActionExecutorTest {
 
         assertTrue(pendingActions(rejected).isEmpty());
         assertTrue(pendingDebts(rejected).isEmpty());
-        assertEquals(2, rejected.get("discardSize"));
+        assertEquals(2, rejected.discardSize());
         assertFalse(cardIds(currentPlayerHand(rejected)).contains(justSayNo.id()));
     }
 
@@ -298,7 +305,7 @@ class ActionExecutorTest {
         StartedGame game = startedGameWithHostCards(List.of(brown, rent, doubleRent), moneyCards("fill", 20));
 
         play(game.engine(), game.sessionId(), brown.id());
-        Map<String, Object> pending = game.engine().executePlayCard(new PlayCardCommand(Map.of(
+        SessionSnapshot pending = game.engine().executePlayCard(new PlayCardCommand(Map.of(
                 "sessionId", game.sessionId(),
                 "playerId", "host",
                 "cardId", rent.id(),
@@ -306,16 +313,16 @@ class ActionExecutorTest {
                 "doubleRentCardId", doubleRent.id()
         )));
 
-        assertEquals(3, pending.get("actionsUsed"));
-        Map<String, Object> afterAccept = game.engine().executeRespondAction(new RespondActionCommand(Map.of(
+        assertEquals(3, pending.actionsUsed());
+        SessionSnapshot afterAccept = game.engine().executeRespondAction(new RespondActionCommand(Map.of(
                 "sessionId", game.sessionId(),
                 "playerId", "player2",
-                "actionId", pendingActions(pending).getFirst().get("actionId"),
+                "actionId", pendingActions(pending).getFirst().actionId(),
                 "accepted", true
         )));
 
-        assertEquals(2, pendingDebts(afterAccept).getFirst().get("amountM"));
-        assertEquals(2, afterAccept.get("discardSize"));
+        assertEquals(2, pendingDebts(afterAccept).getFirst().amountM());
+        assertEquals(2, afterAccept.discardSize());
     }
 
     @Test
@@ -340,25 +347,25 @@ class ActionExecutorTest {
                 money("host-next-1", 1),
                 money("host-next-2", 1)
         ));
-        Map<String, Object> created = createSession(engine, "host", 5);
+        SessionSnapshot created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
         endTurn(engine, sessionId, "host");
         playAs(engine, sessionId, "player2", red.id());
         endTurn(engine, sessionId, "player2");
 
-        Map<String, Object> pending = engine.executePlayCard(new PlayCardCommand(Map.of(
+        SessionSnapshot pending = engine.executePlayCard(new PlayCardCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "host",
                 "cardId", slyDeal.id(),
                 "targetPlayerId", "player2",
                 "targetCardId", red.id()
         )));
-        Map<String, Object> accepted = engine.executeRespondAction(new RespondActionCommand(Map.of(
+        SessionSnapshot accepted = engine.executeRespondAction(new RespondActionCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "player2",
-                "actionId", pendingActions(pending).getFirst().get("actionId"),
+                "actionId", pendingActions(pending).getFirst().actionId(),
                 "accepted", true
         )));
 
@@ -389,16 +396,16 @@ class ActionExecutorTest {
                 money("host-next-1", 1),
                 money("host-next-2", 1)
         ));
-        Map<String, Object> created = createSession(engine, "host", 5);
+        SessionSnapshot created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
         play(engine, sessionId, hostBlue.id());
         endTurn(engine, sessionId, "host");
         playAs(engine, sessionId, "player2", targetRed.id());
         endTurn(engine, sessionId, "player2");
 
-        Map<String, Object> pending = engine.executePlayCard(new PlayCardCommand(Map.of(
+        SessionSnapshot pending = engine.executePlayCard(new PlayCardCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "host",
                 "cardId", forcedDeal.id(),
@@ -406,10 +413,10 @@ class ActionExecutorTest {
                 "offeredCardId", hostBlue.id(),
                 "requestedCardId", targetRed.id()
         )));
-        Map<String, Object> accepted = engine.executeRespondAction(new RespondActionCommand(Map.of(
+        SessionSnapshot accepted = engine.executeRespondAction(new RespondActionCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "player2",
-                "actionId", pendingActions(pending).getFirst().get("actionId"),
+                "actionId", pendingActions(pending).getFirst().actionId(),
                 "accepted", true
         )));
 
@@ -440,31 +447,31 @@ class ActionExecutorTest {
                 money("host-next-1", 1),
                 money("host-next-2", 1)
         ));
-        Map<String, Object> created = createSession(engine, "host", 5);
+        SessionSnapshot created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
         endTurn(engine, sessionId, "host");
         playAs(engine, sessionId, "player2", brown1.id());
-        Map<String, Object> player2Board = playAs(engine, sessionId, "player2", brown2.id());
-        String rowId = (String) propertyRows(playerSummary(player2Board, "player2")).getFirst().get("rowId");
+        SessionSnapshot player2Board = playAs(engine, sessionId, "player2", brown2.id());
+        String rowId = propertyRows(playerSummary(player2Board, "player2")).getFirst().rowId();
         endTurn(engine, sessionId, "player2");
 
-        Map<String, Object> pending = engine.executePlayCard(new PlayCardCommand(Map.of(
+        SessionSnapshot pending = engine.executePlayCard(new PlayCardCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "host",
                 "cardId", dealBreaker.id(),
                 "targetPlayerId", "player2",
                 "targetPropertyRowId", rowId
         )));
-        Map<String, Object> accepted = engine.executeRespondAction(new RespondActionCommand(Map.of(
+        SessionSnapshot accepted = engine.executeRespondAction(new RespondActionCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "player2",
-                "actionId", pendingActions(pending).getFirst().get("actionId"),
+                "actionId", pendingActions(pending).getFirst().actionId(),
                 "accepted", true
         )));
 
-        assertTrue((Boolean) propertyRows(playerSummary(accepted, "host")).getFirst().get("complete"));
+        assertTrue(propertyRows(playerSummary(accepted, "host")).getFirst().complete());
         assertTrue(propertyRows(playerSummary(accepted, "player2")).isEmpty());
     }
 
@@ -492,9 +499,9 @@ class ActionExecutorTest {
                 money("player2-next-1", 1),
                 money("player2-next-2", 1)
         ));
-        Map<String, Object> created = createSession(engine, "host", 5);
+        SessionSnapshot created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
 
         endTurn(engine, sessionId, "host");
@@ -503,17 +510,17 @@ class ActionExecutorTest {
         playAs(engine, sessionId, "host", red.id());
         playAs(engine, sessionId, "host", "host-1");
         playAs(engine, sessionId, "host", "host-2");
-        Map<String, Object> proposed = engine.executeProposeTrade(new ProposeTradeCommand(Map.of(
+        SessionSnapshot proposed = engine.executeProposeTrade(new ProposeTradeCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "host",
                 "targetPlayerId", "player2",
                 "offeredCardIds", List.of(red.id()),
                 "requestedCardIds", List.of(payment.id())
         )));
-        String tradeId = (String) pendingTrades(proposed).getFirst().get("tradeId");
+        String tradeId = pendingTrades(proposed).getFirst().tradeId();
 
         endTurn(engine, sessionId, "host");
-        Map<String, Object> accepted = engine.executeRespondTrade(new RespondTradeCommand(Map.of(
+        SessionSnapshot accepted = engine.executeRespondTrade(new RespondTradeCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "player2",
                 "tradeId", tradeId,
@@ -521,7 +528,7 @@ class ActionExecutorTest {
         )));
 
         assertTrue(pendingTrades(accepted).isEmpty());
-        assertEquals(5, playerSummary(accepted, "host").get("bankTotalValueM"));
+        assertEquals(5, playerSummary(accepted, "host").bankTotalValueM());
         assertTrue(propertyRows(playerSummary(accepted, "host")).isEmpty());
         assertEquals(List.of(red.id()), cardIds(rowCards(propertyRows(playerSummary(accepted, "player2")).getFirst())));
     }
@@ -542,7 +549,7 @@ class ActionExecutorTest {
                 ))));
 
         assertEquals("RECEIVER_ROW_REJECTS_CARD", error.getErrorCode());
-        Map<String, Object> snapshot = game.engine().executeRejoinSession(new ie.ucd.bdic.group6.command.RejoinSessionCommand(Map.of(
+        SessionSnapshot snapshot = game.engine().executeRejoinSession(new ie.ucd.bdic.group6.command.RejoinSessionCommand(Map.of(
                 "sessionIdentity", game.sessionId(),
                 "playerId", "host"
         )));
@@ -575,7 +582,7 @@ class ActionExecutorTest {
                 ))));
 
         assertEquals("ACTION_LIMIT_REACHED", error.getErrorCode());
-        Map<String, Object> snapshot = game.engine().executeRejoinSession(new ie.ucd.bdic.group6.command.RejoinSessionCommand(Map.of(
+        SessionSnapshot snapshot = game.engine().executeRejoinSession(new ie.ucd.bdic.group6.command.RejoinSessionCommand(Map.of(
                 "sessionIdentity", game.sessionId(),
                 "playerId", "host"
         )));
@@ -603,23 +610,23 @@ class ActionExecutorTest {
                 "playerId", "host",
                 "discardedCardIds", List.of(discard.id())
         )));
-        Map<String, Object> afterEnd = endTurn(game.engine(), game.sessionId(), "host");
-        assertEquals(2, afterEnd.get("discardSize"));
-        assertEquals("player2", afterEnd.get("activePlayerId"));
+        SessionSnapshot afterEnd = endTurn(game.engine(), game.sessionId(), "host");
+        assertEquals(2, afterEnd.discardSize());
+        assertEquals("player2", afterEnd.activePlayerId());
     }
 
     @Test
     void endTurnAdvancesActivePlayerAndAppliesDrawRule() {
         GameEngine engine = engineWithDrawOrder(moneyCards("c", 30));
-        Map<String, Object> created = createSession(engine, "host", 5);
+        SessionSnapshot created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
 
-        Map<String, Object> afterEnd = endTurn(engine, sessionId, "host");
+        SessionSnapshot afterEnd = endTurn(engine, sessionId, "host");
 
-        assertEquals("player2", afterEnd.get("activePlayerId"));
-        assertEquals(7, playerSummary(afterEnd, "player2").get("handCount"));
+        assertEquals("player2", afterEnd.activePlayerId());
+        assertEquals(7, playerSummary(afterEnd, "player2").handCount());
     }
 
     @Test
@@ -641,17 +648,17 @@ class ActionExecutorTest {
         endTurn(game.engine(), game.sessionId(), "player2");
         play(game.engine(), game.sessionId(), "brown-2");
         play(game.engine(), game.sessionId(), "dark-blue-2");
-        Map<String, Object> afterWin = play(game.engine(), game.sessionId(), "utility-2");
+        SessionSnapshot afterWin = play(game.engine(), game.sessionId(), "utility-2");
 
-        assertEquals("FINISHED", afterWin.get("status"));
-        assertEquals("host", afterWin.get("winnerPlayerId"));
+        assertEquals("FINISHED", afterWin.status());
+        assertEquals("host", afterWin.winnerPlayerId());
     }
 
     @Test
     void rejoinRejectsUnknownPlayerId() {
         GameEngine engine = engineWithDrawOrder(moneyCards("c", 20));
-        Map<String, Object> created = createSession(engine, "host", 5);
-        join(engine, text(created, "sessionCode"), "player2");
+        SessionSnapshot created = createSession(engine, "host", 5);
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, text(created, "sessionId"), "host");
 
         GameException error = assertThrows(GameException.class,
@@ -666,9 +673,9 @@ class ActionExecutorTest {
     void disconnectedActivePlayerIsSkippedAfterThirtySeconds() {
         MutableClock clock = new MutableClock();
         GameEngine engine = engineWithDrawOrder(moneyCards("c", 40), clock);
-        Map<String, Object> created = createSession(engine, "host", 5);
+        SessionSnapshot created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
 
         engine.executePlayerDisconnected(new PlayerDisconnectedCommand(Map.of(
@@ -680,21 +687,21 @@ class ActionExecutorTest {
                 new ProcessDisconnectTimeoutsCommand(Map.of()));
 
         assertEquals(List.of(sessionId), processed.get("sessionIds"));
-        Map<String, Object> snapshot = engine.executeRejoinSession(new RejoinSessionCommand(Map.of(
+        SessionSnapshot snapshot = engine.executeRejoinSession(new RejoinSessionCommand(Map.of(
                 "sessionIdentity", sessionId,
                 "playerId", "player2"
         )));
-        assertEquals("player2", snapshot.get("activePlayerId"));
-        assertEquals("DISCONNECTED", playerSummary(snapshot, "host").get("playerStatus"));
+        assertEquals("player2", snapshot.activePlayerId());
+        assertEquals("DISCONNECTED", playerSummary(snapshot, "host").playerStatus());
     }
 
     @Test
     void disconnectedPlayerForfeitsAfterNinetySecondsAndCardsAreDiscarded() {
         MutableClock clock = new MutableClock();
         GameEngine engine = engineWithDrawOrder(moneyCards("c", 40), clock);
-        Map<String, Object> created = createSession(engine, "host", 5);
+        SessionSnapshot created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
 
         engine.executePlayerDisconnected(new PlayerDisconnectedCommand(Map.of(
@@ -703,16 +710,16 @@ class ActionExecutorTest {
         )));
         clock.advance(Duration.ofSeconds(91));
         engine.executeProcessDisconnectTimeouts(new ProcessDisconnectTimeoutsCommand(Map.of()));
-        Map<String, Object> snapshot = engine.executeRejoinSession(new RejoinSessionCommand(Map.of(
+        SessionSnapshot snapshot = engine.executeRejoinSession(new RejoinSessionCommand(Map.of(
                 "sessionIdentity", sessionId,
                 "playerId", "host"
         )));
 
-        assertEquals("FINISHED", snapshot.get("status"));
-        assertEquals("host", snapshot.get("winnerPlayerId"));
-        assertEquals(List.of("player2"), snapshot.get("forfeitedPlayerIds"));
-        assertEquals("DEFEATED", playerSummary(snapshot, "player2").get("playerStatus"));
-        assertEquals(5, snapshot.get("discardSize"));
+        assertEquals("FINISHED", snapshot.status());
+        assertEquals("host", snapshot.winnerPlayerId());
+        assertEquals(List.of("player2"), snapshot.forfeitedPlayerIds());
+        assertEquals("DEFEATED", playerSummary(snapshot, "player2").playerStatus());
+        assertEquals(5, snapshot.discardSize());
     }
 
     private StartedGame startedGameWithHostCards(List<Card> hostCards, List<Card> extraTopCards) {
@@ -727,13 +734,13 @@ class ActionExecutorTest {
         drawOrder.addAll(extraTopCards);
         drawOrder.addAll(moneyCards("extra", 20));
         GameEngine engine = engineWithDrawOrder(drawOrder);
-        Map<String, Object> created = createSession(engine, "host", 5);
-        join(engine, text(created, "sessionCode"), "player2");
+        SessionSnapshot created = createSession(engine, "host", 5);
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, text(created, "sessionId"), "host");
         return new StartedGame(engine, text(created, "sessionId"));
     }
 
-    private Map<String, Object> play(GameEngine engine, String sessionId, String cardId) {
+    private SessionSnapshot play(GameEngine engine, String sessionId, String cardId) {
         return engine.executePlayCard(new PlayCardCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "host",
@@ -741,7 +748,7 @@ class ActionExecutorTest {
         )));
     }
 
-    private Map<String, Object> playAs(GameEngine engine, String sessionId, String playerId, String cardId) {
+    private SessionSnapshot playAs(GameEngine engine, String sessionId, String playerId, String cardId) {
         return engine.executePlayCard(new PlayCardCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", playerId,
@@ -749,7 +756,7 @@ class ActionExecutorTest {
         )));
     }
 
-    private Map<String, Object> createSession(GameEngine engine, String hostPlayerId, int maxPlayers) {
+    private SessionSnapshot createSession(GameEngine engine, String hostPlayerId, int maxPlayers) {
         return engine.executeCreateSession(new CreateSessionCommand(Map.of(
                 "hostPlayerId", hostPlayerId,
                 "playerName", hostPlayerId,
@@ -757,22 +764,22 @@ class ActionExecutorTest {
         )));
     }
 
-    private void join(GameEngine engine, String sessionCode, String playerId) {
+    private void join(GameEngine engine, String roomCode, String playerId) {
         engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                "sessionCode", sessionCode,
+                "roomCode", roomCode,
                 "playerId", playerId,
                 "playerName", playerId
         )));
     }
 
-    private Map<String, Object> startGame(GameEngine engine, String sessionId, String playerId) {
+    private SessionSnapshot startGame(GameEngine engine, String sessionId, String playerId) {
         return engine.executeStartGame(new StartGameCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", playerId
         )));
     }
 
-    private Map<String, Object> endTurn(GameEngine engine, String sessionId, String playerId) {
+    private SessionSnapshot endTurn(GameEngine engine, String sessionId, String playerId) {
         return engine.executeEndTurn(new EndTurnCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", playerId
@@ -829,53 +836,49 @@ class ActionExecutorTest {
         return new ActionCard(id, "Rent", actionType, 1, java.util.EnumSet.of(first, second));
     }
 
-    private String text(Map<String, Object> data, String key) {
-        return (String) data.get(key);
+    private String text(SessionSnapshot snapshot, String key) {
+        return switch (key) {
+            case "sessionId" -> snapshot.sessionId();
+            case "roomCode" -> snapshot.roomCode();
+            default -> throw new IllegalArgumentException("Unsupported snapshot text key: " + key);
+        };
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> currentPlayerHand(Map<String, Object> snapshot) {
-        return (List<Map<String, Object>>) snapshot.get("currentPlayerHand");
+    private List<CardSnapshot> currentPlayerHand(SessionSnapshot snapshot) {
+        return snapshot.currentPlayerHand();
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> bankCards(Map<String, Object> player) {
-        return (List<Map<String, Object>>) player.get("bankCards");
+    private List<CardSnapshot> bankCards(PlayerStateSnapshot player) {
+        return player.bankCards();
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> propertyRows(Map<String, Object> player) {
-        return (List<Map<String, Object>>) player.get("propertyRows");
+    private List<PropertyRowSnapshot> propertyRows(PlayerStateSnapshot player) {
+        return player.propertyRows();
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> rowCards(Map<String, Object> row) {
-        return (List<Map<String, Object>>) row.get("cards");
+    private List<CardSnapshot> rowCards(PropertyRowSnapshot row) {
+        return row.cards();
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> pendingDebts(Map<String, Object> snapshot) {
-        return (List<Map<String, Object>>) snapshot.get("pendingDebts");
+    private List<PendingDebtSnapshot> pendingDebts(SessionSnapshot snapshot) {
+        return snapshot.pendingDebts();
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> pendingTrades(Map<String, Object> snapshot) {
-        return (List<Map<String, Object>>) snapshot.get("pendingTrades");
+    private List<PendingTradeSnapshot> pendingTrades(SessionSnapshot snapshot) {
+        return snapshot.pendingTrades();
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> pendingActions(Map<String, Object> snapshot) {
-        return (List<Map<String, Object>>) snapshot.get("pendingActions");
+    private List<PendingActionSnapshot> pendingActions(SessionSnapshot snapshot) {
+        return snapshot.pendingActions();
     }
 
-    private List<String> cardIds(List<Map<String, Object>> cards) {
-        return cards.stream().map(card -> (String) card.get("id")).toList();
+    private List<String> cardIds(List<CardSnapshot> cards) {
+        return cards.stream().map(CardSnapshot::id).toList();
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> playerSummary(Map<String, Object> snapshot, String playerId) {
-        return ((List<Map<String, Object>>) snapshot.get("players")).stream()
-                .filter(player -> playerId.equals(player.get("playerId")))
+    private PlayerStateSnapshot playerSummary(SessionSnapshot snapshot, String playerId) {
+        return snapshot.players().stream()
+                .filter(player -> playerId.equals(player.playerId()))
                 .findFirst()
                 .orElseThrow();
     }

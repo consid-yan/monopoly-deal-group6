@@ -3,11 +3,14 @@ package ie.ucd.bdic.group6.network.server;
 import ie.ucd.bdic.group6.command.CommandType;
 import ie.ucd.bdic.group6.controller.GameController;
 import ie.ucd.bdic.group6.controller.dto.ControllerRequest;
+import ie.ucd.bdic.group6.core.snapshot.SessionSnapshot;
 import ie.ucd.bdic.group6.facade.model.GameResult;
-import ie.ucd.bdic.group6.network.protocol.ClientCommand;
-import ie.ucd.bdic.group6.network.protocol.ServerNotice;
-import ie.ucd.bdic.group6.network.protocol.ServerResult;
-import ie.ucd.bdic.group6.network.protocol.StateUpdate;
+import ie.ucd.bdic.group6.network.message.ClientRequest;
+import ie.ucd.bdic.group6.network.message.Message;
+import ie.ucd.bdic.group6.network.message.NoticeType;
+import ie.ucd.bdic.group6.network.message.ServerNotice;
+import ie.ucd.bdic.group6.network.message.ServerResponse;
+import ie.ucd.bdic.group6.network.message.ServerUpdate;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -27,13 +30,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import static ie.ucd.bdic.group6.network.NetworkConfig.requireValidPort;
 
 public class GameServer implements AutoCloseable {
+    private static final Logger LOGGER = Logger.getLogger(GameServer.class.getName());
+
     private final GameController gameController;
     private final int requestedPort;
+
     private final Set<ClientConnection> clients = ConcurrentHashMap.newKeySet();
-    private final Map<String, Map<String, String>> playerTokensBySession = new ConcurrentHashMap<>();
-    private final Map<String, String> sessionIdByCode = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, String>> playerTokensBySessionId = new ConcurrentHashMap<>();
+    private final Map<String, String> sessionIdByRoomCode = new ConcurrentHashMap<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     private ServerSocket serverSocket;
@@ -42,9 +52,7 @@ public class GameServer implements AutoCloseable {
 
     public GameServer(GameController gameController, int port) {
         this.gameController = Objects.requireNonNull(gameController, "gameController");
-        if (port < 0 || port > 65535) {
-            throw new IllegalArgumentException("port must be between 0 and 65535");
-        }
+        requireValidPort(port);
         this.requestedPort = port;
     }
 
@@ -52,25 +60,28 @@ public class GameServer implements AutoCloseable {
         if (running.get()) {
             return;
         }
+
         serverSocket = new ServerSocket(requestedPort);
         running.set(true);
-        acceptThread = new Thread(this::acceptLoop, "MonopolyDealServer-Accept");
+
+        acceptThread = new Thread(this::acceptLoop, "monopoly-server-accept");
         acceptThread.setDaemon(true);
         acceptThread.start();
-        timeoutExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "MonopolyDealServer-DisconnectTimeouts");
+
+        timeoutExecutor = Executors.newSingleThreadScheduledExecutor(task -> {
+            Thread thread = new Thread(task, "monopoly-server-disconnect-timeouts");
             thread.setDaemon(true);
             return thread;
         });
+
         timeoutExecutor.scheduleAtFixedRate(this::processDisconnectTimeouts, 1, 1, TimeUnit.SECONDS);
+
+        LOGGER.info("Server started on port " + port());
     }
 
     public int port() {
         ServerSocket currentSocket = serverSocket;
-        if (currentSocket == null) {
-            return requestedPort;
-        }
-        return currentSocket.getLocalPort();
+        return currentSocket == null ? requestedPort : currentSocket.getLocalPort();
     }
 
     public boolean isRunning() {
@@ -81,13 +92,18 @@ public class GameServer implements AutoCloseable {
         if (!running.getAndSet(false)) {
             return;
         }
+
         closeServerSocket();
+
         if (timeoutExecutor != null) {
             timeoutExecutor.shutdownNow();
             timeoutExecutor = null;
         }
+
         clients.forEach(ClientConnection::close);
         clients.clear();
+
+        LOGGER.info("Server stopped");
     }
 
     @Override
@@ -100,51 +116,61 @@ public class GameServer implements AutoCloseable {
             try {
                 Socket socket = serverSocket.accept();
                 ClientConnection connection = new ClientConnection(socket);
+
                 clients.add(connection);
                 connection.start();
-                connection.send(new ServerNotice("CONNECTED", "Connected to Monopoly Deal server",
-                        Map.of("port", port())));
+
+                connection.send(new ServerNotice(
+                        NoticeType.CONNECTED,
+                        Map.of(
+                                "message", "Connected to Monopoly Deal server",
+                                "port", port()
+                        )
+                ));
             } catch (SocketException e) {
                 if (running.get()) {
+                    LOGGER.log(Level.WARNING, "Server socket closed unexpectedly", e);
                     running.set(false);
                 }
             } catch (IOException e) {
                 if (running.get()) {
-                    // Keep accepting future connections after a single bad socket.
+                    LOGGER.log(Level.WARNING, "Failed to accept client connection", e);
                 }
             }
         }
     }
 
-    private void handleCommand(ClientConnection connection, ClientCommand command) {
-        String clientIp = connection.socket.getInetAddress().getHostAddress();
+    private void handleRequest(ClientConnection connection, ClientRequest request) {
+        ServerResponse authFailure = authenticate(request);
 
-        ServerResult authFailure = authenticate(command);
         if (authFailure != null) {
-            System.err.println("[SERVER] ❌ Client[" + clientIp + "] authentication failed");
-            System.err.println("   Error Code：" + authFailure.code());
-            System.err.println("   Message：" + authFailure.message());
-            System.err.println("   🔍 Troubleshoot: Player token expired, session missing or illegal request");
-
             connection.send(authFailure);
             return;
         }
 
-        GameResult result = execute(command);
-        String sessionId = text(result.getData().get("sessionId"));
-        String playerId = resolvePlayerId(command);
+        GameResult result = execute(request);
+
+        SessionSnapshot snapshot = result.getSnapshot().orElse(null);
+        String sessionId = snapshot == null ? text(result.getData().get("sessionId")) : text(snapshot.sessionId());
+        String playerId = resolvePlayerId(request);
         Map<String, Object> resultData = result.getData();
+
         if (result.isSuccess()) {
-            rememberSessionCode(resultData);
-            resultData = withIssuedPlayerToken(command, sessionId, playerId, resultData);
+            if (snapshot != null) {
+                rememberRoomCode(snapshot);
+                resultData = responsePayload(snapshot);
+            }
+            resultData = withIssuedPlayerToken(request, sessionId, playerId, resultData);
         }
-        ServerResult serverResult = new ServerResult(
-                command.requestId(),
+
+        connection.send(new ServerResponse(
+                request.requestId(),
                 result.isSuccess(),
                 result.getCode(),
                 result.getMessage(),
-                resultData);
-        connection.send(serverResult);
+                resultData,
+                snapshot
+        ));
 
         if (!result.isSuccess()) {
             return;
@@ -156,63 +182,121 @@ public class GameServer implements AutoCloseable {
         }
     }
 
-    private ServerResult authenticate(ClientCommand command) {
-        if (command.commandType() == CommandType.CREATE_SESSION
-                || command.commandType() == CommandType.JOIN_SESSION) {
+    private ServerResponse authenticate(ClientRequest request) {
+        CommandType commandType = request.commandType();
+
+        if (commandType == CommandType.CREATE_SESSION || commandType == CommandType.JOIN_SESSION) {
             return null;
         }
 
-        String sessionId = authenticatedSessionId(command);
-        String playerId = text(command.payload().get("playerId"));
-        String playerToken = text(command.payload().get("playerToken"));
+        String sessionId = authenticatedSessionId(request);
+        String playerId = text(request.payload().get("playerId"));
+        String playerToken = text(request.payload().get("playerToken"));
+
         if (sessionId == null || playerId == null || playerToken == null) {
-            return new ServerResult(command.requestId(), false, "AUTH_REQUIRED",
-                    "A valid player token is required for " + command.commandType(), Map.of());
+            return new ServerResponse(
+                    request.requestId(),
+                    false,
+                    "AUTH_REQUIRED",
+                    "A valid player token is required for " + commandType,
+                    Map.of(), null
+            );
         }
 
-        String expectedToken = playerTokensBySession
+        String expectedToken = playerTokensBySessionId
                 .getOrDefault(sessionId, Map.of())
                 .get(playerId);
+
         if (!playerToken.equals(expectedToken)) {
-            return new ServerResult(command.requestId(), false, "UNAUTHORIZED_PLAYER",
-                    "Player identity could not be verified", Map.of());
+            return new ServerResponse(
+                    request.requestId(),
+                    false,
+                    "UNAUTHORIZED_PLAYER",
+                    "Player identity could not be verified",
+                    Map.of(), null
+            );
         }
+
         return null;
     }
 
-    private String authenticatedSessionId(ClientCommand command) {
-        if (command.commandType() == CommandType.REJOIN_SESSION) {
-            String sessionIdentity = text(command.payload().get("sessionIdentity"));
+    private String authenticatedSessionId(ClientRequest request) {
+        if (request.commandType() == CommandType.REJOIN_SESSION) {
+            String sessionIdentity = text(request.payload().get("sessionIdentity"));
+
             if (sessionIdentity == null) {
                 return null;
             }
-            return sessionIdByCode.getOrDefault(sessionIdentity, sessionIdentity);
+
+            return sessionIdByRoomCode.getOrDefault(sessionIdentity, sessionIdentity);
         }
-        return text(command.payload().get("sessionId"));
+
+        return text(request.payload().get("sessionId"));
     }
 
-    private void rememberSessionCode(Map<String, Object> data) {
-        String sessionId = text(data.get("sessionId"));
-        String sessionCode = text(data.get("sessionCode"));
-        if (sessionId != null && sessionCode != null) {
-            sessionIdByCode.put(sessionCode, sessionId);
+    private GameResult execute(ClientRequest request) {
+        try {
+            ControllerRequest controllerRequest = new ControllerRequest(request.payload());
+
+            return switch (request.commandType()) {
+                case CREATE_SESSION -> gameController.createSession(controllerRequest);
+                case JOIN_SESSION -> gameController.joinSession(controllerRequest);
+                case START_GAME -> gameController.startGame(controllerRequest);
+                case PLAY_CARD -> gameController.playCard(controllerRequest);
+                case PAY_DEBT -> gameController.payDebt(controllerRequest);
+                case PROPOSE_TRADE -> gameController.proposeTrade(controllerRequest);
+                case RESPOND_TRADE -> gameController.respondTrade(controllerRequest);
+                case RESPOND_ACTION -> gameController.respondAction(controllerRequest);
+                case DISCARD_CARDS -> gameController.discardCards(controllerRequest);
+                case END_TURN -> gameController.endTurn(controllerRequest);
+                case REJOIN_SESSION -> gameController.rejoinSession(controllerRequest);
+                case PLAYER_DISCONNECTED -> gameController.playerDisconnected(controllerRequest);
+                case PROCESS_DISCONNECT_TIMEOUTS -> gameController.processDisconnectTimeouts(controllerRequest);
+            };
+        } catch (RuntimeException e) {
+            LOGGER.log(Level.WARNING, "Failed to execute command " + request.commandType(), e);
+
+            return GameResult.failure(
+                    "NETWORK_COMMAND_FAILED",
+                    "Failed to execute " + request.commandType() + ": " + e.getMessage()
+            );
         }
+    }
+
+    private void rememberRoomCode(SessionSnapshot snapshot) {
+        String sessionId = text(snapshot.sessionId());
+        String roomCode = text(snapshot.roomCode());
+
+        if (sessionId != null && roomCode != null) {
+            sessionIdByRoomCode.put(roomCode, sessionId);
+        }
+    }
+
+    private Map<String, Object> responsePayload(SessionSnapshot snapshot) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("sessionId", snapshot.sessionId());
+        payload.put("roomCode", snapshot.roomCode());
+        return payload;
     }
 
     private Map<String, Object> withIssuedPlayerToken(
-            ClientCommand command,
+            ClientRequest request,
             String sessionId,
             String playerId,
-            Map<String, Object> data) {
+            Map<String, Object> data
+    ) {
         if (sessionId == null || playerId == null) {
             return data;
         }
 
-        String playerToken = switch (command.commandType()) {
+        String playerToken = switch (request.commandType()) {
             case CREATE_SESSION, JOIN_SESSION -> issuePlayerToken(sessionId, playerId);
-            case REJOIN_SESSION -> playerTokensBySession.getOrDefault(sessionId, Map.of()).get(playerId);
+            case REJOIN_SESSION -> playerTokensBySessionId
+                    .getOrDefault(sessionId, Map.of())
+                    .get(playerId);
             default -> null;
         };
+
         if (playerToken == null) {
             return data;
         }
@@ -223,53 +307,28 @@ public class GameServer implements AutoCloseable {
     }
 
     private String issuePlayerToken(String sessionId, String playerId) {
-        Map<String, String> tokens = playerTokensBySession.computeIfAbsent(
+        Map<String, String> tokens = playerTokensBySessionId.computeIfAbsent(
                 sessionId,
-                _ -> new ConcurrentHashMap<>());
-        return tokens.computeIfAbsent(playerId, _ -> UUID.randomUUID().toString());
-    }
+                ignored -> new ConcurrentHashMap<>()
+        );
 
-    private GameResult execute(ClientCommand command) {
-        try {
-            ControllerRequest request = new ControllerRequest(command.payload());
-            return switch (command.commandType()) {
-                case CREATE_SESSION -> gameController.createSession(request);
-                case JOIN_SESSION -> {
-                    GameResult result = gameController.joinSession(request);
-                    if (!result.isSuccess()) {
-                        System.err.println("[SERVER] ❌ Failed to join game session");
-                        System.err.println("   Error Code：" + result.getCode());
-                        System.err.println("   Message：" + result.getMessage());
-                        System.err.println("   🔍 Troubleshoot: Wrong session code, full room or game already started");
-                    }
-                    yield result;
-                }
-                case START_GAME -> gameController.startGame(request);
-                case PLAY_CARD -> gameController.playCard(request);
-                case PAY_DEBT -> gameController.payDebt(request);
-                case PROPOSE_TRADE -> gameController.proposeTrade(request);
-                case RESPOND_TRADE -> gameController.respondTrade(request);
-                case RESPOND_ACTION -> gameController.respondAction(request);
-                case DISCARD_CARDS -> gameController.discardCards(request);
-                case END_TURN -> gameController.endTurn(request);
-                case REJOIN_SESSION -> gameController.rejoinSession(request);
-                case PLAYER_DISCONNECTED -> gameController.playerDisconnected(request);
-                case PROCESS_DISCONNECT_TIMEOUTS -> gameController.processDisconnectTimeouts(request);
-            };
-        } catch (RuntimeException e) {
-            return GameResult.failure("NETWORK_COMMAND_FAILED",
-                    "Failed to execute " + command.commandType() + ": " + e.getMessage());
-        }
+        return tokens.computeIfAbsent(playerId, ignored -> UUID.randomUUID().toString());
     }
 
     private void bind(ClientConnection connection, String sessionId, String playerId) {
         connection.bind(sessionId, playerId);
+
         for (ClientConnection other : clients) {
             if (other != connection && other.isBoundTo(sessionId, playerId)) {
-                other.send(new ServerNotice("SESSION_REPLACED",
-                        "Another connection rejoined this player session", Map.of(
-                        "sessionId", sessionId,
-                        "playerId", playerId)));
+                other.send(new ServerNotice(
+                        NoticeType.SESSION_REPLACED,
+                        Map.of(
+                                "message", "Another connection rejoined this player session",
+                                "sessionId", sessionId,
+                                "playerId", playerId
+                        )
+                ));
+
                 other.replaceAndClose();
             }
         }
@@ -280,33 +339,45 @@ public class GameServer implements AutoCloseable {
             if (!connection.isBoundTo(sessionId)) {
                 continue;
             }
-            GameResult snapshot = gameController.rejoinSession(new ControllerRequest(Map.of(
+
+            GameResult stateResult = gameController.rejoinSession(new ControllerRequest(Map.of(
                     "sessionIdentity", sessionId,
-                    "playerId", connection.playerId())));
-            if (snapshot.isSuccess()) {
-                connection.send(new StateUpdate(sessionId, connection.playerId(), snapshot.getData()));
+                    "playerId", connection.playerId()
+            )));
+
+            if (stateResult.isSuccess() && stateResult.getSnapshot().isPresent()) {
+                connection.send(new ServerUpdate(stateResult.getSnapshot().orElseThrow()));
             } else {
-                connection.send(new ServerNotice("STATE_UPDATE_FAILED", snapshot.getMessage(), Map.of(
-                        "code", snapshot.getCode(),
-                        "sessionId", sessionId,
-                        "playerId", connection.playerId())));
+                connection.send(new ServerNotice(
+                        NoticeType.STATE_UPDATE_FAILED,
+                        Map.of(
+                                "message", stateResult.getMessage(),
+                                "code", stateResult.getCode(),
+                                "sessionId", sessionId,
+                                "playerId", connection.playerId()
+                        )
+                ));
             }
         }
     }
 
-    @SuppressWarnings("unchecked")
     private void processDisconnectTimeouts() {
         if (!running.get()) {
             return;
         }
+
         GameResult result = gameController.processDisconnectTimeouts(new ControllerRequest(Map.of()));
+
         if (!result.isSuccess()) {
             return;
         }
+
         Object rawSessionIds = result.getData().get("sessionIds");
+
         if (!(rawSessionIds instanceof List<?> sessionIds)) {
             return;
         }
+
         for (Object sessionId : sessionIds) {
             if (sessionId != null) {
                 broadcastSessionState(sessionId.toString());
@@ -314,34 +385,62 @@ public class GameServer implements AutoCloseable {
         }
     }
 
-    private String resolvePlayerId(ClientCommand command) {
-        String playerId = text(command.payload().get("playerId"));
+    private String resolvePlayerId(ClientRequest request) {
+        String playerId = text(request.payload().get("playerId"));
+
         if (playerId != null) {
             return playerId;
         }
-        if (command.commandType() == CommandType.CREATE_SESSION) {
-            return text(command.payload().get("hostPlayerId"));
+
+        if (request.commandType() == CommandType.CREATE_SESSION) {
+            return text(request.payload().get("hostPlayerId"));
         }
+
         return null;
     }
 
-    private String text(Object value) {
+    private boolean hasBoundConnection(String sessionId, String playerId) {
+        for (ClientConnection connection : clients) {
+            if (connection.isBoundTo(sessionId, playerId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static String text(Object value) {
         if (value == null) {
             return null;
         }
+
         String text = value.toString().trim();
         return text.isEmpty() ? null : text;
     }
 
-    private void closeServerSocket() {
-        if (serverSocket == null) {
+    private synchronized void closeServerSocket() {
+        closeQuietly(serverSocket);
+        serverSocket = null;
+    }
+
+    private static void closeQuietly(ServerSocket socket) {
+        if (socket == null) {
             return;
         }
+
         try {
-            serverSocket.close();
-        } catch (IOException ignored) {
-            // Best-effort shutdown.
+            socket.close();
+        } catch (IOException ignored) {}
+    }
+
+    private static void closeQuietly(Socket socket) {
+        if (socket == null) {
+            return;
         }
+
+        try {
+            socket.close();
+        } catch (IOException ignored) {}
     }
 
     private final class ClientConnection implements Runnable, AutoCloseable {
@@ -357,10 +456,13 @@ public class GameServer implements AutoCloseable {
 
         private ClientConnection(Socket socket) throws IOException {
             this.socket = Objects.requireNonNull(socket, "socket");
+
             this.output = new ObjectOutputStream(socket.getOutputStream());
             this.output.flush();
+
             this.input = new ObjectInputStream(socket.getInputStream());
-            this.thread = new Thread(this, "MonopolyDealServer-Client-" + socket.getPort());
+
+            this.thread = new Thread(this, "monopoly-server-client-" + socket.getPort());
             this.thread.setDaemon(true);
         }
 
@@ -370,104 +472,101 @@ public class GameServer implements AutoCloseable {
 
         @Override
         public void run() {
-            String clientIp = socket.getInetAddress().getHostAddress();
-            int clientPort = socket.getPort();
-            System.out.println("\n[SERVER] 📡 New client incoming: " + clientIp + ":" + clientPort);
-
             try {
                 while (running.get() && open.get()) {
-                    Object message = input.readObject();
-                    if (message instanceof ClientCommand command) {
-                        System.out.println("[SERVER] ✅ Received command from [" + clientIp + "]: " + command.commandType());
+                    Object incomingObject = input.readObject();
 
-                        // Log JOIN_SESSION action for room entry tracking
-                        if (command.commandType() == CommandType.JOIN_SESSION) {
-                            System.out.println("[SERVER] ℹ️  Client[" + clientIp + "] is attempting to join game session");
-                        }
-
-                        handleCommand(this, command);
+                    if (incomingObject instanceof ClientRequest request) {
+                        handleRequest(this, request);
                     } else {
-                        System.err.println("[SERVER] ❌ Client[" + clientIp + "] sent invalid message type: " + message.getClass().getName());
-                        send(new ServerNotice("INVALID_MESSAGE",
-                                "Server expected a ClientCommand", Map.of()));
+                        handleInvalidMessage(incomingObject);
                     }
                 }
             } catch (EOFException e) {
-                System.out.println("[SERVER] ℹ️  Client[" + clientIp + "] disconnected normally");
+                LOGGER.info("Client disconnected normally: " + clientAddress());
             } catch (SocketException e) {
-                if (e.getMessage().contains("Connection reset")) {
-                    System.err.println("[SERVER] ❌ Client[" + clientIp + "] abnormal disconnect: connection reset by peer");
-                    System.err.println("   🔍 Possible reason: Client forced shutdown, network drop or firewall cut connection");
-                } else {
-                    System.out.println("[SERVER] ℹ️  Client[" + clientIp + "] disconnected");
-                }
-            } catch (IOException e) {
-                System.err.println("[SERVER] ❌ Communication error with client[" + clientIp + "]");
-                System.err.println("   Exception Type：" + e.getClass().getSimpleName());
-                System.err.println("   Message：" + e.getMessage());
-
-                if (e.getMessage().contains("invalid type code") || e instanceof java.io.StreamCorruptedException) {
-                    System.err.println("   🔍 Troubleshoot: Version mismatch between client and server or incompatible serialization");
-                }
-
-                e.printStackTrace();
                 if (open.get()) {
-                    send(new ServerNotice("CONNECTION_ERROR", e.getMessage(), Map.of()));
+                    LOGGER.log(Level.INFO, "Client socket closed: " + clientAddress(), e);
                 }
-            } catch (ClassNotFoundException e) {
-                System.err.println("[SERVER] ❌ Unrecognized object received from client[" + clientIp + "]");
-                System.err.println("   Message：" + e.getMessage());
-                System.err.println("   🔍 Troubleshoot: Client/server version inconsistency or missing serialized class");
-                e.printStackTrace();
+            } catch (IOException | ClassNotFoundException e) {
+                LOGGER.log(Level.WARNING, "Client communication failed: " + clientAddress(), e);
+
+                if (open.get()) {
+                    send(new ServerNotice(
+                            NoticeType.CONNECTION_ERROR,
+                            Map.of("message", e.getMessage() == null ? "" : e.getMessage())
+                    ));
+                }
             } finally {
-                String closedSessionId = sessionId;
-                String closedPlayerId = playerId;
-                boolean shouldMarkDisconnected = running.get()
-                        && !replaced
-                        && closedSessionId != null
-                        && closedPlayerId != null;
-
-                close();
-                clients.remove(this);
-
-                if (shouldMarkDisconnected && hasBoundConnection(closedSessionId, closedPlayerId)) {
-                    shouldMarkDisconnected = false;
-                }
-
-                if (shouldMarkDisconnected) {
-                    System.out.println("[SERVER] ℹ️  Player[" + closedPlayerId + "] left session[" + closedSessionId + "]");
-                    GameResult result = gameController.playerDisconnected(new ControllerRequest(Map.of(
-                            "sessionId", closedSessionId,
-                            "playerId", closedPlayerId
-                    )));
-                    if (result.isSuccess()) {
-                        broadcastSessionState(closedSessionId);
-                    }
-                }
-
-                System.out.println("[SERVER] ✅ Connection cleanup finished for [" + clientIp + "]\n");
+                cleanupAfterClose();
             }
         }
 
-        private boolean hasBoundConnection(String sessionId, String playerId) {
-            for (ClientConnection connection : clients) {
-                if (connection.isBoundTo(sessionId, playerId)) {
-                    return true;
-                }
-            }
-            return false;
+        private void handleInvalidMessage(Object incomingObject) {
+            String messageType = incomingObject == null ? "null" : incomingObject.getClass().getName();
+
+            LOGGER.warning("Invalid client message type: " + messageType);
+
+            send(new ServerNotice(
+                    NoticeType.INVALID_MESSAGE,
+                    Map.of(
+                            "message", "Server expected a ClientRequest",
+                            "messageType", messageType
+                    )
+            ));
         }
 
-        private synchronized void send(Object message) {
+        private void cleanupAfterClose() {
+            String closedSessionId = sessionId;
+            String closedPlayerId = playerId;
+
+            boolean shouldMarkDisconnected =
+                    running.get()
+                            && !replaced
+                            && closedSessionId != null
+                            && closedPlayerId != null;
+
+            close();
+            clients.remove(this);
+
+            if (shouldMarkDisconnected && hasBoundConnection(closedSessionId, closedPlayerId)) {
+                shouldMarkDisconnected = false;
+            }
+
+            if (shouldMarkDisconnected) {
+                markPlayerDisconnected(closedSessionId, closedPlayerId);
+            }
+
+            LOGGER.fine("Connection cleanup finished for " + clientAddress());
+        }
+
+        private void markPlayerDisconnected(String sessionId, String playerId) {
+            GameResult result = gameController.playerDisconnected(new ControllerRequest(Map.of(
+                    "sessionId", sessionId,
+                    "playerId", playerId
+            )));
+
+            if (result.isSuccess()) {
+                broadcastSessionState(sessionId);
+            } else {
+                LOGGER.warning("Failed to mark player disconnected: " + result.getMessage());
+            }
+        }
+
+        private synchronized void send(Message message) {
             if (!open.get()) {
                 return;
             }
+
             try {
                 output.writeObject(message);
                 output.flush();
                 output.reset();
+            } catch (SocketException e) {
+                open.set(false);
+                closeQuietly(socket);
             } catch (IOException e) {
-                close();
+                LOGGER.log(Level.WARNING, "Failed to send message to client: " + clientAddress(), e);
             }
         }
 
@@ -482,7 +581,9 @@ public class GameServer implements AutoCloseable {
         }
 
         private boolean isBoundTo(String sessionId) {
-            return open.get() && Objects.equals(this.sessionId, sessionId) && playerId != null;
+            return open.get()
+                    && Objects.equals(this.sessionId, sessionId)
+                    && playerId != null;
         }
 
         private boolean isBoundTo(String sessionId, String playerId) {
@@ -495,16 +596,17 @@ public class GameServer implements AutoCloseable {
             return playerId;
         }
 
+        private String clientAddress() {
+            return socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
+        }
+
         @Override
         public void close() {
             if (!open.getAndSet(false)) {
                 return;
             }
-            try {
-                socket.close();
-            } catch (IOException ignored) {
-                // Best-effort shutdown.
-            }
+
+            closeQuietly(socket);
         }
     }
 }

@@ -1,14 +1,10 @@
 package ie.ucd.bdic.group6.network.client;
 
 import ie.ucd.bdic.group6.command.CommandType;
-import ie.ucd.bdic.group6.network.protocol.ClientCommand;
-import ie.ucd.bdic.group6.network.protocol.ServerNotice;
-import ie.ucd.bdic.group6.network.protocol.ServerResult;
-import ie.ucd.bdic.group6.network.protocol.StateUpdate;
+import ie.ucd.bdic.group6.network.message.*;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Map;
 import java.util.Objects;
@@ -19,56 +15,57 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import static ie.ucd.bdic.group6.network.NetworkConfig.CONNECT_TIMEOUT_MS;
+import static ie.ucd.bdic.group6.network.NetworkConfig.requireValidPort;
 
 public class GameClient implements AutoCloseable {
-    private final Map<String, CompletableFuture<ServerResult>> pendingResults = new ConcurrentHashMap<>();
-    private final CopyOnWriteArrayList<Consumer<ServerResult>> resultListeners = new CopyOnWriteArrayList<>();
-    private final CopyOnWriteArrayList<Consumer<StateUpdate>> stateUpdateListeners = new CopyOnWriteArrayList<>();
+    private static final Logger LOGGER = Logger.getLogger(GameClient.class.getName());
+
+    private final Map<String, CompletableFuture<ServerResponse>> pendingRequests = new ConcurrentHashMap<>();
+    private final CopyOnWriteArrayList<Consumer<ServerUpdate>> updateListeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Consumer<ServerNotice>> noticeListeners = new CopyOnWriteArrayList<>();
-    private final AtomicBoolean connected = new AtomicBoolean(false);
+
+    private ObjectOutputStream output;
+    private ObjectInputStream input;
 
     private Socket socket;
-    private ObjectOutputStream output;
+    private final AtomicBoolean connected = new AtomicBoolean(false);
 
-    public synchronized void connect(String host, int port) throws IOException {
-        System.out.println("[Client] Connecting to server: " + host + ":" + port);
+    public synchronized void connect(String serverAddress, int port) throws IOException {
+        Objects.requireNonNull(serverAddress, "serverAddress must be non-null");
+        requireValidPort(port);
 
         if (connected.get()) {
-            System.out.println("[Client] ⚠️  Client already connected, skip duplicate connection");
+            LOGGER.warning("Client is already connected; duplicate connection ignored");
             return;
         }
 
+        Socket candidateSocket = new Socket();
         try {
-            socket = new Socket(Objects.requireNonNull(host, "host"), port);
-            System.out.println("[Client] ✅ TCP connection established successfully");
+            candidateSocket.connect(new InetSocketAddress(serverAddress, port), CONNECT_TIMEOUT_MS);
 
-            output = new ObjectOutputStream(socket.getOutputStream());
-            output.flush();
-            System.out.println("[Client] ✅ Output stream initialized");
+            ObjectOutputStream out = new ObjectOutputStream(candidateSocket.getOutputStream());
+            out.flush();
 
-            var input = new ObjectInputStream(socket.getInputStream());
-            System.out.println("[Client] ✅ Input stream initialized");
+            ObjectInputStream in = new ObjectInputStream(candidateSocket.getInputStream());
 
+            socket = candidateSocket;
+            output = out;
+            input = in;
             connected.set(true);
-            var gameThread = new GameThread(input, this);
-            gameThread.start();
-            System.out.println("[Client] ✅ Message reading thread started");
 
+            Thread receiverThread = new Thread(new ClientReceiver(in, this), "client-receiver");
+            receiverThread.setDaemon(true);
+            receiverThread.start();
+
+            LOGGER.info("Connected to server " + serverAddress + ":" + port);
         } catch (IOException e) {
-            System.err.println("[Client] ❌ Failed to connect to server");
-            System.err.println("   Target address: " + host + ":" + port);
-            System.err.println("   Error type: " + e.getClass().getSimpleName());
-            System.err.println("   Error message: " + e.getMessage());
+            closeSocket(candidateSocket);
+            LOGGER.log(Level.SEVERE, "Failed to connect to server " + serverAddress + ":" + port, e);
 
-            if (e.getMessage().contains("Connection refused")) {
-                System.err.println("   🔍 Troubleshoot: Server not started, wrong port, inbound connection blocked by firewall");
-            } else if (e.getMessage().contains("Connection timed out")) {
-                System.err.println("   🔍 Troubleshoot: Network unreachable, incorrect IP, outbound connection blocked by firewall");
-            } else if (e.getMessage().contains("No route to host")) {
-                System.err.println("   🔍 Troubleshoot: Server offline, not in same LAN, invalid IP address");
-            }
-
-            closeSocket();
             throw e;
         }
     }
@@ -77,48 +74,49 @@ public class GameClient implements AutoCloseable {
         return connected.get();
     }
 
-    public CompletableFuture<ServerResult> sendCommand(CommandType commandType, Map<String, Object> payload) {
+    private synchronized void send(ClientRequest request) throws IOException {
+        if (output == null) {
+            throw new IOException("Output stream is not available");
+        }
+
+        output.writeObject(request);
+        output.flush();
+        output.reset();
+    }
+
+    public CompletableFuture<ServerResponse> sendCommand(CommandType commandType,
+                                                         Map<String, Object> payload) {
         Objects.requireNonNull(commandType, "commandType");
-        System.out.println("[Client] Sending command: " + commandType);
 
         if (!connected.get()) {
-            CompletableFuture<ServerResult> failed = new CompletableFuture<>();
+            CompletableFuture<ServerResponse> failed = new CompletableFuture<>();
             failed.completeExceptionally(new IllegalStateException("Client is not connected"));
-            System.err.println("[Client] ❌ Failed to send command: Client is offline");
             return failed;
         }
 
+        // Creates the content of the request
         String requestId = UUID.randomUUID().toString();
-        CompletableFuture<ServerResult> future = new CompletableFuture<>();
-        pendingResults.put(requestId, future);
+        CompletableFuture<ServerResponse> future = new CompletableFuture<>();
 
+        pendingRequests.put(requestId, future);
         try {
-            send(new ClientCommand(requestId, commandType, payload));
-            System.out.println("[Client] ✅ Command sent successfully, Request ID: " + requestId);
+            send(new ClientRequest(requestId, commandType, payload));
         } catch (IOException e) {
-            pendingResults.remove(requestId);
+            pendingRequests.remove(requestId);
             future.completeExceptionally(e);
-            System.err.println("[Client] ❌ Command send failed: " + e.getMessage());
-            e.printStackTrace();
+            LOGGER.log(Level.SEVERE, "Failed to send command " + commandType, e);
+            handleDisconnect(e);
         }
 
         return future;
     }
 
-    public void addResultListener(Consumer<ServerResult> listener) {
-        resultListeners.add(Objects.requireNonNull(listener, "listener"));
+    public void addUpdateListener(Consumer<ServerUpdate> listener) {
+        updateListeners.add(Objects.requireNonNull(listener, "listener"));
     }
 
-    public void removeResultListener(Consumer<ServerResult> listener) {
-        resultListeners.remove(listener);
-    }
-
-    public void addStateUpdateListener(Consumer<StateUpdate> listener) {
-        stateUpdateListeners.add(Objects.requireNonNull(listener, "listener"));
-    }
-
-    public void removeStateUpdateListener(Consumer<StateUpdate> listener) {
-        stateUpdateListeners.remove(listener);
+    public void removeUpdateListener(Consumer<ServerUpdate> listener) {
+        updateListeners.remove(listener);
     }
 
     public void addNoticeListener(Consumer<ServerNotice> listener) {
@@ -129,88 +127,102 @@ public class GameClient implements AutoCloseable {
         noticeListeners.remove(listener);
     }
 
-    void handleMessage(Object message) {
-        if (message instanceof ServerResult result) {
-            CompletableFuture<ServerResult> pending = pendingResults.remove(result.requestId());
-            if (pending != null) {
-                pending.complete(result);
+    void handleMessage(Object inputObject) {
+        if (!(inputObject instanceof Message message)) {
+            LOGGER.warning("Received unknown message type: "
+                    + (inputObject == null ? "null" : inputObject.getClass().getName()));
+            return;
+        }
+
+        switch (message) {
+            case ServerResponse response -> {
+                CompletableFuture<ServerResponse> future = pendingRequests.remove(response.requestId());
+
+                if (future != null) {
+                    future.complete(response);
+                } else {
+                    LOGGER.warning("Received response with no pending request: " + response.requestId());
+                }
+                return;
             }
-            resultListeners.forEach(listener -> listener.accept(result));
-            return;
+            case ServerUpdate update -> {
+                notifyListeners(updateListeners, update);
+                return;
+            }
+            case ServerNotice notice -> {
+                notifyListeners(noticeListeners, notice);
+                return;
+            }
+            default -> {}
         }
-        if (message instanceof StateUpdate update) {
-            stateUpdateListeners.forEach(listener -> listener.accept(update));
-            return;
-        }
-        if (message instanceof ServerNotice notice) {
-            noticeListeners.forEach(listener -> listener.accept(notice));
-            return;
-        }
-        ServerNotice notice = new ServerNotice("UNKNOWN_MESSAGE",
-                "Client received an unknown server message", Map.of(
-                "messageType", message == null ? "null" : message.getClass().getName()));
-        noticeListeners.forEach(listener -> listener.accept(notice));
+
+        LOGGER.warning("Unhandled message type: " + message.getClass().getName());
     }
 
     void handleDisconnect(Exception cause) {
+        // Someone had handled it
         if (!connected.getAndSet(false)) {
             return;
         }
 
-        System.out.println("\n[Client] ⚠️  Disconnected from server");
-        if (cause != null) {
-            System.err.println("[Client] ❌ Disconnect reason: " + cause.getClass().getSimpleName() + " - " + cause.getMessage());
-            cause.printStackTrace();
-
-            if (cause instanceof ClassNotFoundException) {
-                System.err.println("   🔍 Troubleshoot: Version mismatch between client and server, incompatible serialized class");
-            } else if (cause instanceof java.io.InvalidClassException) {
-                System.err.println("   🔍 Troubleshoot: SerialVersionUID mismatch or modified class structure");
-            }
-        } else {
-            System.out.println("[Client] ℹ️  Normal connection closure");
-        }
-
+        // Handles it
         CancellationException cancellation = new CancellationException("Client disconnected");
+
         if (cause != null) {
             cancellation.initCause(cause);
         }
-        pendingResults.forEach((_, future) -> future.completeExceptionally(cancellation));
-        pendingResults.clear();
 
-        if (cause != null) {
-            ServerNotice notice = new ServerNotice("CONNECTION_CLOSED", cause.getMessage(), Map.of());
-            noticeListeners.forEach(listener -> listener.accept(notice));
+        failPendingRequests(cancellation);
+
+        if (cause == null) {
+            LOGGER.info("Disconnected from server normally");
+        } else {
+            LOGGER.log(Level.WARNING, "Disconnected from server", cause);
         }
-        closeSocket();
+
+        closeConnection();
+    }
+
+    private <T> void notifyListeners(CopyOnWriteArrayList<Consumer<T>> listeners, T event) {
+        for (Consumer<T> listener : listeners) {
+            try {
+                listener.accept(event);
+            } catch (RuntimeException e) {
+                LOGGER.log(Level.SEVERE, "Listener failed while handling event", e);
+            }
+        }
     }
 
     @Override
     public void close() {
-        if (!connected.getAndSet(false)) {
-            closeSocket();
-            return;
+        if (connected.getAndSet(false)) {
+            CancellationException cancellation = new CancellationException("Client closed");
+
+            failPendingRequests(cancellation);
         }
-        pendingResults.forEach((_, future) ->
-                future.completeExceptionally(new CancellationException("Client closed")));
-        pendingResults.clear();
-        closeSocket();
+
+        closeConnection();
     }
 
-    private synchronized void send(Object message) throws IOException {
-        output.writeObject(message);
-        output.flush();
-        output.reset();
+    private void failPendingRequests(Throwable cause) {
+        pendingRequests.values().forEach(future ->
+                future.completeExceptionally(cause));
+        pendingRequests.clear();
     }
 
-    private void closeSocket() {
+    private synchronized void closeConnection() {
+        closeSocket(socket);
+        socket = null;
+        output = null;
+        input = null;
+    }
+
+    private void closeSocket(Socket socket) {
         if (socket == null) {
             return;
         }
         try {
             socket.close();
-        } catch (IOException ignored) {
-            // Best-effort shutdown.
-        }
+        } catch (IOException ignored) {}
     }
 }

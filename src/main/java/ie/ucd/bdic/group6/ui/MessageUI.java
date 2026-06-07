@@ -5,8 +5,6 @@ import javafx.scene.control.TextInputControl;
 import java.util.Collection;
 
 public final class MessageUI {
-    private MessageUI() {
-    }
 
     static void show(TextInputControl target, String message) {
         if (target == null || message == null || message.isBlank()) {

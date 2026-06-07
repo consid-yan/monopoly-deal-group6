@@ -1,5 +1,6 @@
 package ie.ucd.bdic.group6.ui;
 
+import ie.ucd.bdic.group6.app.GameSessionCoordinator;
 import ie.ucd.bdic.group6.command.CommandType;
 
 import javafx.collections.FXCollections;
@@ -14,10 +15,11 @@ import java.util.List;
 import java.util.Map;
 
 public class LobbyUI {
-    private final UiSessionContext context;
+
+    private final GameSessionCoordinator context;
 
     @FXML
-    private TextField sessionCodeField;
+    private TextField roomCodeField;
 
     @FXML
     private TextField hostField;
@@ -29,9 +31,6 @@ public class LobbyUI {
     private TextField joinHostField;
 
     @FXML
-    private TextField joinPortField;
-
-    @FXML
     private ListView<String> playersList;
 
     @FXML
@@ -40,17 +39,16 @@ public class LobbyUI {
     @FXML
     private TextArea statusArea;
 
-    public LobbyUI(UiSessionContext context) {
+    public LobbyUI(GameSessionCoordinator context) {
         this.context = context;
     }
 
     @FXML
     private void initialize() {
-        sessionCodeField.clear();
+        roomCodeField.clear();
         hostField.clear();
         playerCountField.clear();
         joinHostField.clear();
-        joinPortField.clear();
         playersList.setItems(FXCollections.observableArrayList());
         context.setSnapshotListener(this::render);
         context.setMessageListener(this::showStatus);
@@ -70,7 +68,7 @@ public class LobbyUI {
         );
         context.sendCommand(CommandType.START_GAME, payload)
                 .thenAccept(result -> {
-                    if (result.success()) {
+                    if (result.accepted()) {
                         javafx.application.Platform.runLater(SceneManager::showGame);
                     }
                 });
@@ -89,11 +87,10 @@ public class LobbyUI {
 
     private void render(UiSnapshot snapshot) {
         if (snapshot == null || snapshot.isEmpty()) {
-            sessionCodeField.clear();
+            roomCodeField.clear();
+            joinHostField.clear();
             hostField.clear();
             playerCountField.clear();
-            joinHostField.clear();
-            joinPortField.clear();
             playersList.setItems(FXCollections.observableArrayList());
             showStatus("Connect to a session from the main menu.");
             return;
@@ -107,28 +104,15 @@ public class LobbyUI {
             return;
         }
 
-        sessionCodeField.setText(snapshot.sessionCode());
+        roomCodeField.setText(snapshot.roomCode());
         hostField.setText(snapshot.playerName(snapshot.hostPlayerId()));
         playerCountField.setText(snapshot.players().size() + " / " + snapshot.maxPlayers());
         joinHostField.setText(context.joinHost());
-        joinPortField.setText(context.joinPort());
         playersList.setItems(FXCollections.observableArrayList(playerRows(snapshot)));
         if (startGameButton != null) {
             startGameButton.setDisable(!context.playerId().equals(snapshot.hostPlayerId()));
         }
-        MessageUI.show(statusArea, """
-                Session ID: %s
-                Your Player ID: %s
-                Your Player Token: %s
-                Join Host: %s
-                Join Port: %s
-                Waiting for the host to start when 2 to 5 players are present.
-                """.formatted(
-                snapshot.sessionId(),
-                context.playerId(),
-                context.playerToken(),
-                context.joinHost(),
-                context.joinPort()));
+        MessageUI.show(statusArea, "Waiting for the host to start");
     }
 
     private List<String> playerRows(UiSnapshot snapshot) {
@@ -138,14 +122,17 @@ public class LobbyUI {
             if (player.playerId().equals(snapshot.hostPlayerId())) {
                 tags.add("Host");
             }
-            tags.add(player.playerStatus());
             if (!player.connected()) {
                 tags.add("Disconnected");
             }
             if (player.playerId().equals(context.playerId())) {
                 tags.add("You");
             }
-            rows.add(player.displayName() + " - " + String.join(" - ", tags));
+            if (tags.isEmpty()) {
+                rows.add(player.displayName());
+            } else {
+                rows.add(player.displayName() + " (" + String.join(", ", tags) + ")");
+            }
         }
         return rows;
     }

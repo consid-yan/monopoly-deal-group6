@@ -1,17 +1,43 @@
 package ie.ucd.bdic.group6.ui;
 
+import ie.ucd.bdic.group6.core.snapshot.CardSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.PendingActionSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.PendingDebtSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.PendingTradeSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.PlayerStateSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.PropertyRowSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.SessionSnapshot;
+
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 public final class UiSnapshot {
-    private static final UiSnapshot EMPTY = new UiSnapshot(Map.of());
 
-    private final Map<String, Object> data;
+    private static final SessionSnapshot EMPTY_SNAPSHOT = new SessionSnapshot(
+            "",
+            "",
+            "",
+            0,
+            "",
+            "",
+            0,
+            0,
+            "",
+            0,
+            0,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of()
+    );
+    private static final UiSnapshot EMPTY = new UiSnapshot(EMPTY_SNAPSHOT);
+
+    private final SessionSnapshot snapshot;
     private final List<PlayerView> players;
     private final List<CardView> currentPlayerHand;
     private final List<PendingDebtView> pendingDebts;
@@ -19,77 +45,76 @@ public final class UiSnapshot {
     private final List<PendingActionView> pendingActions;
     private final List<String> forfeitedPlayerIds;
 
-    private UiSnapshot(Map<String, Object> data) {
-        this.data = data == null ? Map.of() : Map.copyOf(data);
-        this.players = maps(this.data.get("players")).stream().map(PlayerView::from).toList();
-        this.currentPlayerHand = maps(this.data.get("currentPlayerHand")).stream().map(CardView::from).toList();
-        this.pendingDebts = maps(this.data.get("pendingDebts")).stream().map(PendingDebtView::from).toList();
-        this.pendingTrades = maps(this.data.get("pendingTrades")).stream().map(PendingTradeView::from).toList();
-        this.pendingActions = maps(this.data.get("pendingActions")).stream().map(PendingActionView::from).toList();
-        this.forfeitedPlayerIds = strings(this.data.get("forfeitedPlayerIds"));
+    private UiSnapshot(SessionSnapshot snapshot) {
+        this.snapshot = snapshot == null ? EMPTY_SNAPSHOT : snapshot;
+        this.players = this.snapshot.players().stream().map(PlayerView::from).toList();
+        this.currentPlayerHand = this.snapshot.currentPlayerHand().stream().map(CardView::from).toList();
+        this.pendingDebts = this.snapshot.pendingDebts().stream().map(PendingDebtView::from).toList();
+        this.pendingTrades = this.snapshot.pendingTrades().stream().map(PendingTradeView::from).toList();
+        this.pendingActions = this.snapshot.pendingActions().stream().map(PendingActionView::from).toList();
+        this.forfeitedPlayerIds = this.snapshot.forfeitedPlayerIds();
     }
 
     public static UiSnapshot empty() {
         return EMPTY;
     }
 
-    public static UiSnapshot from(Map<String, Object> data) {
-        if (data == null || data.isEmpty()) {
+    public static UiSnapshot from(SessionSnapshot snapshot) {
+        if (snapshot == null) {
             return empty();
         }
-        return new UiSnapshot(data);
+        return new UiSnapshot(snapshot);
     }
 
     public boolean isEmpty() {
-        return data.isEmpty();
-    }
-
-    public Map<String, Object> data() {
-        return data;
+        return snapshot == EMPTY_SNAPSHOT
+                || (snapshot.sessionId().isBlank()
+                && snapshot.roomCode().isBlank()
+                && players.isEmpty());
     }
 
     public String sessionId() {
-        return text(data.get("sessionId"));
+        return snapshot.sessionId();
     }
 
-    public String sessionCode() {
-        return text(data.get("sessionCode"));
+    public String roomCode() {
+        return snapshot.roomCode();
     }
 
     public String status() {
-        return text(data.get("status"));
+        return snapshot.status();
     }
 
     public String hostPlayerId() {
-        return text(data.get("hostPlayerId"));
+        return snapshot.hostPlayerId();
     }
 
     public int maxPlayers() {
-        return number(data.get("maxPlayers"));
+        return snapshot.maxPlayers();
     }
 
     public String activePlayerId() {
-        return text(data.get("activePlayerId"));
+        return snapshot.activePlayerId();
     }
 
     public int actionsUsed() {
-        return number(data.get("actionsUsed"));
+        return snapshot.actionsUsed();
     }
 
     public int actionsRemaining() {
-        return number(data.get("actionsRemaining"));
+        return snapshot.actionsRemaining();
     }
 
     public String winnerPlayerId() {
-        return text(data.get("winnerPlayerId"));
+        return snapshot.winnerPlayerId();
     }
 
     public int deckSize() {
-        return number(data.get("deckSize"));
+        return snapshot.deckSize();
     }
 
     public int discardSize() {
-        return number(data.get("discardSize"));
+        return snapshot.discardSize();
     }
 
     public List<PlayerView> players() {
@@ -150,6 +175,60 @@ public final class UiSnapshot {
                 .toList();
     }
 
+    public boolean isTurnFor(String playerId) {
+        return playerId != null && !playerId.isBlank() && playerId.equals(activePlayerId());
+    }
+
+    public int cardsToDiscard() {
+        return Math.max(0, currentPlayerHand.size() - 7);
+    }
+
+    public List<PendingDebtView> pendingDebtsForDebtor(String playerId) {
+        return pendingDebts.stream()
+                .filter(debt -> debt.debtorPlayerId().equals(playerId))
+                .toList();
+    }
+
+    public List<PendingTradeView> pendingTradesForTarget(String playerId) {
+        return pendingTrades.stream()
+                .filter(trade -> trade.targetPlayerId().equals(playerId))
+                .filter(PendingTradeView::pending)
+                .toList();
+    }
+
+    public List<PendingActionView> pendingActionsAwaiting(String playerId) {
+        return pendingActions.stream()
+                .filter(action -> action.awaits(playerId))
+                .toList();
+    }
+
+    public boolean canProposeTrade(String playerId) {
+        return opponents(playerId).stream().anyMatch(player -> !player.defeated())
+                && currentPlayer(playerId)
+                .map(player -> !player.visibleCards().isEmpty())
+                .orElse(false);
+    }
+
+    public List<String> tableActivityLines() {
+        List<String> lines = new ArrayList<>();
+        lines.add("Draw pile: " + deckSize() + " cards");
+        lines.add("Discard pile: " + discardSize() + " cards");
+        pendingActions.forEach(action -> lines.add("Action: "
+                + humanize(action.actionType())
+                + " from " + playerName(action.actorPlayerId())));
+        pendingDebts.forEach(debt -> lines.add("Debt: "
+                + playerName(debt.debtorPlayerId())
+                + " owes "
+                + playerName(debt.creditorPlayerId())
+                + " $" + debt.amountM() + "M"));
+        pendingTrades.forEach(trade -> lines.add("Trade: "
+                + playerName(trade.proposerPlayerId())
+                + " -> "
+                + playerName(trade.targetPlayerId())
+                + " (" + humanize(trade.status()) + ")"));
+        return List.copyOf(lines);
+    }
+
     public record PlayerView(
             String playerId,
             String name,
@@ -162,18 +241,18 @@ public final class UiSnapshot {
             List<CardView> bankCards,
             List<PropertyRowView> propertyRows) {
 
-        private static PlayerView from(Map<String, Object> data) {
+        private static PlayerView from(PlayerStateSnapshot snapshot) {
             return new PlayerView(
-                    text(data.get("playerId")),
-                    text(data.get("name")),
-                    text(data.get("playerStatus")),
-                    bool(data.get("connected")),
-                    text(data.get("disconnectedAt")),
-                    bool(data.get("defeated")),
-                    number(data.get("handCount")),
-                    number(data.get("bankTotalValueM")),
-                    maps(data.get("bankCards")).stream().map(CardView::from).toList(),
-                    maps(data.get("propertyRows")).stream().map(PropertyRowView::from).toList());
+                    snapshot.playerId(),
+                    snapshot.name(),
+                    snapshot.playerStatus(),
+                    snapshot.connected(),
+                    snapshot.disconnectedAt(),
+                    snapshot.defeated(),
+                    snapshot.handCount(),
+                    snapshot.bankTotalValueM(),
+                    snapshot.bankCards().stream().map(CardView::from).toList(),
+                    snapshot.propertyRows().stream().map(PropertyRowView::from).toList());
         }
 
         public String displayName() {
@@ -205,15 +284,15 @@ public final class UiSnapshot {
             boolean hasHotel,
             List<CardView> cards) {
 
-        private static PropertyRowView from(Map<String, Object> data) {
+        private static PropertyRowView from(PropertyRowSnapshot snapshot) {
             return new PropertyRowView(
-                    text(data.get("rowId")),
-                    text(data.get("anchorColor")),
-                    bool(data.get("complete")),
-                    number(data.get("rentValue")),
-                    bool(data.get("hasHouse")),
-                    bool(data.get("hasHotel")),
-                    maps(data.get("cards")).stream().map(CardView::from).toList());
+                    snapshot.rowId(),
+                    snapshot.anchorColor(),
+                    snapshot.complete(),
+                    snapshot.rentValue(),
+                    snapshot.hasHouse(),
+                    snapshot.hasHotel(),
+                    snapshot.cards().stream().map(CardView::from).toList());
         }
 
         public String label() {
@@ -229,6 +308,31 @@ public final class UiSnapshot {
             }
             return label.toString();
         }
+
+        public int requiredToComplete() {
+            int colorRequirement = switch (anchorColor) {
+                case "BROWN", "DARK_BLUE", "UTILITY" -> 2;
+                case "RAILROAD" -> 4;
+                case "LIGHT_BLUE", "PINK", "ORANGE", "RED", "YELLOW", "GREEN" -> 3;
+                default -> 0;
+            };
+            if (colorRequirement > 0) {
+                return colorRequirement;
+            }
+            return cards.stream()
+                    .mapToInt(CardView::requiredToComplete)
+                    .filter(required -> required > 0)
+                    .findFirst()
+                    .orElse(cards.size());
+        }
+
+        public String progressLabel() {
+            int required = requiredToComplete();
+            if (required <= 0) {
+                return cards.size() + " cards";
+            }
+            return cards.size() + "/" + required + " cards";
+        }
     }
 
     public record CardView(
@@ -243,18 +347,18 @@ public final class UiSnapshot {
             String actionType,
             List<String> rentColorOptions) {
 
-        private static CardView from(Map<String, Object> data) {
+        private static CardView from(CardSnapshot snapshot) {
             return new CardView(
-                    text(data.get("id")),
-                    text(data.get("type")),
-                    text(data.get("displayName")),
-                    number(data.get("bankValueM")),
-                    number(data.get("valueM")),
-                    text(data.get("propertyColor")),
-                    number(data.get("requiredToComplete")),
-                    strings(data.get("allowedColors")),
-                    text(data.get("actionType")),
-                    strings(data.get("rentColorOptions")));
+                    snapshot.id(),
+                    snapshot.type(),
+                    snapshot.displayName(),
+                    snapshot.bankValueM(),
+                    snapshot.valueM(),
+                    snapshot.propertyColor(),
+                    snapshot.requiredToComplete(),
+                    snapshot.allowedColors(),
+                    snapshot.actionType(),
+                    snapshot.rentColorOptions());
         }
 
         public String title() {
@@ -281,14 +385,14 @@ public final class UiSnapshot {
             String sourceAction,
             String sourceCardId) {
 
-        private static PendingDebtView from(Map<String, Object> data) {
+        private static PendingDebtView from(PendingDebtSnapshot snapshot) {
             return new PendingDebtView(
-                    text(data.get("debtId")),
-                    text(data.get("creditorPlayerId")),
-                    text(data.get("debtorPlayerId")),
-                    number(data.get("amountM")),
-                    text(data.get("sourceAction")),
-                    text(data.get("sourceCardId")));
+                    snapshot.debtId(),
+                    snapshot.creditorPlayerId(),
+                    snapshot.debtorPlayerId(),
+                    snapshot.amountM(),
+                    snapshot.sourceAction(),
+                    snapshot.sourceCardId());
         }
     }
 
@@ -298,16 +402,24 @@ public final class UiSnapshot {
             String targetPlayerId,
             List<String> offeredCardIds,
             List<String> requestedCardIds,
-            String status) {
+            String status,
+            String createdAt,
+            String respondedAt) {
 
-        private static PendingTradeView from(Map<String, Object> data) {
+        private static PendingTradeView from(PendingTradeSnapshot snapshot) {
             return new PendingTradeView(
-                    text(data.get("tradeId")),
-                    text(data.get("proposerPlayerId")),
-                    text(data.get("targetPlayerId")),
-                    strings(data.get("offeredCardIds")),
-                    strings(data.get("requestedCardIds")),
-                    text(data.get("status")));
+                    snapshot.tradeId(),
+                    snapshot.proposerPlayerId(),
+                    snapshot.targetPlayerId(),
+                    snapshot.offeredCardIds(),
+                    snapshot.requestedCardIds(),
+                    snapshot.status(),
+                    snapshot.createdAt(),
+                    snapshot.respondedAt());
+        }
+
+        public boolean pending() {
+            return "PENDING".equals(status);
         }
     }
 
@@ -324,94 +436,33 @@ public final class UiSnapshot {
             String offeredCardId,
             String requestedCardId,
             List<String> targetPlayerIds,
-            Map<String, String> responses) {
+            Map<String, String> responses,
+            String createdAt) {
 
-        private static PendingActionView from(Map<String, Object> data) {
+        private static PendingActionView from(PendingActionSnapshot snapshot) {
             return new PendingActionView(
-                    text(data.get("actionId")),
-                    text(data.get("actorPlayerId")),
-                    text(data.get("actionType")),
-                    text(data.get("actionCardId")),
-                    text(data.get("doubleRentCardId")),
-                    text(data.get("propertyColor")),
-                    number(data.get("amountM")),
-                    text(data.get("targetCardId")),
-                    text(data.get("targetPropertyRowId")),
-                    text(data.get("offeredCardId")),
-                    text(data.get("requestedCardId")),
-                    strings(data.get("targetPlayerIds")),
-                    stringMap(data.get("responses")));
+                    snapshot.actionId(),
+                    snapshot.actorPlayerId(),
+                    snapshot.actionType(),
+                    snapshot.actionCardId(),
+                    snapshot.doubleRentCardId(),
+                    snapshot.propertyColor(),
+                    snapshot.amountM(),
+                    snapshot.targetCardId(),
+                    snapshot.targetPropertyRowId(),
+                    snapshot.offeredCardId(),
+                    snapshot.requestedCardId(),
+                    snapshot.targetPlayerIds(),
+                    snapshot.responses(),
+                    snapshot.createdAt());
         }
 
         public boolean awaits(String playerId) {
-            return targetPlayerIds.contains(playerId) && !responses.containsKey(playerId);
-        }
-    }
-
-    static List<Map<String, Object>> maps(Object raw) {
-        if (!(raw instanceof Iterable<?> iterable)) {
-            return List.of();
-        }
-        List<Map<String, Object>> values = new ArrayList<>();
-        for (Object value : iterable) {
-            if (value instanceof Map<?, ?> map) {
-                Map<String, Object> copy = new LinkedHashMap<>();
-                map.forEach((key, entryValue) -> copy.put(Objects.toString(key, ""), entryValue));
-                values.add(Map.copyOf(copy));
+            if (playerId == null || !targetPlayerIds.contains(playerId)) {
+                return false;
             }
+            return "PENDING".equals(responses.getOrDefault(playerId, "PENDING"));
         }
-        return List.copyOf(values);
-    }
-
-    static List<String> strings(Object raw) {
-        if (!(raw instanceof Iterable<?> iterable)) {
-            return List.of();
-        }
-        List<String> values = new ArrayList<>();
-        for (Object value : iterable) {
-            String text = text(value);
-            if (!text.isBlank()) {
-                values.add(text);
-            }
-        }
-        return List.copyOf(values);
-    }
-
-    private static Map<String, String> stringMap(Object raw) {
-        if (!(raw instanceof Map<?, ?> map)) {
-            return Map.of();
-        }
-        Map<String, String> copy = new LinkedHashMap<>();
-        map.forEach((key, value) -> copy.put(Objects.toString(key, ""), text(value)));
-        return Map.copyOf(copy);
-    }
-
-    static String text(Object raw) {
-        if (raw == null) {
-            return "";
-        }
-        return raw.toString();
-    }
-
-    static int number(Object raw) {
-        if (raw instanceof Number number) {
-            return number.intValue();
-        }
-        if (raw == null || raw.toString().isBlank()) {
-            return 0;
-        }
-        try {
-            return Integer.parseInt(raw.toString());
-        } catch (NumberFormatException e) {
-            return 0;
-        }
-    }
-
-    static boolean bool(Object raw) {
-        if (raw instanceof Boolean value) {
-            return value;
-        }
-        return Boolean.parseBoolean(text(raw));
     }
 
     static String humanize(String raw) {

@@ -5,11 +5,14 @@ import ie.ucd.bdic.group6.command.CommandType;
 import ie.ucd.bdic.group6.controller.GameController;
 import ie.ucd.bdic.group6.controller.mapper.RequestMapper;
 import ie.ucd.bdic.group6.core.engine.GameEngine;
+import ie.ucd.bdic.group6.core.snapshot.CardSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.PlayerStateSnapshot;
 import ie.ucd.bdic.group6.facade.GameFacade;
 import ie.ucd.bdic.group6.network.client.GameClient;
-import ie.ucd.bdic.group6.network.protocol.ServerNotice;
-import ie.ucd.bdic.group6.network.protocol.ServerResult;
-import ie.ucd.bdic.group6.network.protocol.StateUpdate;
+import ie.ucd.bdic.group6.network.message.NoticeType;
+import ie.ucd.bdic.group6.network.message.ServerNotice;
+import ie.ucd.bdic.group6.network.message.ServerResponse;
+import ie.ucd.bdic.group6.network.message.ServerUpdate;
 import ie.ucd.bdic.group6.network.server.GameServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +30,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
+import static ie.ucd.bdic.group6.network.NetworkConfig.DEFAULT_PORT;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NetworkIntegrationTest {
@@ -44,91 +48,96 @@ class NetworkIntegrationTest {
 
     @Test
     void loopbackClientsExecuteCommandsReceivePrivateStateAndRejoin() throws Exception {
-        server = new AppConfig().gameServer(0);
+        server = new AppConfig().gameServer(DEFAULT_PORT);
         server.startAsync();
         assertTrue(server.isRunning());
         assertTrue(server.port() > 0);
 
-        GameClient host = connectedClient();
-        GameClient player2 = connectedClient();
+        GameClient host = client();
         List<ServerNotice> hostNotices = notices(host);
+        List<ServerUpdate> hostUpdates = updates(host);
+        connect(host);
+
+        GameClient player2 = client();
         List<ServerNotice> player2Notices = notices(player2);
-        List<StateUpdate> hostUpdates = updates(host);
-        List<StateUpdate> player2Updates = updates(player2);
+        List<ServerUpdate> player2Updates = updates(player2);
+        connect(player2);
 
-        await(hostNotices, notice -> notice.type().equals("CONNECTED"));
-        await(player2Notices, notice -> notice.type().equals("CONNECTED"));
+        await(hostNotices, notice -> notice.type() == NoticeType.CONNECTED);
+        await(player2Notices, notice -> notice.type() == NoticeType.CONNECTED);
 
-        ServerResult created = host.sendCommand(CommandType.CREATE_SESSION, Map.of(
+        ServerResponse created = host.sendCommand(CommandType.CREATE_SESSION, Map.of(
                 "hostPlayerId", "host",
                 "playerName", "Host",
                 "maxPlayers", 2
         )).get(3, TimeUnit.SECONDS);
-        assertTrue(created.success());
-        String sessionId = text(created.data(), "sessionId");
-        String sessionCode = text(created.data(), "sessionCode");
-        String hostToken = text(created.data(), "playerToken");
+        assertTrue(created.accepted());
+        String sessionId = text(created.payload(), "sessionId");
+        String roomCode = text(created.payload(), "roomCode");
+        String hostToken = text(created.payload(), "playerToken");
         assertNotNull(sessionId);
-        assertNotNull(sessionCode);
+        assertNotNull(roomCode);
         assertNotNull(hostToken);
-        assertEquals("host", created.data().get("hostPlayerId"));
-        assertEquals(2, created.data().get("maxPlayers"));
+        assertNotNull(created.snapshot());
+        assertEquals("host", created.snapshot().hostPlayerId());
+        assertEquals(2, created.snapshot().maxPlayers());
 
-        ServerResult invalidJoin = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
-                "sessionCode", "NOPE",
+        ServerResponse invalidJoin = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
+                "roomCode", "NOPE",
                 "playerId", "player2",
                 "playerName", "Player 2"
         )).get(3, TimeUnit.SECONDS);
-        assertFalse(invalidJoin.success());
+        assertFalse(invalidJoin.accepted());
         assertTrue(host.isConnected());
         assertTrue(player2.isConnected());
 
-        ServerResult joined = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
-                "sessionCode", sessionCode,
+        ServerResponse joined = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
+                "roomCode", roomCode,
                 "playerId", "player2",
                 "playerName", "Player 2"
         )).get(3, TimeUnit.SECONDS);
-        assertTrue(joined.success());
-        String player2Token = text(joined.data(), "playerToken");
+        assertTrue(joined.accepted());
+        String player2Token = text(joined.payload(), "playerToken");
         assertNotNull(player2Token);
-        await(hostUpdates, update -> update.sessionId().equals(sessionId)
+        await(hostUpdates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
                 && players(update).size() == 2);
-        await(player2Updates, update -> update.sessionId().equals(sessionId)
+        await(player2Updates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
                 && players(update).size() == 2);
 
-        ServerResult started = host.sendCommand(CommandType.START_GAME, Map.of(
+        ServerResponse started = host.sendCommand(CommandType.START_GAME, Map.of(
                 "sessionId", sessionId,
                 "playerId", "host",
                 "playerToken", hostToken
         )).get(3, TimeUnit.SECONDS);
-        assertTrue(started.success());
+        assertTrue(started.accepted());
 
-        StateUpdate hostActive = await(hostUpdates, activeUpdate(sessionId, "host"));
-        StateUpdate player2Active = await(player2Updates, activeUpdate(sessionId, "player2"));
+        ServerUpdate hostActive = await(hostUpdates, activeUpdate(sessionId));
+        ServerUpdate player2Active = await(player2Updates, activeUpdate(sessionId));
         assertNotNull(hostActive);
-        assertEquals("ACTIVE", hostActive.data().get("status"));
+        assertEquals("ACTIVE", hostActive.snapshot().status());
         assertNotNull(player2Active);
-        assertEquals("ACTIVE", player2Active.data().get("status"));
-        assertEquals("host", hostActive.data().get("hostPlayerId"));
-        assertEquals(2, hostActive.data().get("maxPlayers"));
+        assertEquals("ACTIVE", player2Active.snapshot().status());
+        assertEquals("host", hostActive.snapshot().hostPlayerId());
+        assertEquals(2, hostActive.snapshot().maxPlayers());
         assertEquals(7, currentPlayerHand(hostActive).size());
         assertEquals(5, currentPlayerHand(player2Active).size());
         assertNotEquals(currentPlayerHand(hostActive), currentPlayerHand(player2Active));
 
         player2.close();
-        GameClient rejoinedPlayer2 = connectedClient();
-        List<StateUpdate> rejoinedUpdates = updates(rejoinedPlayer2);
-        ServerResult rejoined = rejoinedPlayer2.sendCommand(CommandType.REJOIN_SESSION, Map.of(
+        GameClient rejoinedPlayer2 = client();
+        List<ServerUpdate> rejoinedUpdates = updates(rejoinedPlayer2);
+        connect(rejoinedPlayer2);
+        ServerResponse rejoined = rejoinedPlayer2.sendCommand(CommandType.REJOIN_SESSION, Map.of(
                 "sessionIdentity", sessionId,
                 "playerId", "player2",
                 "playerToken", player2Token
         )).get(3, TimeUnit.SECONDS);
-        assertTrue(rejoined.success());
-        assertEquals(player2Token, rejoined.data().get("playerToken"));
+        assertTrue(rejoined.accepted());
+        assertEquals(player2Token, rejoined.payload().get("playerToken"));
 
-        StateUpdate rejoinedState = await(rejoinedUpdates, activeUpdate(sessionId, "player2"));
+        ServerUpdate rejoinedState = await(rejoinedUpdates, activeUpdate(sessionId));
         assertNotNull(rejoinedState);
-        assertEquals("ACTIVE", rejoinedState.data().get("status"));
+        assertEquals("ACTIVE", rejoinedState.snapshot().status());
         assertEquals(5, currentPlayerHand(rejoinedState).size());
     }
 
@@ -136,114 +145,126 @@ class NetworkIntegrationTest {
     void serverMarksDisconnectedPlayerForfeitAndBroadcastsResultAfterTimeout() throws Exception {
         MutableClock clock = new MutableClock();
         GameEngine engine = new GameEngine(clock);
-        server = new GameServer(new GameController(new GameFacade(engine), new RequestMapper()), 0);
+        server = new GameServer(new GameController(new GameFacade(engine), new RequestMapper()), DEFAULT_PORT);
         server.startAsync();
 
-        GameClient host = connectedClient();
+        GameClient host = client();
         List<ServerNotice> hostNotices = notices(host);
-        GameClient player2 = connectedClient();
-        List<ServerNotice> player2Notices = notices(player2);
-        List<StateUpdate> hostUpdates = updates(host);
-        await(hostNotices, notice -> notice.type().equals("CONNECTED"));
-        await(player2Notices, notice -> notice.type().equals("CONNECTED"));
+        List<ServerUpdate> hostUpdates = updates(host);
+        connect(host);
 
-        ServerResult created = host.sendCommand(CommandType.CREATE_SESSION, Map.of(
+        GameClient player2 = client();
+        List<ServerNotice> player2Notices = notices(player2);
+        connect(player2);
+        await(hostNotices, notice -> notice.type() == NoticeType.CONNECTED);
+        await(player2Notices, notice -> notice.type() == NoticeType.CONNECTED);
+
+        ServerResponse created = host.sendCommand(CommandType.CREATE_SESSION, Map.of(
                 "hostPlayerId", "host",
                 "playerName", "Host",
                 "maxPlayers", 2
         )).get(3, TimeUnit.SECONDS);
-        String sessionId = text(created.data(), "sessionId");
-        String sessionCode = text(created.data(), "sessionCode");
-        String hostToken = text(created.data(), "playerToken");
-        assertTrue(created.success());
+        String sessionId = text(created.payload(), "sessionId");
+        String roomCode = text(created.payload(), "roomCode");
+        String hostToken = text(created.payload(), "playerToken");
+        assertTrue(created.accepted());
 
-        assertNotNull(sessionCode);
-        ServerResult joined = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
-                "sessionCode", sessionCode,
+        assertNotNull(roomCode);
+        ServerResponse joined = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
+                "roomCode", roomCode,
                 "playerId", "player2",
                 "playerName", "Player 2"
         )).get(3, TimeUnit.SECONDS);
-        assertTrue(joined.success());
+        assertTrue(joined.accepted());
         assertNotNull(sessionId);
         assertNotNull(hostToken);
         assertTrue(host.sendCommand(CommandType.START_GAME, Map.of(
                 "sessionId", sessionId,
                 "playerId", "host",
                 "playerToken", hostToken
-        )).get(3, TimeUnit.SECONDS).success());
-        await(hostUpdates, activeUpdate(sessionId, "host"));
+        )).get(3, TimeUnit.SECONDS).accepted());
+        await(hostUpdates, activeUpdate(sessionId));
 
         player2.close();
-        await(hostUpdates, update -> update.sessionId().equals(sessionId)
+        await(hostUpdates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
                 && playerHasStatus(update, "player2", "DISCONNECTED"));
 
         clock.advance(Duration.ofSeconds(91));
-        StateUpdate finished = await(hostUpdates, update -> update.sessionId().equals(sessionId)
-                && "FINISHED".equals(update.data().get("status")));
+        ServerUpdate finished = await(hostUpdates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
+                && "FINISHED".equals(update.snapshot().status()));
 
         assertNotNull(finished);
-        assertEquals("host", finished.data().get("winnerPlayerId"));
-        assertEquals(List.of("player2"), finished.data().get("forfeitedPlayerIds"));
-        assertEquals("DEFEATED", player(finished, "player2").get("playerStatus"));
+        assertEquals("host", finished.snapshot().winnerPlayerId());
+        assertEquals(List.of("player2"), finished.snapshot().forfeitedPlayerIds());
+        assertEquals("DEFEATED", player(finished, "player2").playerStatus());
     }
 
     @Test
     void serverRejectsCommandsWhenPlayerTokenIsMissingOrWrong() throws Exception {
-        server = new AppConfig().gameServer(0);
+        server = new AppConfig().gameServer(DEFAULT_PORT);
         server.startAsync();
 
         GameClient host = connectedClient();
         GameClient player2 = connectedClient();
 
-        ServerResult created = host.sendCommand(CommandType.CREATE_SESSION, Map.of(
+        ServerResponse created = host.sendCommand(CommandType.CREATE_SESSION, Map.of(
                 "hostPlayerId", "host",
                 "playerName", "Host",
                 "maxPlayers", 2
         )).get(3, TimeUnit.SECONDS);
-        assertTrue(created.success());
-        String sessionId = text(created.data(), "sessionId");
-        String sessionCode = text(created.data(), "sessionCode");
-        String hostToken = text(created.data(), "playerToken");
+        assertTrue(created.accepted());
+        String sessionId = text(created.payload(), "sessionId");
+        String roomCode = text(created.payload(), "roomCode");
+        String hostToken = text(created.payload(), "playerToken");
         assertNotNull(sessionId);
-        assertNotNull(sessionCode);
+        assertNotNull(roomCode);
         assertNotNull(hostToken);
 
-        ServerResult missingToken = host.sendCommand(CommandType.START_GAME, Map.of(
+        ServerResponse missingToken = host.sendCommand(CommandType.START_GAME, Map.of(
                 "sessionId", sessionId,
                 "playerId", "host"
         )).get(3, TimeUnit.SECONDS);
-        assertFalse(missingToken.success());
+        assertFalse(missingToken.accepted());
         assertEquals("AUTH_REQUIRED", missingToken.code());
 
-        ServerResult joined = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
-                "sessionCode", sessionCode,
+        ServerResponse joined = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
+                "roomCode", roomCode,
                 "playerId", "player2",
                 "playerName", "Player 2"
         )).get(3, TimeUnit.SECONDS);
-        assertTrue(joined.success());
-        String player2Token = text(joined.data(), "playerToken");
+        assertTrue(joined.accepted());
+        String player2Token = text(joined.payload(), "playerToken");
         assertNotNull(player2Token);
 
-        ServerResult spoofedHost = player2.sendCommand(CommandType.START_GAME, Map.of(
+        ServerResponse spoofedHost = player2.sendCommand(CommandType.START_GAME, Map.of(
                 "sessionId", sessionId,
                 "playerId", "host",
                 "playerToken", player2Token
         )).get(3, TimeUnit.SECONDS);
-        assertFalse(spoofedHost.success());
+        assertFalse(spoofedHost.accepted());
         assertEquals("UNAUTHORIZED_PLAYER", spoofedHost.code());
 
-        ServerResult legitimateStart = host.sendCommand(CommandType.START_GAME, withToken(Map.of(
+        ServerResponse legitimateStart = host.sendCommand(CommandType.START_GAME, withToken(Map.of(
                 "sessionId", sessionId,
                 "playerId", "host"
         ), hostToken)).get(3, TimeUnit.SECONDS);
-        assertTrue(legitimateStart.success());
+        assertTrue(legitimateStart.accepted());
     }
 
     private GameClient connectedClient() throws IOException {
+        GameClient client = client();
+        connect(client);
+        return client;
+    }
+
+    private GameClient client() {
         GameClient client = new GameClient();
         clients.add(client);
-        client.connect("127.0.0.1", server.port());
         return client;
+    }
+
+    private void connect(GameClient client) throws IOException {
+        client.connect("127.0.0.1", server.port());
     }
 
     private List<ServerNotice> notices(GameClient client) {
@@ -252,9 +273,9 @@ class NetworkIntegrationTest {
         return notices;
     }
 
-    private List<StateUpdate> updates(GameClient client) {
-        List<StateUpdate> updates = new CopyOnWriteArrayList<>();
-        client.addStateUpdateListener(updates::add);
+    private List<ServerUpdate> updates(GameClient client) {
+        List<ServerUpdate> updates = new CopyOnWriteArrayList<>();
+        client.addUpdateListener(updates::add);
         return updates;
     }
 
@@ -264,10 +285,9 @@ class NetworkIntegrationTest {
         return copy;
     }
 
-    private Predicate<StateUpdate> activeUpdate(String sessionId, String playerId) {
-        return update -> update.sessionId().equals(sessionId)
-                && update.playerId().equals(playerId)
-                && "ACTIVE".equals(update.data().get("status"));
+    private Predicate<ServerUpdate> activeUpdate(String sessionId) {
+        return update -> sessionId.equals(text(update.snapshot(), "sessionId"))
+                && "ACTIVE".equals(update.snapshot().status());
     }
 
     private <T> T await(List<T> values, Predicate<T> predicate) throws InterruptedException {
@@ -284,29 +304,33 @@ class NetworkIntegrationTest {
         return null;
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> players(StateUpdate update) {
-        return (List<Map<String, Object>>) update.data().get("players");
+    private List<PlayerStateSnapshot> players(ServerUpdate update) {
+        return update.snapshot().players();
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> player(StateUpdate update, String playerId) {
-        return ((List<Map<String, Object>>) update.data().get("players")).stream()
-                .filter(player -> playerId.equals(player.get("playerId")))
+    private PlayerStateSnapshot player(ServerUpdate update, String playerId) {
+        return update.snapshot().players().stream()
+                .filter(player -> playerId.equals(player.playerId()))
                 .findFirst()
                 .orElseThrow();
     }
 
-    @SuppressWarnings("unchecked")
-    private boolean playerHasStatus(StateUpdate update, String playerId, String status) {
-        return ((List<Map<String, Object>>) update.data().get("players")).stream()
-                .anyMatch(player -> playerId.equals(player.get("playerId"))
-                        && status.equals(player.get("playerStatus")));
+    private boolean playerHasStatus(ServerUpdate update, String playerId, String status) {
+        return update.snapshot().players().stream()
+                .anyMatch(player -> playerId.equals(player.playerId())
+                        && status.equals(player.playerStatus()));
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> currentPlayerHand(StateUpdate update) {
-        return (List<Map<String, Object>>) update.data().get("currentPlayerHand");
+    private List<CardSnapshot> currentPlayerHand(ServerUpdate update) {
+        return update.snapshot().currentPlayerHand();
+    }
+
+    private String text(ie.ucd.bdic.group6.core.snapshot.SessionSnapshot snapshot, String key) {
+        return switch (key) {
+            case "sessionId" -> snapshot.sessionId();
+            case "roomCode" -> snapshot.roomCode();
+            default -> null;
+        };
     }
 
     private String text(Map<String, Object> data, String key) {
