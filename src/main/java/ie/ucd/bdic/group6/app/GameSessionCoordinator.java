@@ -69,13 +69,6 @@ public final class GameSessionCoordinator implements AutoCloseable {
         return connected && currentClient != null && currentClient.isConnected();
     }
 
-    public String connectionLabel() {
-        if (isConnected()) {
-            return host + ":" + DEFAULT_PORT;
-        }
-        return "Disconnected";
-    }
-
     public String joinHost() {
         return host;
     }

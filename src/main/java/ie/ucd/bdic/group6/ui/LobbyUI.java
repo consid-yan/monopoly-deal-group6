@@ -6,9 +6,9 @@ import ie.ucd.bdic.group6.command.CommandType;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,16 +19,16 @@ public class LobbyUI {
     private final GameSessionCoordinator context;
 
     @FXML
-    private TextField roomCodeField;
+    private Label roomCodeLabel;
 
     @FXML
-    private TextField hostField;
+    private Label hostLabel;
 
     @FXML
-    private TextField playerCountField;
+    private Label playerCountLabel;
 
     @FXML
-    private TextField joinHostField;
+    private Label joinHostLabel;
 
     @FXML
     private ListView<String> playersList;
@@ -45,10 +45,10 @@ public class LobbyUI {
 
     @FXML
     private void initialize() {
-        roomCodeField.clear();
-        hostField.clear();
-        playerCountField.clear();
-        joinHostField.clear();
+        setReadout(roomCodeLabel, "", "Waiting for room code");
+        setReadout(hostLabel, "", "Waiting for host");
+        setReadout(playerCountLabel, "", "0 / 5");
+        setReadout(joinHostLabel, "", "Waiting for host address");
         playersList.setItems(FXCollections.observableArrayList());
         context.setSnapshotListener(this::render);
         context.setMessageListener(this::showStatus);
@@ -87,10 +87,10 @@ public class LobbyUI {
 
     private void render(UiSnapshot snapshot) {
         if (snapshot == null || snapshot.isEmpty()) {
-            roomCodeField.clear();
-            joinHostField.clear();
-            hostField.clear();
-            playerCountField.clear();
+            setReadout(roomCodeLabel, "", "Waiting for room code");
+            setReadout(joinHostLabel, "", "Waiting for host address");
+            setReadout(hostLabel, "", "Waiting for host");
+            setReadout(playerCountLabel, "", "0 / 5");
             playersList.setItems(FXCollections.observableArrayList());
             showStatus("Connect to a session from the main menu.");
             return;
@@ -104,10 +104,10 @@ public class LobbyUI {
             return;
         }
 
-        roomCodeField.setText(snapshot.roomCode());
-        hostField.setText(snapshot.playerName(snapshot.hostPlayerId()));
-        playerCountField.setText(snapshot.players().size() + " / " + snapshot.maxPlayers());
-        joinHostField.setText(context.joinHost());
+        setReadout(roomCodeLabel, snapshot.roomCode(), "Waiting for room code");
+        setReadout(hostLabel, snapshot.playerName(snapshot.hostPlayerId()), "Waiting for host");
+        setReadout(playerCountLabel, snapshot.players().size() + " / " + snapshot.maxPlayers(), "0 / 5");
+        setReadout(joinHostLabel, context.joinHost(), "Waiting for host address");
         playersList.setItems(FXCollections.observableArrayList(playerRows(snapshot)));
         if (startGameButton != null) {
             startGameButton.setDisable(!context.playerId().equals(snapshot.hostPlayerId()));
@@ -139,5 +139,11 @@ public class LobbyUI {
 
     private void showStatus(String message) {
         MessageUI.show(statusArea, message);
+    }
+
+    private void setReadout(Label label, String value, String placeholder) {
+        if (label != null) {
+            label.setText(value == null || value.isBlank() ? placeholder : value);
+        }
     }
 }

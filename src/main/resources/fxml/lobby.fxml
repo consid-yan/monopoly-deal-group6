@@ -6,7 +6,6 @@
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.TextArea?>
-<?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
@@ -39,7 +38,7 @@
                     <Font name="Georgia Bold" size="54.0"/>
                 </font>
             </Label>
-            <Label styleClass="lobby-logo-subtitle" text="Start when 2 to 5 players are ready" textAlignment="CENTER">
+            <Label styleClass="lobby-logo-subtitle" text="Requires 2–5 players to start" textAlignment="CENTER">
                 <font>
                     <Font size="12.0"/>
                 </font>
@@ -58,7 +57,7 @@
 
             <HBox alignment="TOP_CENTER" maxWidth="760.0" prefWidth="760.0" spacing="24.0">
                 <VBox spacing="14.0" HBox.hgrow="ALWAYS">
-                    <Label styleClass="lobby-section-title" text="Session Information">
+                    <Label styleClass="lobby-section-title" text="Room Information">
                         <font>
                             <Font name="System Bold" size="15.0"/>
                         </font>
@@ -69,13 +68,13 @@
                             <ColumnConstraints hgrow="ALWAYS" minWidth="220.0"/>
                         </columnConstraints>
                         <Label styleClass="lobby-field-label" text="Room Code" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-                        <TextField fx:id="roomCodeField" editable="false" promptText="Waiting for room code" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
-                        <Label styleClass="lobby-field-label" text="Join Host" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-                        <TextField fx:id="joinHostField" editable="false" promptText="Waiting for host address" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+                        <Label fx:id="roomCodeLabel" maxWidth="Infinity" styleClass="lobby-readonly-label" text="Waiting for room code" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+                        <Label styleClass="lobby-field-label" text="Host IP" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                        <Label fx:id="joinHostLabel" maxWidth="Infinity" styleClass="lobby-readonly-label" text="Waiting for host address" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
                         <Label styleClass="lobby-field-label" text="Host" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
-                        <TextField fx:id="hostField" editable="false" promptText="Waiting for host" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
-                        <Label styleClass="lobby-field-label" text="Player Count" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
-                        <TextField fx:id="playerCountField" editable="false" promptText="0 / 5" styleClass="lobby-readonly-field" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
+                        <Label fx:id="hostLabel" maxWidth="Infinity" styleClass="lobby-readonly-label" text="Waiting for host" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+                        <Label styleClass="lobby-field-label" text="Players Joined" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+                        <Label fx:id="playerCountLabel" maxWidth="Infinity" styleClass="lobby-readonly-label" text="0 / 5" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
                     </GridPane>
 
                     <Separator/>
@@ -84,7 +83,7 @@
                             <Font name="System Bold" size="15.0"/>
                         </font>
                     </Label>
-                    <ListView fx:id="playersList" prefHeight="184.0" prefWidth="456.0" styleClass="lobby-player-list" VBox.vgrow="ALWAYS">
+                    <ListView fx:id="playersList" focusTraversable="false" prefHeight="220.0" prefWidth="456.0" styleClass="readonly-list" VBox.vgrow="ALWAYS">
                         <placeholder>
                             <Label text="Waiting for players to join"/>
                         </placeholder>
@@ -92,12 +91,10 @@
                 </VBox>
 
                 <VBox alignment="TOP_CENTER" prefWidth="260.0" spacing="12.0">
-                    <Label styleClass="lobby-section-title" text="Lobby Controls">
-                        <font>
-                            <Font name="System Bold" size="15.0"/>
-                        </font>
-                    </Label>
                     <Button fx:id="startGameButton" graphicTextGap="10.0" mnemonicParsing="false" onAction="#startGame" prefHeight="44.0" prefWidth="260.0" styleClass="menu-primary-button" text="Start Game">
+                        <VBox.margin>
+                            <Insets top="32.0"/>
+                        </VBox.margin>
                         <graphic>
                             <FontIcon iconLiteral="bx-play" styleClass="menu-icon-primary"/>
                         </graphic>

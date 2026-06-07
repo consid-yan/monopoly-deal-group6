@@ -15,12 +15,11 @@
 
 .root {
     -fx-font-family: "Segoe UI", "Microsoft YaHei", "Arial";
-    -fx-font-smoothing-type: lcd;
+    -fx-font-smoothing-type: gray;
 }
 
 .root-screen {
-    -fx-font-family: "System";
-    -fx-background-color: radial-gradient(center 50% 40%, radius 85%, #1a5c38 0%, #0e3b24 72%);
+    -fx-font-family: "Segoe UI", "Microsoft YaHei", "Arial";
 }
 
 .lobby-screen,
@@ -85,13 +84,176 @@
     -fx-font-weight: bold;
 }
 
-.winner-label {
-    -fx-text-fill: #d4b86a;
+.separator .line {
+    -fx-border-color: rgba(200, 168, 78, 0.25);
+}
+
+.app-dialog {
+    -fx-background-color: #112b1d;
+    -fx-background-insets: 0;
+    -fx-background-radius: 12;
+    -fx-border-color: #c8a84b;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.42), 26, 0.16, 0, 10);
+    -fx-padding: 0;
+}
+
+.app-dialog > .header-panel {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.app-dialog > .content {
+    -fx-background-color: #112b1d;
+    -fx-background-radius: 0 0 12 12;
+    -fx-padding: 20 22 0 22;
+}
+
+.app-dialog-titlebar {
+    -fx-background-color: #0d2117;
+    -fx-background-radius: 12 12 0 0;
+    -fx-border-color: transparent transparent #1f4a2e transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 14 18 14 18;
+}
+
+.app-dialog-badge {
+    -fx-alignment: center;
+    -fx-background-color: #c8a84b;
+    -fx-background-radius: 6;
+    -fx-font-family: "Georgia";
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-min-height: 32;
+    -fx-min-width: 32;
+    -fx-pref-height: 32;
+    -fx-pref-width: 32;
+    -fx-text-fill: #112b1d;
+}
+
+.app-dialog-title {
+    -fx-font-family: "Georgia";
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #e5d59a;
+}
+
+.app-dialog-close-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 4;
+    -fx-border-color: transparent;
+    -fx-cursor: hand;
+    -fx-padding: 2 6 2 6;
+}
+
+.app-dialog-close-button:hover {
+    -fx-background-color: transparent;
+}
+
+.app-dialog-close-icon {
+    -fx-icon-color: #6b9e7a;
+    -fx-icon-size: 18;
+}
+
+.app-dialog-close-button:hover .app-dialog-close-icon {
+    -fx-icon-color: #e5d59a;
+}
+
+.app-dialog-heading {
+    -fx-font-size: 13px;
+    -fx-text-fill: #6b9e7a;
+}
+
+.app-dialog-form {
+    -fx-fill-width: true;
+}
+
+.app-dialog-field-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #c8a84b;
+}
+
+.app-dialog-field-helper {
+    -fx-font-size: 11px;
+    -fx-text-fill: #3d6b52;
+}
+
+.app-dialog-input {
+    -fx-background-color: #0d2117;
+    -fx-background-radius: 8;
+    -fx-border-color: #1f4a2e;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-font-size: 14px;
+    -fx-padding: 10 14 10 14;
+    -fx-prompt-text-fill: #3d6b52;
+    -fx-text-fill: #e8f2ec;
+}
+
+.app-dialog-input:focused {
+    -fx-background-color: #0d2117;
+    -fx-border-color: #c8a84b;
+}
+
+.app-dialog .content.label {
+    -fx-font-size: 13px;
+    -fx-text-fill: #e8f2ec;
+}
+
+.app-dialog .button-bar {
+    -fx-background-color: #112b1d;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0 0 12 12;
+    -fx-padding: 8 22 22 22;
+}
+
+.app-dialog .button-bar > .container {
+    -fx-alignment: center-right;
+    -fx-spacing: 10;
+}
+
+.app-dialog-confirm-button,
+.app-dialog-cancel-button {
+    -fx-font-family: "Georgia";
+    -fx-font-size: 13px;
     -fx-font-weight: bold;
 }
 
-.separator .line {
-    -fx-border-color: rgba(200, 168, 78, 0.25);
+.app-dialog .button:default,
+.app-dialog-confirm-button {
+    -fx-background-color: #c8a84b;
+    -fx-background-radius: 8;
+    -fx-border-color: transparent;
+    -fx-border-radius: 8;
+    -fx-border-width: 0;
+    -fx-cursor: hand;
+    -fx-padding: 9 22 9 22;
+    -fx-text-fill: #0d2117;
+}
+
+.app-dialog .button:default:hover,
+.app-dialog-confirm-button:hover {
+    -fx-background-color: #e5c96a;
+}
+
+.app-dialog .button:cancel,
+.app-dialog-cancel-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-border-color: #1f4a2e;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+    -fx-padding: 9 18 9 18;
+    -fx-text-fill: #6b9e7a;
+}
+
+.app-dialog .button:cancel:hover,
+.app-dialog-cancel-button:hover {
+    -fx-border-color: #3d6b52;
+    -fx-text-fill: #a0c8b0;
 }
 
 /* ── Shared buttons (non-menu screens) ─────────────────────────────────── */
@@ -210,7 +372,9 @@
     -fx-padding: 30 56 34 56;
 }
 
-.menu-logo-lockup {
+.menu-logo-lockup,
+.lobby-brand,
+.help-brand {
     -fx-padding: 0;
 }
 
@@ -226,14 +390,14 @@
 }
 
 .menu-logo-subtitle {
-    -fx-font-family: "System";
+    -fx-font-family: "Segoe UI", "Microsoft YaHei", "Arial";
     -fx-font-size: 11px;
     -fx-font-weight: normal;
     -fx-text-fill: rgba(250, 250, 242, 0.44);
 }
 
 .menu-tagline {
-    -fx-font-family: "System";
+    -fx-font-family: "Segoe UI", "Microsoft YaHei", "Arial";
     -fx-font-size: 11px;
     -fx-font-style: italic;
     -fx-text-fill: rgba(200, 168, 78, 0.44);
@@ -265,7 +429,7 @@
     -fx-border-radius: 5;
     -fx-border-width: 1;
     -fx-cursor: hand;
-    -fx-font-family: "System";
+    -fx-font-family: "Segoe UI", "Microsoft YaHei", "Arial";
     -fx-font-size: 14px;
     -fx-font-weight: bold;
     -fx-graphic-text-gap: 12;
@@ -373,23 +537,19 @@
 /*
  * How-to-play & Lobby — card-table screens using same green-felt language.
  */
-.help-screen-root {
+.help-screen-root,
+.lobby-screen-root,
+.game-screen-root {
     -fx-background-color: radial-gradient(center 50% 40%, radius 72%, #1a5c38 0%, #0e3b24 100%);
 }
 
-.lobby-screen-root {
-    -fx-background-color: radial-gradient(center 50% 40%, radius 72%, #1a5c38 0%, #0e3b24 100%);
-}
-
-.lobby-content {
+.lobby-content,
+.help-content {
     -fx-padding: 34 48 42 48;
 }
 
-.lobby-brand {
-    -fx-padding: 0;
-}
-
-.lobby-logo-title {
+.lobby-logo-title,
+.help-logo-title {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
     -fx-effect: dropshadow(gaussian, rgba(200, 168, 78, 0.36), 24, 0, 0, 3);
@@ -400,8 +560,9 @@
     -fx-text-fill: #c8a84e;
 }
 
-.lobby-logo-subtitle {
-    -fx-font-family: "System";
+.lobby-logo-subtitle,
+.help-logo-subtitle {
+    -fx-font-family: "Segoe UI", "Microsoft YaHei", "Arial";
     -fx-font-size: 12px;
     -fx-font-weight: normal;
     -fx-text-fill: rgba(250, 250, 242, 0.36);
@@ -428,29 +589,15 @@
     -fx-font-size: 13px;
 }
 
-.lobby-readonly-field {
+.lobby-readonly-label {
+    -fx-alignment: center-left;
     -fx-background-color: rgba(10, 42, 25, 0.64);
+    -fx-background-radius: 3;
     -fx-border-color: rgba(200, 168, 78, 0.18);
     -fx-border-radius: 3;
-    -fx-background-radius: 3;
+    -fx-min-height: 38;
+    -fx-padding: 8 10 8 10;
     -fx-text-fill: rgba(250, 250, 242, 0.84);
-    -fx-prompt-text-fill: rgba(250, 250, 242, 0.32);
-}
-
-.lobby-player-list {
-    -fx-background-color: rgba(10, 42, 25, 0.62);
-    -fx-border-color: rgba(200, 168, 78, 0.30);
-    -fx-border-radius: 3;
-    -fx-background-radius: 3;
-}
-
-.lobby-player-list .list-cell {
-    -fx-background-color: transparent;
-    -fx-text-fill: rgba(250, 250, 242, 0.78);
-}
-
-.lobby-player-list .list-cell:filled:hover {
-    -fx-background-color: rgba(250, 250, 242, 0.06);
 }
 
 .lobby-status-area,
@@ -468,32 +615,6 @@
     -fx-border-width: 0 0 1 0;
 }
 
-.help-content {
-    -fx-padding: 34 48 42 48;
-}
-
-.help-brand {
-    -fx-padding: 0;
-}
-
-.help-logo-title {
-    -fx-background-color: transparent;
-    -fx-border-color: transparent;
-    -fx-effect: dropshadow(gaussian, rgba(200, 168, 78, 0.36), 24, 0, 0, 3);
-    -fx-font-family: "Georgia";
-    -fx-font-size: 54px;
-    -fx-font-weight: bold;
-    -fx-padding: 0;
-    -fx-text-fill: #c8a84e;
-}
-
-.help-logo-subtitle {
-    -fx-font-family: "System";
-    -fx-font-size: 12px;
-    -fx-font-weight: normal;
-    -fx-text-fill: rgba(250, 250, 242, 0.36);
-}
-
 .help-guide-panel {
     -fx-background-color: linear-gradient(from 0% 0% to 100% 100%, rgba(10, 42, 25, 0.64) 0%, rgba(10, 42, 25, 0.48) 100%);
     -fx-background-radius: 4;
@@ -502,11 +623,6 @@
     -fx-border-width: 1;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.68), 70, 0, 0, 22);
     -fx-padding: 30 56 34 56;
-}
-
-.help-scroll-pane,
-.help-scroll-pane > .viewport {
-    -fx-background-color: transparent;
 }
 
 .help-rules-list {
@@ -654,6 +770,34 @@
     -fx-text-fill: #0a2a19;
 }
 
+.readonly-list {
+    -fx-background-color: rgba(10, 42, 25, 0.62);
+    -fx-border-color: rgba(200, 168, 78, 0.30);
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+}
+
+.readonly-list .list-cell:filled {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent rgba(200, 168, 78, 0.22) transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 10 12 10 12;
+    -fx-text-fill: rgba(250, 250, 242, 0.84);
+}
+
+.readonly-list .list-cell:empty {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+}
+
+.readonly-list .list-cell:filled:hover,
+.readonly-list .list-cell:filled:selected,
+.readonly-list .list-cell:filled:selected:hover,
+.readonly-list:focused .list-cell:filled:selected {
+    -fx-background-color: transparent;
+    -fx-text-fill: rgba(250, 250, 242, 0.84);
+}
+
 .status-area,
 .status-area .content {
     -fx-background-color: rgba(26, 122, 74, 0.24);
@@ -672,20 +816,61 @@
     -fx-font-size: 11px;
 }
 
+.result-field-label {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #e8e4d4;
+}
+
+.result-value-field,
+.result-readout {
+    -fx-background-color: rgba(10, 42, 25, 0.50);
+    -fx-border-color: rgba(200, 168, 78, 0.35);
+    -fx-border-width: 1;
+    -fx-border-radius: 7;
+    -fx-background-radius: 7;
+    -fx-font-size: 14px;
+    -fx-text-fill: #e8e4d4;
+}
+
+.result-readout {
+    -fx-alignment: center-left;
+    -fx-padding: 7 10 7 10;
+}
+
 .winner-field {
     -fx-background-color: rgba(200, 168, 78, 0.18);
     -fx-border-color: #c8a84e;
     -fx-border-width: 1.5;
     -fx-border-radius: 7;
     -fx-background-radius: 7;
-    -fx-font-size: 16px;
+    -fx-font-size: 14px;
     -fx-font-weight: bold;
     -fx-text-fill: #d4b86a;
 }
 
+.help-scroll-pane,
+.help-scroll-pane > .viewport,
 .help-screen .scroll-pane,
 .scroll-pane,
-.scroll-pane > .viewport {
+.scroll-pane > .viewport,
+.game-opponent-scroll,
+.game-opponent-scroll > .viewport,
+.game-action-scroll,
+.game-action-scroll > .viewport,
+.game-property-scroll,
+.game-property-scroll > .viewport,
+.game-table-scroll,
+.game-table-scroll > .viewport,
+.game-outer-scroll,
+.game-outer-scroll > .viewport,
+.hand-scroll-pane,
+.hand-scroll-pane > .viewport,
+.game-shell,
+.game-header,
+.game-center,
+.game-action-rail,
+.clean-property-rows {
     -fx-background-color: transparent;
 }
 
@@ -796,7 +981,8 @@
     -fx-border-color: rgba(200, 168, 78, 0.60);
 }
 
-.property-board {
+.property-board,
+.game-property-board {
     -fx-padding: 1;
 }
 
@@ -899,10 +1085,6 @@
     -fx-text-alignment: center;
 }
 
-.compact-deal-card .card-art-text {
-    -fx-font-size: 6px;
-}
-
 .card-title {
     -fx-text-fill: #1a1208;
     -fx-font-size: 10px;
@@ -920,6 +1102,7 @@
     -fx-font-size: 7px;
 }
 
+.compact-deal-card .card-art-text,
 .compact-deal-card .card-detail,
 .compact-deal-card .card-type-label,
 .compact-deal-card .card-value-badge {
@@ -1000,20 +1183,6 @@
 }
 
 /* ── Game screen — green felt tabletop ─────────────────────────────────── */
-.game-screen-root {
-    -fx-background-color: radial-gradient(center 50% 40%, radius 72%, #1a5c38 0%, #0e3b24 100%);
-}
-
-.game-shell {
-    -fx-background-color: transparent;
-}
-
-.game-header,
-.game-center,
-.game-action-rail {
-    -fx-background-color: transparent;
-}
-
 .game-logo-title {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
@@ -1023,11 +1192,6 @@
     -fx-font-weight: bold;
     -fx-padding: 0;
     -fx-text-fill: #c8a84e;
-}
-
-.game-logo-subtitle {
-    -fx-font-size: 12px;
-    -fx-text-fill: rgba(250, 250, 242, 0.36);
 }
 
 .game-status-strip,
@@ -1108,17 +1272,6 @@
     -fx-min-height: 440;
 }
 
-.game-opponent-scroll,
-.game-opponent-scroll > .viewport,
-.game-action-scroll,
-.game-action-scroll > .viewport,
-.game-property-scroll,
-.game-property-scroll > .viewport,
-.game-table-scroll,
-.game-table-scroll > .viewport {
-    -fx-background-color: transparent;
-}
-
 .game-action-rail {
     -fx-padding: 10 14 12 14;
 }
@@ -1177,10 +1330,6 @@
 .game-small-zone .game-drop-zone {
     -fx-min-height: 72;
     -fx-pref-height: 72;
-}
-
-.game-property-board {
-    -fx-padding: 1;
 }
 
 .game-property-drop-zone {
@@ -1254,18 +1403,6 @@
     -fx-text-fill: rgba(250, 250, 242, 0.50);
 }
 
-/* ── Outer scroll wrapper for game screen ───────────────────────────────── */
-.game-outer-scroll,
-.game-outer-scroll > .viewport {
-    -fx-background-color: transparent;
-}
-
-/* ── Hand scroll pane ──────────────────────────────────────────────────── */
-.hand-scroll-pane,
-.hand-scroll-pane > .viewport {
-    -fx-background-color: transparent;
-}
-
 .hand-cards-box {
     -fx-background-color: rgba(10, 42, 25, 0.56);
     -fx-background-radius: 4;
@@ -1310,10 +1447,6 @@
     -fx-border-width: 1;
     -fx-padding: 5 7 5 7;
     -fx-text-fill: rgba(250, 250, 242, 0.72);
-}
-
-.clean-property-rows {
-    -fx-background-color: transparent;
 }
 
 .property-row-card {

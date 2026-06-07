@@ -4,7 +4,6 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
-<?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.TitledPane?>
@@ -13,7 +12,6 @@
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane prefHeight="640.0" prefWidth="960.0"
@@ -24,24 +22,15 @@
     <top>
         <VBox alignment="CENTER_LEFT" spacing="8.0" BorderPane.alignment="CENTER">
             <padding>
-                <Insets bottom="18.0" left="48.0" right="48.0" top="36.0"/>
+                <Insets bottom="10.0" left="48.0" right="48.0" top="24.0"/>
             </padding>
-            <Label styleClass="menu-title title-banner" text="Game Over">
-                <font>
-                    <Font name="System Bold" size="38.0"/>
-                </font>
-            </Label>
-            <Label styleClass="menu-subtitle" text="Final Monopoly Deal result and player summary" wrapText="true">
-                <font>
-                    <Font size="15.0"/>
-                </font>
-            </Label>
+            <Label styleClass="menu-title title-banner" text="Game Over"/>
         </VBox>
     </top>
     <center>
-        <VBox spacing="18.0" BorderPane.alignment="CENTER">
+        <VBox spacing="12.0" BorderPane.alignment="CENTER">
             <padding>
-                <Insets bottom="28.0" left="48.0" right="48.0" top="8.0"/>
+                <Insets bottom="16.0" left="48.0" right="48.0" top="0.0"/>
             </padding>
             <GridPane hgap="18.0" styleClass="surface-panel" vgap="12.0">
                 <columnConstraints>
@@ -50,64 +39,35 @@
                     <ColumnConstraints minWidth="160.0" prefWidth="190.0"/>
                     <ColumnConstraints hgrow="ALWAYS" minWidth="260.0"/>
                 </columnConstraints>
-                <Label styleClass="winner-label" text="Winner" GridPane.columnIndex="0" GridPane.rowIndex="0">
-                    <font>
-                        <Font name="System Bold" size="16.0"/>
-                    </font>
-                </Label>
+                <Label styleClass="result-field-label" text="Winner" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
                 <TextField fx:id="winnerField" editable="false" promptText="Winner" styleClass="winner-field" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
-                <Label text="Completed Property Sets" GridPane.columnIndex="2" GridPane.rowIndex="0">
-                    <font>
-                        <Font name="System Bold" size="16.0"/>
-                    </font>
-                </Label>
-                <TextField fx:id="completedSetsField" editable="false" promptText="Completed Property Sets" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
-                <Label text="Win Condition" GridPane.columnIndex="0" GridPane.rowIndex="1">
-                    <font>
-                        <Font name="System Bold" size="16.0"/>
-                    </font>
-                </Label>
-                <TextField editable="false" text="Completed 3 full property sets" GridPane.columnIndex="1" GridPane.columnSpan="3" GridPane.rowIndex="1"/>
+                <Label styleClass="result-field-label" text="Completed Property Sets" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
+                <TextField fx:id="completedSetsField" editable="false" promptText="Completed Property Sets" styleClass="result-value-field" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
+                <Label styleClass="result-field-label" text="Win Condition" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                <Label maxWidth="Infinity" styleClass="result-readout" text="Complete 3 full property sets" wrapText="true" GridPane.columnIndex="1" GridPane.columnSpan="3" GridPane.rowIndex="1"/>
             </GridPane>
-            <Separator/>
-            <HBox spacing="20.0">
-                <TitledPane animated="false" collapsible="false" prefHeight="260.0" text="Player Summary"
-                            HBox.hgrow="ALWAYS">
-                    <ListView fx:id="playerSummaryList" prefHeight="230.0" prefWidth="420.0">
-                        <placeholder>
-                            <Label text="Game Summary"/>
-                        </placeholder>
-                    </ListView>
-                </TitledPane>
-                <TitledPane animated="false" collapsible="false" prefHeight="260.0" text="Defeated / Forfeit Status"
-                            HBox.hgrow="ALWAYS">
-                    <ListView fx:id="forfeitList" prefHeight="230.0" prefWidth="420.0">
-                        <placeholder>
-                            <Label text="Defeated/Forfeit players"/>
-                        </placeholder>
-                    </ListView>
-                </TitledPane>
-            </HBox>
-            <TitledPane animated="false" collapsible="false" styleClass="section-panel" text="Final Result">
+            <TitledPane animated="false" collapsible="false" maxWidth="Infinity" prefHeight="240.0" text="Player Summary">
+                <ListView fx:id="playerSummaryList" focusTraversable="false" prefHeight="210.0" prefWidth="840.0" styleClass="readonly-list">
+                    <placeholder>
+                        <Label text="Game Summary"/>
+                    </placeholder>
+                </ListView>
+            </TitledPane>
+            <TitledPane animated="false" collapsible="false" styleClass="section-panel" text="Match Summary">
                 <TextArea fx:id="finalResultArea"
                           editable="false"
                           focusTraversable="false"
-                          prefHeight="110.0"
-                              promptText="Final Result"
-                              styleClass="status-area"
-                              wrapText="true"/>
+                          prefHeight="92.0"
+                          promptText="Match Summary"
+                          styleClass="status-area"
+                          wrapText="true"/>
             </TitledPane>
-            <Label styleClass="menu-note" text="Gameplay has terminated. Further game actions are rejected after the final result is declared." wrapText="true">
-                <font>
-                    <Font size="13.0"/>
-                </font>
-            </Label>
         </VBox>
     </center>
     <bottom>
         <HBox alignment="CENTER_RIGHT" spacing="12.0" BorderPane.alignment="CENTER">
             <padding>
-                <Insets bottom="24.0" left="48.0" right="48.0" top="8.0"/>
+                <Insets bottom="16.0" left="48.0" right="48.0" top="4.0"/>
             </padding>
             <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#backToMenu" prefHeight="40.0" prefWidth="140.0" styleClass="secondary-button" text="Main Menu">
                 <graphic>
