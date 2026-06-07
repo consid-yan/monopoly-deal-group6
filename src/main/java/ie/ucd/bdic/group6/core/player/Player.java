@@ -92,10 +92,6 @@ public final class Player {
         hand.add(card);
     }
 
-    public void addAllToHand(Collection<Card> cards) {
-        hand.addAll(cards);
-    }
-
     public OperationResult<Void> tryBankFromHand(Card card) {
         Objects.requireNonNull(card, "card");
         if (!hand.contains(card)) {
@@ -187,20 +183,6 @@ public final class Player {
                     OperationError.NOT_COMPLETE_SET, "row cannot accept " + expected + " improvement right now");
         }
         return OperationResult.ok(actionFromHand);
-    }
-
-    public OperationResult<ActionCard> trySpendHouseCardOnRowById(ActionCard houseFromHand, String rowId) {
-        return findPropertyRow(rowId)
-                .map(row -> trySpendHouseCardOnRow(houseFromHand, row))
-                .orElseGet(() -> OperationResult.fail(
-                        OperationError.PROPERTY_ROW_NOT_FOUND, "no property row with id " + rowId));
-    }
-
-    public OperationResult<ActionCard> trySpendHotelCardOnRowById(ActionCard hotelFromHand, String rowId) {
-        return findPropertyRow(rowId)
-                .map(row -> trySpendHotelCardOnRow(hotelFromHand, row))
-                .orElseGet(() -> OperationResult.fail(
-                        OperationError.PROPERTY_ROW_NOT_FOUND, "no property row with id " + rowId));
     }
 
     public OperationResult<Void> tryDiscardHandDownTo(int maxHandSize, List<Card> selectionOrder, CardDiscardSink discardSink) {

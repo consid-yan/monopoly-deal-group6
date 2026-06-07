@@ -2,7 +2,6 @@ package ie.ucd.bdic.group6.core.common;
 
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
 
 /**
  * Explicit success/failure for domain operations (preferred over bare {@code boolean} for UI/engine feedback).
@@ -30,13 +29,6 @@ public sealed interface OperationResult<T> permits OperationResult.Success, Oper
     Optional<OperationError> errorCode();
 
     Optional<String> errorMessage();
-
-    default <U> OperationResult<U> map(Function<? super T, ? extends U> mapper) {
-        if (isSuccess()) {
-            return ok(mapper.apply(value().orElse(null)));
-        }
-        return fail(errorCode().orElse(OperationError.GENERIC), errorMessage().orElse(""));
-    }
 
     record Success<T>(T payload) implements OperationResult<T> {
         @Override
