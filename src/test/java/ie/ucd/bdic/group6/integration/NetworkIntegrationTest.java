@@ -53,12 +53,15 @@ class NetworkIntegrationTest {
         assertTrue(server.isRunning());
         assertTrue(server.port() > 0);
 
-        GameClient host = connectedClient();
-        GameClient player2 = connectedClient();
+        GameClient host = client();
         List<ServerNotice> hostNotices = notices(host);
-        List<ServerNotice> player2Notices = notices(player2);
         List<ServerUpdate> hostUpdates = updates(host);
+        connect(host);
+
+        GameClient player2 = client();
+        List<ServerNotice> player2Notices = notices(player2);
         List<ServerUpdate> player2Updates = updates(player2);
+        connect(player2);
 
         await(hostNotices, notice -> notice.type() == NoticeType.CONNECTED);
         await(player2Notices, notice -> notice.type() == NoticeType.CONNECTED);
@@ -121,8 +124,9 @@ class NetworkIntegrationTest {
         assertNotEquals(currentPlayerHand(hostActive), currentPlayerHand(player2Active));
 
         player2.close();
-        GameClient rejoinedPlayer2 = connectedClient();
+        GameClient rejoinedPlayer2 = client();
         List<ServerUpdate> rejoinedUpdates = updates(rejoinedPlayer2);
+        connect(rejoinedPlayer2);
         ServerResponse rejoined = rejoinedPlayer2.sendCommand(CommandType.REJOIN_SESSION, Map.of(
                 "sessionIdentity", sessionId,
                 "playerId", "player2",
@@ -144,11 +148,14 @@ class NetworkIntegrationTest {
         server = new GameServer(new GameController(new GameFacade(engine), new RequestMapper()), DEFAULT_PORT);
         server.startAsync();
 
-        GameClient host = connectedClient();
+        GameClient host = client();
         List<ServerNotice> hostNotices = notices(host);
-        GameClient player2 = connectedClient();
-        List<ServerNotice> player2Notices = notices(player2);
         List<ServerUpdate> hostUpdates = updates(host);
+        connect(host);
+
+        GameClient player2 = client();
+        List<ServerNotice> player2Notices = notices(player2);
+        connect(player2);
         await(hostNotices, notice -> notice.type() == NoticeType.CONNECTED);
         await(player2Notices, notice -> notice.type() == NoticeType.CONNECTED);
 
@@ -245,10 +252,19 @@ class NetworkIntegrationTest {
     }
 
     private GameClient connectedClient() throws IOException {
+        GameClient client = client();
+        connect(client);
+        return client;
+    }
+
+    private GameClient client() {
         GameClient client = new GameClient();
         clients.add(client);
-        client.connect("127.0.0.1", server.port());
         return client;
+    }
+
+    private void connect(GameClient client) throws IOException {
+        client.connect("127.0.0.1", server.port());
     }
 
     private List<ServerNotice> notices(GameClient client) {
