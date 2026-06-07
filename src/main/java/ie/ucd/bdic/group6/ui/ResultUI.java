@@ -1,5 +1,6 @@
 package ie.ucd.bdic.group6.ui;
 
+import ie.ucd.bdic.group6.app.GameSessionCoordinator;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.ListView;
@@ -10,7 +11,8 @@ import java.util.Comparator;
 import java.util.List;
 
 public class ResultUI {
-    private final UiSessionContext context;
+
+    private final GameSessionCoordinator context;
 
     @FXML
     private TextField winnerField;
@@ -27,7 +29,7 @@ public class ResultUI {
     @FXML
     private TextArea finalResultArea;
 
-    public ResultUI(UiSessionContext context) {
+    public ResultUI(GameSessionCoordinator context) {
         this.context = context;
     }
 

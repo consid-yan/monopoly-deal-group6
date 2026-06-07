@@ -11,14 +11,6 @@ public class AppConfig {
     private final GameFacade gameFacade = new GameFacade(gameEngine);
     private final RequestMapper requestMapper = new RequestMapper();
 
-    public GameFacade gameFacade() {
-        return gameFacade;
-    }
-
-    public RequestMapper requestMapper() {
-        return requestMapper;
-    }
-
     public GameController gameController() {
         return new GameController(gameFacade, requestMapper);
     }

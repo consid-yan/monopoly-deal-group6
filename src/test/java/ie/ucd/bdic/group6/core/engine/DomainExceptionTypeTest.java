@@ -63,7 +63,7 @@ class DomainExceptionTypeTest {
                 "hostPlayerId", "host"
         )));
         engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                "sessionCode", created.get("sessionCode"),
+                "roomCode", created.get("roomCode"),
                 "playerId", "player2"
         )));
         engine.executeStartGame(new StartGameCommand(Map.of(
@@ -73,7 +73,7 @@ class DomainExceptionTypeTest {
 
         InvalidGameStateException error = assertThrows(InvalidGameStateException.class,
                 () -> engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                        "sessionCode", created.get("sessionCode"),
+                        "roomCode", created.get("roomCode"),
                         "playerId", "late-player"
                 ))));
 

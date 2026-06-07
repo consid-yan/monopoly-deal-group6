@@ -27,7 +27,7 @@ class GameFacadeTest {
         assertEquals(5, created.getData().get("maxPlayers"));
 
         GameResult joined = facade.execute(new JoinSessionCommand(Map.of(
-                "sessionCode", created.getData().get("sessionCode"),
+                "roomCode", created.getData().get("roomCode"),
                 "playerId", "player2"
         )));
         assertTrue(joined.isSuccess());
@@ -72,7 +72,7 @@ class GameFacadeTest {
     void joinNonexistentSessionReturnsFailure() {
         GameFacade facade = new GameFacade();
         GameResult result = facade.execute(new JoinSessionCommand(Map.of(
-                "sessionCode", "ZZZZZZ",
+                "roomCode", "ZZZZZZ",
                 "playerId", "player1"
         )));
         assertFalse(result.isSuccess());

@@ -12,6 +12,12 @@
  */
 
 /* ── Global screen backgrounds ─────────────────────────────────────────── */
+
+.root {
+    -fx-font-family: "Segoe UI", "Microsoft YaHei", "Arial";
+    -fx-font-smoothing-type: lcd;
+}
+
 .root-screen {
     -fx-font-family: "System";
     -fx-background-color: radial-gradient(center 50% 40%, radius 85%, #1a5c38 0%, #0e3b24 72%);
@@ -1266,4 +1272,55 @@
     -fx-border-color: rgba(200, 168, 78, 0.30);
     -fx-border-radius: 4;
     -fx-border-width: 1;
+}
+
+/* Clean game table overrides */
+.clean-game-main-table {
+    -fx-min-height: 390;
+}
+
+.clean-game-board-row {
+    -fx-min-height: 146;
+    -fx-pref-height: 146;
+}
+
+.clean-zone-panel,
+.clean-property-panel {
+    -fx-background-color: rgba(10, 42, 25, 0.42);
+    -fx-border-color: rgba(200, 168, 78, 0.12);
+    -fx-effect: none;
+}
+
+.clean-drop-zone,
+.clean-activity-zone {
+    -fx-background-color: rgba(250, 250, 242, 0.028);
+    -fx-border-color: rgba(200, 168, 78, 0.18);
+    -fx-border-style: solid;
+}
+
+.clean-activity-zone {
+    -fx-padding: 8;
+}
+
+.activity-chip {
+    -fx-background-color: rgba(250, 250, 242, 0.055);
+    -fx-background-radius: 4;
+    -fx-border-color: rgba(200, 168, 78, 0.13);
+    -fx-border-radius: 4;
+    -fx-border-width: 1;
+    -fx-padding: 5 7 5 7;
+    -fx-text-fill: rgba(250, 250, 242, 0.72);
+}
+
+.clean-property-rows {
+    -fx-background-color: transparent;
+}
+
+.property-row-card {
+    -fx-background-color: rgba(250, 250, 242, 0.040);
+    -fx-background-radius: 4;
+    -fx-border-color: rgba(200, 168, 78, 0.15);
+    -fx-border-radius: 4;
+    -fx-border-width: 1;
+    -fx-padding: 7;
 }

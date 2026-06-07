@@ -44,10 +44,10 @@ class ActionExecutorTest {
         GameEngine engine = engineWithDrawOrder(moneyCards("c", 20));
         Map<String, Object> created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        String sessionCode = text(created, "sessionCode");
+        String roomCode = text(created, "roomCode");
 
         engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                "sessionCode", sessionCode,
+                "roomCode", roomCode,
                 "playerId", "player2"
         )));
         Map<String, Object> started = startGame(engine, sessionId, "host");
@@ -71,7 +71,7 @@ class ActionExecutorTest {
         GameEngine nonHostEngine = new GameEngine();
         Map<String, Object> created = createSession(nonHostEngine, "host", 5);
         nonHostEngine.executeJoinSession(new JoinSessionCommand(Map.of(
-                "sessionCode", text(created, "sessionCode"),
+                "roomCode", text(created, "roomCode"),
                 "playerId", "player2"
         )));
         GameException nonHost = assertThrows(GameException.class,
@@ -83,22 +83,22 @@ class ActionExecutorTest {
     void joinSessionRejectsDuplicateAndFullLobby() {
         GameEngine engine = new GameEngine();
         Map<String, Object> created = createSession(engine, "host", 2);
-        String sessionCode = text(created, "sessionCode");
+        String roomCode = text(created, "roomCode");
 
         GameException duplicate = assertThrows(GameException.class,
                 () -> engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                        "sessionCode", sessionCode,
+                        "roomCode", roomCode,
                         "playerId", "host"
                 ))));
         assertEquals("PLAYER_ALREADY_JOINED", duplicate.getErrorCode());
 
         engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                "sessionCode", sessionCode,
+                "roomCode", roomCode,
                 "playerId", "player2"
         )));
         GameException full = assertThrows(GameException.class,
                 () -> engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                        "sessionCode", sessionCode,
+                        "roomCode", roomCode,
                         "playerId", "player3"
                 ))));
         assertEquals("SESSION_FULL", full.getErrorCode());
@@ -109,9 +109,9 @@ class ActionExecutorTest {
         GameEngine engine = engineWithDrawOrder(moneyCards("c", 40));
         Map<String, Object> created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        String sessionCode = text(created, "sessionCode");
-        join(engine, sessionCode, "player2");
-        join(engine, sessionCode, "player3");
+        String roomCode = text(created, "roomCode");
+        join(engine, roomCode, "player2");
+        join(engine, roomCode, "player3");
         startGame(engine, sessionId, "host");
 
         Map<String, Object> afterHost = endTurn(engine, sessionId, "host");
@@ -203,7 +203,7 @@ class ActionExecutorTest {
         ));
         Map<String, Object> created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
 
         endTurn(engine, sessionId, "host");
@@ -264,7 +264,7 @@ class ActionExecutorTest {
         ));
         Map<String, Object> created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
 
         Map<String, Object> pending = engine.executePlayCard(new PlayCardCommand(Map.of(
@@ -342,7 +342,7 @@ class ActionExecutorTest {
         ));
         Map<String, Object> created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
         endTurn(engine, sessionId, "host");
         playAs(engine, sessionId, "player2", red.id());
@@ -391,7 +391,7 @@ class ActionExecutorTest {
         ));
         Map<String, Object> created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
         play(engine, sessionId, hostBlue.id());
         endTurn(engine, sessionId, "host");
@@ -442,7 +442,7 @@ class ActionExecutorTest {
         ));
         Map<String, Object> created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
         endTurn(engine, sessionId, "host");
         playAs(engine, sessionId, "player2", brown1.id());
@@ -494,7 +494,7 @@ class ActionExecutorTest {
         ));
         Map<String, Object> created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
 
         endTurn(engine, sessionId, "host");
@@ -613,7 +613,7 @@ class ActionExecutorTest {
         GameEngine engine = engineWithDrawOrder(moneyCards("c", 30));
         Map<String, Object> created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
 
         Map<String, Object> afterEnd = endTurn(engine, sessionId, "host");
@@ -651,7 +651,7 @@ class ActionExecutorTest {
     void rejoinRejectsUnknownPlayerId() {
         GameEngine engine = engineWithDrawOrder(moneyCards("c", 20));
         Map<String, Object> created = createSession(engine, "host", 5);
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, text(created, "sessionId"), "host");
 
         GameException error = assertThrows(GameException.class,
@@ -668,7 +668,7 @@ class ActionExecutorTest {
         GameEngine engine = engineWithDrawOrder(moneyCards("c", 40), clock);
         Map<String, Object> created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
 
         engine.executePlayerDisconnected(new PlayerDisconnectedCommand(Map.of(
@@ -694,7 +694,7 @@ class ActionExecutorTest {
         GameEngine engine = engineWithDrawOrder(moneyCards("c", 40), clock);
         Map<String, Object> created = createSession(engine, "host", 5);
         String sessionId = text(created, "sessionId");
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, sessionId, "host");
 
         engine.executePlayerDisconnected(new PlayerDisconnectedCommand(Map.of(
@@ -728,7 +728,7 @@ class ActionExecutorTest {
         drawOrder.addAll(moneyCards("extra", 20));
         GameEngine engine = engineWithDrawOrder(drawOrder);
         Map<String, Object> created = createSession(engine, "host", 5);
-        join(engine, text(created, "sessionCode"), "player2");
+        join(engine, text(created, "roomCode"), "player2");
         startGame(engine, text(created, "sessionId"), "host");
         return new StartedGame(engine, text(created, "sessionId"));
     }
@@ -757,9 +757,9 @@ class ActionExecutorTest {
         )));
     }
 
-    private void join(GameEngine engine, String sessionCode, String playerId) {
+    private void join(GameEngine engine, String roomCode, String playerId) {
         engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                "sessionCode", sessionCode,
+                "roomCode", roomCode,
                 "playerId", playerId,
                 "playerName", playerId
         )));

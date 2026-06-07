@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.Objects;
 
+import ie.ucd.bdic.group6.app.GameSessionCoordinator;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -27,16 +28,13 @@ public final class SceneManager {
     private static final String APP_ICON = "/images/icon.png";
 
     private static Stage stage;
-    private static UiSessionContext sessionContext;
+    private static GameSessionCoordinator sessionContext;
     private static String currentScreen;
     private static String howToPlayReturnScreen;
 
-    private SceneManager() {
-    }
-
     public static void initialize(Stage primaryStage, AppConfig appConfig) {
         stage = primaryStage;
-        sessionContext = new UiSessionContext(appConfig);
+        sessionContext = new GameSessionCoordinator(appConfig);
         UiTheme.applyDefaultTheme();
         stage.setTitle("Monopoly Deal");
         stage.getIcons().setAll(new Image(Objects.requireNonNull(SceneManager.class.getResource(APP_ICON))
@@ -46,7 +44,7 @@ public final class SceneManager {
         showMenu();
     }
 
-    public static UiSessionContext sessionContext() {
+    public static GameSessionCoordinator sessionContext() {
         if (sessionContext == null) {
             throw new IllegalStateException("SceneManager has not been initialized.");
         }
@@ -144,7 +142,7 @@ public final class SceneManager {
 
     private static Object createController(Class<?> controllerType) {
         try {
-            Constructor<?> constructor = controllerType.getDeclaredConstructor(UiSessionContext.class);
+            Constructor<?> constructor = controllerType.getDeclaredConstructor(GameSessionCoordinator.class);
             constructor.setAccessible(true);
             return constructor.newInstance(sessionContext());
         } catch (NoSuchMethodException ignored) {

@@ -17,9 +17,6 @@ final class UiDialogs {
     private static final String DIALOG_ICON = "/images/icon.png";
     private static final String ERROR_GRAPHIC = "/images/error.png";
 
-    private UiDialogs() {
-    }
-
     static Optional<NewGameRequest> promptNewGame() {
         TextField playerNameField = field("Player name");
         TextField maxPlayersField = field("Number from 2 to 5");
@@ -41,14 +38,11 @@ final class UiDialogs {
 
     static Optional<JoinRequest> promptJoinGame() {
         TextField hostField = field("Server host");
-        TextField portField = field("Server port");
-        TextField sessionCodeField = field("Session code");
+        TextField roomCodeField = field("Room code");
         TextField playerNameField = field("Player name");
-        hostField.setText("127.0.0.1");
         Optional<ButtonType> result = showForm("Join Game", "Connect to an existing session",
                 row("Host", hostField),
-                row("Port", portField),
-                row("Session Code", sessionCodeField),
+                row("Room Code", roomCodeField),
                 row("Player Name", playerNameField));
         if (result.isEmpty() || result.get() != ButtonType.OK) {
             return Optional.empty();
@@ -56,8 +50,7 @@ final class UiDialogs {
         try {
             return Optional.of(new JoinRequest(
                     requireText(hostField.getText(), "Host"),
-                    parsePort(portField.getText()),
-                    requireText(sessionCodeField.getText(), "Session code"),
+                    requireText(roomCodeField.getText(), "Room code"),
                     requireText(playerNameField.getText(), "Player name")));
         } catch (IllegalArgumentException e) {
             showError("Invalid Join Settings", e.getMessage());
@@ -66,28 +59,15 @@ final class UiDialogs {
     }
 
     static Optional<RejoinRequest> promptRejoinGame() {
-        TextField hostField = field("Server host");
-        TextField portField = field("Server port");
-        TextField sessionIdentityField = field("Session id or code");
-        TextField playerIdField = field("Prior player id");
-        TextField playerTokenField = field("Prior player token");
-        hostField.setText("127.0.0.1");
-        Optional<ButtonType> result = showForm("Rejoin Session", "Reconnect with the same player identity",
-                row("Host", hostField),
-                row("Port", portField),
-                row("Session", sessionIdentityField),
-                row("Player ID", playerIdField),
-                row("Player Token", playerTokenField));
+        TextField roomCodeField = field("Room code");
+        Optional<ButtonType> result = showForm("Rejoin Session", "Reconnect with the same player id",
+                row("Room Code", roomCodeField));
         if (result.isEmpty() || result.get() != ButtonType.OK) {
             return Optional.empty();
         }
         try {
             return Optional.of(new RejoinRequest(
-                    requireText(hostField.getText(), "Host"),
-                    parsePort(portField.getText()),
-                    requireText(sessionIdentityField.getText(), "Session"),
-                    requireText(playerIdField.getText(), "Player ID"),
-                    requireText(playerTokenField.getText(), "Player token")));
+                    requireText(roomCodeField.getText(), "Room code")));
         } catch (IllegalArgumentException e) {
             showError("Invalid Rejoin Settings", e.getMessage());
             return Optional.empty();
@@ -166,18 +146,6 @@ final class UiDialogs {
         return new FormRow(label, field);
     }
 
-    private static int parsePort(String raw) {
-        try {
-            int port = Integer.parseInt(requireText(raw, "Port"));
-            if (port < 0 || port > 65535) {
-                throw new IllegalArgumentException("Port must be between 0 and 65535");
-            }
-            return port;
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Port must be a number", e);
-        }
-    }
-
     private static int parseMaxPlayers(String raw) {
         try {
             int maxPlayers = Integer.parseInt(requireText(raw, "Max players"));
@@ -199,9 +167,9 @@ final class UiDialogs {
 
     record NewGameRequest(String playerName, int maxPlayers) {}
 
-    record JoinRequest(String host, int port, String sessionCode, String playerName) {}
+    record JoinRequest(String host, String roomCode, String playerName) {}
 
-    record RejoinRequest(String host, int port, String sessionIdentity, String playerId, String playerToken) {}
+    record RejoinRequest(String roomCode) {}
 
     private record FormRow(String label, Node field) {}
 }

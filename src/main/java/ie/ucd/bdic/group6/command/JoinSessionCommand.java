@@ -12,7 +12,7 @@ public class JoinSessionCommand extends AbstractCommand {
         return CommandType.JOIN_SESSION;
     }
 
-    public String getSessionCode() {
-        return (String) payload().get("sessionCode");
+    public String roomCode() {
+        return (String) payload().get("roomCode");
     }
 }

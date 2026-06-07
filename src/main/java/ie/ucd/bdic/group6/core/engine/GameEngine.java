@@ -34,7 +34,7 @@ public class GameEngine implements ActionExecutor {
     private static final Duration DISCONNECTED_FORFEIT_AFTER = Duration.ofSeconds(90);
 
     private final Map<String, GameSession> sessionsById = new HashMap<>();
-    private final Map<String, GameSession> sessionsByCode = new HashMap<>();
+    private final Map<String, GameSession> sessionsByRoomCode = new HashMap<>();
     private final Supplier<Deck> deckSupplier;
     private final Clock clock;
     private final ActionRule actionRule = new ActionRule();
@@ -63,21 +63,21 @@ public class GameEngine implements ActionExecutor {
         String hostPlayerId = requireText(command.getHostPlayerId(), "hostPlayerId");
         int maxPlayers = readMaxPlayers(command.payload().get("maxPlayers"));
         String sessionId = UUID.randomUUID().toString();
-        String sessionCode = nextSessionCode();
+        String roomCode = nextRoomCode();
 
-        var session = new GameSession(sessionId, sessionCode, hostPlayerId, maxPlayers);
+        var session = new GameSession(sessionId, roomCode, hostPlayerId, maxPlayers);
 
         session.addPlayer(new Player(hostPlayerId, playerName(command.payload(), hostPlayerId)));
         sessionsById.put(sessionId, session);
-        sessionsByCode.put(sessionCode, session);
+        sessionsByRoomCode.put(roomCode, session);
         return snapshot(session, hostPlayerId);
     }
 
     @Override
     public synchronized Map<String, Object> executeJoinSession(JoinSessionCommand command) {
-        String sessionCode = requireText(command.getSessionCode(), "sessionCode");
+        String roomCode = requireText(command.roomCode(), "roomCode");
         String playerId = requireText(command.getPlayerId(), "playerId");
-        GameSession session = requireSessionByCode(sessionCode);
+        GameSession session = requireRoomCode(roomCode);
         actionRule.requireLobby(session);
         if (session.hasPlayer(playerId)) {
             throw new GameException("PLAYER_ALREADY_JOINED", "This player has already joined the session");
@@ -316,7 +316,7 @@ public class GameEngine implements ActionExecutor {
         String playerId = requireText(command.getPlayerId(), "playerId");
         GameSession session = sessionsById.get(sessionIdentity);
         if (session == null) {
-            session = sessionsByCode.get(sessionIdentity);
+            session = sessionsByRoomCode.get(sessionIdentity);
         }
         if (session == null) {
             throw new SessionNotFoundException("No session exists for the given identity");
@@ -871,10 +871,10 @@ public class GameEngine implements ActionExecutor {
         return session;
     }
 
-    private GameSession requireSessionByCode(String sessionCode) {
-        GameSession session = sessionsByCode.get(sessionCode);
+    private GameSession requireRoomCode(String roomCode) {
+        GameSession session = sessionsByRoomCode.get(roomCode);
         if (session == null) {
-            throw new SessionNotFoundException("No session exists for code " + sessionCode);
+            throw new SessionNotFoundException("No session exists for code " + roomCode);
         }
         return session;
     }
@@ -1380,7 +1380,7 @@ public class GameEngine implements ActionExecutor {
         Optional<ActiveGameState> activeGame = session.activeGame();
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("sessionId", session.sessionId());
-        data.put("sessionCode", session.sessionCode());
+        data.put("roomCode", session.roomCode());
         data.put("hostPlayerId", session.hostPlayerId());
         data.put("maxPlayers", session.maxPlayers());
         data.put("status", session.status().name());
@@ -1539,11 +1539,11 @@ public class GameEngine implements ActionExecutor {
         return List.copyOf(ids);
     }
 
-    private String nextSessionCode() {
+    private String nextRoomCode() {
         String code;
         do {
             code = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase(Locale.ROOT);
-        } while (sessionsByCode.containsKey(code));
+        } while (sessionsByRoomCode.containsKey(code));
         return code;
     }
 

@@ -12,7 +12,6 @@
 <?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
@@ -118,105 +117,36 @@
                     </ScrollPane>
                 </VBox>
 
-                <VBox spacing="10.0" styleClass="game-main-table" VBox.vgrow="ALWAYS">
+                <VBox spacing="10.0" styleClass="game-main-table clean-game-main-table" VBox.vgrow="ALWAYS">
                     <HBox alignment="CENTER_LEFT" spacing="10.0">
                         <Label styleClass="game-section-title" text="Your Table"/>
                         <Label styleClass="game-helper-text" text="Build 3 complete property sets to win"/>
                     </HBox>
 
-                    <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="game-table-scroll" VBox.vgrow="ALWAYS">
-                        <VBox spacing="10.0" styleClass="game-table-content">
-                            <padding>
-                                <Insets bottom="2.0" left="2.0" right="2.0" top="2.0"/>
-                            </padding>
-
-                    <HBox alignment="CENTER" spacing="10.0" styleClass="game-board-row">
-                        <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="game-zone-panel">
-                            <Label styleClass="zone-heading" text="Your Bank"/>
-                            <FlowPane fx:id="bankZone" hgap="7.0" prefHeight="100.0" styleClass="drop-zone symbolic-drop-zone bank-drop-zone game-drop-zone" vgap="7.0"/>
+                    <HBox alignment="CENTER" spacing="10.0" styleClass="game-board-row clean-game-board-row">
+                        <VBox HBox.hgrow="ALWAYS" minWidth="260.0" spacing="5.0" styleClass="game-zone-panel clean-zone-panel">
+                            <Label styleClass="zone-heading" text="Bank"/>
+                            <FlowPane fx:id="bankZone" hgap="7.0" prefHeight="118.0" styleClass="drop-zone symbolic-drop-zone bank-drop-zone game-drop-zone clean-drop-zone" vgap="7.0"/>
                         </VBox>
-                        <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="game-zone-panel">
-                            <Label styleClass="zone-heading" text="Discard Pile"/>
-                            <FlowPane fx:id="discardZone" hgap="7.0" prefHeight="100.0" styleClass="drop-zone discard-drop-zone game-drop-zone" vgap="7.0"/>
-                        </VBox>
-                        <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="game-zone-panel">
-                            <Label styleClass="zone-heading" text="Pending Actions"/>
-                            <FlowPane fx:id="actionZone" hgap="7.0" prefHeight="100.0" styleClass="drop-zone action-drop-zone game-drop-zone" vgap="7.0"/>
+                        <VBox HBox.hgrow="ALWAYS" minWidth="360.0" spacing="5.0" styleClass="game-zone-panel clean-zone-panel">
+                            <Label styleClass="zone-heading" text="Activity"/>
+                            <FlowPane fx:id="tableActivityZone" hgap="7.0" prefHeight="118.0" styleClass="drop-zone action-drop-zone game-drop-zone clean-activity-zone" vgap="7.0"/>
                         </VBox>
                     </HBox>
 
-                    <HBox alignment="CENTER" spacing="10.0" styleClass="game-board-row">
-                        <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="game-zone-panel game-small-zone">
-                            <Label styleClass="zone-heading" text="Payments"/>
-                            <FlowPane fx:id="paymentZone" hgap="7.0" prefHeight="72.0" styleClass="drop-zone symbolic-drop-zone payment-drop-zone game-drop-zone" vgap="7.0"/>
-                        </VBox>
-                        <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="game-zone-panel game-small-zone">
-                            <Label styleClass="zone-heading" text="Trade Offer"/>
-                            <FlowPane fx:id="tradeOfferZone" hgap="7.0" prefHeight="72.0" styleClass="drop-zone symbolic-drop-zone trade-drop-zone game-drop-zone" vgap="7.0"/>
-                        </VBox>
-                        <VBox HBox.hgrow="ALWAYS" spacing="5.0" styleClass="game-zone-panel game-small-zone">
-                            <Label styleClass="zone-heading" text="Trade Request"/>
-                            <FlowPane fx:id="tradeRequestZone" hgap="7.0" prefHeight="72.0" styleClass="drop-zone symbolic-drop-zone trade-drop-zone game-drop-zone" vgap="7.0"/>
-                        </VBox>
-                    </HBox>
-
-                    <ScrollPane fitToHeight="true" fitToWidth="true" styleClass="game-property-scroll" VBox.vgrow="ALWAYS">
-                        <GridPane hgap="8.0" styleClass="property-board game-property-board" vgap="8.0">
-                            <columnConstraints>
-                                <ColumnConstraints hgrow="ALWAYS" minWidth="116.0" percentWidth="20.0"/>
-                                <ColumnConstraints hgrow="ALWAYS" minWidth="116.0" percentWidth="20.0"/>
-                                <ColumnConstraints hgrow="ALWAYS" minWidth="116.0" percentWidth="20.0"/>
-                                <ColumnConstraints hgrow="ALWAYS" minWidth="116.0" percentWidth="20.0"/>
-                                <ColumnConstraints hgrow="ALWAYS" minWidth="116.0" percentWidth="20.0"/>
-                            </columnConstraints>
-                            <rowConstraints>
-                                <RowConstraints vgrow="ALWAYS"/>
-                                <RowConstraints vgrow="ALWAYS"/>
-                            </rowConstraints>
-                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="0" GridPane.rowIndex="0">
-                                <Label styleClass="zone-heading property-brown" text="Brown Set (2)"/>
-                                <FlowPane fx:id="brownPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="1" GridPane.rowIndex="0">
-                                <Label styleClass="zone-heading property-light-blue" text="Light Blue Set (3)"/>
-                                <FlowPane fx:id="lightBluePropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="2" GridPane.rowIndex="0">
-                                <Label styleClass="zone-heading property-pink" text="Pink Set (3)"/>
-                                <FlowPane fx:id="pinkPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="3" GridPane.rowIndex="0">
-                                <Label styleClass="zone-heading property-orange" text="Orange Set (3)"/>
-                                <FlowPane fx:id="orangePropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="4" GridPane.rowIndex="0">
-                                <Label styleClass="zone-heading property-red" text="Red Set (3)"/>
-                                <FlowPane fx:id="redPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="0" GridPane.rowIndex="1">
-                                <Label styleClass="zone-heading property-yellow" text="Yellow Set (3)"/>
-                                <FlowPane fx:id="yellowPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="1" GridPane.rowIndex="1">
-                                <Label styleClass="zone-heading property-green" text="Green Set (3)"/>
-                                <FlowPane fx:id="greenPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="2" GridPane.rowIndex="1">
-                                <Label styleClass="zone-heading property-dark-blue" text="Dark Blue Set (2)"/>
-                                <FlowPane fx:id="darkBluePropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="3" GridPane.rowIndex="1">
-                                <Label styleClass="zone-heading property-railroad" text="Railroad Set (4)"/>
-                                <FlowPane fx:id="railroadPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                            <VBox spacing="5.0" styleClass="property-slot game-property-slot" GridPane.columnIndex="4" GridPane.rowIndex="1">
-                                <Label styleClass="zone-heading property-utility" text="Utility Set (2)"/>
-                                <FlowPane fx:id="utilityPropertyZone" hgap="7.0" prefHeight="108.0" styleClass="drop-zone property-drop-zone game-property-drop-zone" vgap="7.0"/>
-                            </VBox>
-                        </GridPane>
-                    </ScrollPane>
-                        </VBox>
-                    </ScrollPane>
+                    <VBox spacing="6.0" styleClass="game-zone-panel clean-property-panel" VBox.vgrow="ALWAYS">
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                            <Label styleClass="zone-heading" text="Properties"/>
+                            <Label styleClass="game-helper-text" text="Only active property rows are shown"/>
+                        </HBox>
+                        <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" styleClass="game-property-scroll" VBox.vgrow="ALWAYS">
+                            <FlowPane fx:id="propertyRowsZone" hgap="10.0" minHeight="150.0" styleClass="property-board clean-property-rows" vgap="10.0">
+                                <padding>
+                                    <Insets bottom="2.0" left="2.0" right="2.0" top="2.0"/>
+                                </padding>
+                            </FlowPane>
+                        </ScrollPane>
+                    </VBox>
                 </VBox>
             </VBox>
         </center>
@@ -247,7 +177,6 @@
 
                         <Separator prefWidth="238.0"/>
                         <Label styleClass="game-section-title" text="Trade and Payment"/>
-                        <TextField fx:id="targetPlayerField" prefWidth="238.0" promptText="Optional target player id" styleClass="game-input"/>
                         <HBox alignment="CENTER" spacing="8.0">
                             <Button fx:id="proposeTradeButton" graphicTextGap="6.0" mnemonicParsing="false" onAction="#proposeTrade" prefWidth="115.0" styleClass="menu-primary-button game-command-button" text="Propose">
                                 <graphic>

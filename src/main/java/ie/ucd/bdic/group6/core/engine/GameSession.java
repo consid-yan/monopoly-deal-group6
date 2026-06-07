@@ -14,7 +14,7 @@ import java.util.Optional;
 
 public final class GameSession {
     private final String sessionId;
-    private final String sessionCode;
+    private final String roomCode;
     private final String hostPlayerId;
     private final int maxPlayers;
     private final Map<String, Player> playersById = new LinkedHashMap<>();
@@ -25,9 +25,9 @@ public final class GameSession {
     private SessionStatus status = SessionStatus.LOBBY;
     private ActiveGameState activeGame;
 
-    public GameSession(String sessionId, String sessionCode, String hostPlayerId, int maxPlayers) {
+    public GameSession(String sessionId, String roomCode, String hostPlayerId, int maxPlayers) {
         this.sessionId = requireText(sessionId, "sessionId");
-        this.sessionCode = requireText(sessionCode, "sessionCode");
+        this.roomCode = requireText(roomCode, "roomCode");
         this.hostPlayerId = requireText(hostPlayerId, "hostPlayerId");
         if (maxPlayers < 2 || maxPlayers > 5) {
             throw new IllegalArgumentException("maxPlayers must be between 2 and 5");
@@ -39,8 +39,8 @@ public final class GameSession {
         return sessionId;
     }
 
-    public String sessionCode() {
-        return sessionCode;
+    public String roomCode() {
+        return roomCode;
     }
 
     public String hostPlayerId() {

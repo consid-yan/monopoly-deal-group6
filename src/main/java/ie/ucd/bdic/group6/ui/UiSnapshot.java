@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 public final class UiSnapshot {
+
     private static final UiSnapshot EMPTY = new UiSnapshot(Map.of());
 
     private final Map<String, Object> data;
@@ -52,8 +53,8 @@ public final class UiSnapshot {
         return text(data.get("sessionId"));
     }
 
-    public String sessionCode() {
-        return text(data.get("sessionCode"));
+    public String roomCode() {
+        return text(data.get("roomCode"));
     }
 
     public String status() {
@@ -150,6 +151,60 @@ public final class UiSnapshot {
                 .toList();
     }
 
+    public boolean isTurnFor(String playerId) {
+        return playerId != null && !playerId.isBlank() && playerId.equals(activePlayerId());
+    }
+
+    public int cardsToDiscard() {
+        return Math.max(0, currentPlayerHand.size() - 7);
+    }
+
+    public List<PendingDebtView> pendingDebtsForDebtor(String playerId) {
+        return pendingDebts.stream()
+                .filter(debt -> debt.debtorPlayerId().equals(playerId))
+                .toList();
+    }
+
+    public List<PendingTradeView> pendingTradesForTarget(String playerId) {
+        return pendingTrades.stream()
+                .filter(trade -> trade.targetPlayerId().equals(playerId))
+                .filter(PendingTradeView::pending)
+                .toList();
+    }
+
+    public List<PendingActionView> pendingActionsAwaiting(String playerId) {
+        return pendingActions.stream()
+                .filter(action -> action.awaits(playerId))
+                .toList();
+    }
+
+    public boolean canProposeTrade(String playerId) {
+        return opponents(playerId).stream().anyMatch(player -> !player.defeated())
+                && currentPlayer(playerId)
+                .map(player -> !player.visibleCards().isEmpty())
+                .orElse(false);
+    }
+
+    public List<String> tableActivityLines() {
+        List<String> lines = new ArrayList<>();
+        lines.add("Draw pile: " + deckSize() + " cards");
+        lines.add("Discard pile: " + discardSize() + " cards");
+        pendingActions.forEach(action -> lines.add("Action: "
+                + humanize(action.actionType())
+                + " from " + playerName(action.actorPlayerId())));
+        pendingDebts.forEach(debt -> lines.add("Debt: "
+                + playerName(debt.debtorPlayerId())
+                + " owes "
+                + playerName(debt.creditorPlayerId())
+                + " $" + debt.amountM() + "M"));
+        pendingTrades.forEach(trade -> lines.add("Trade: "
+                + playerName(trade.proposerPlayerId())
+                + " -> "
+                + playerName(trade.targetPlayerId())
+                + " (" + humanize(trade.status()) + ")"));
+        return List.copyOf(lines);
+    }
+
     public record PlayerView(
             String playerId,
             String name,
@@ -229,6 +284,31 @@ public final class UiSnapshot {
             }
             return label.toString();
         }
+
+        public int requiredToComplete() {
+            int colorRequirement = switch (anchorColor) {
+                case "BROWN", "DARK_BLUE", "UTILITY" -> 2;
+                case "RAILROAD" -> 4;
+                case "LIGHT_BLUE", "PINK", "ORANGE", "RED", "YELLOW", "GREEN" -> 3;
+                default -> 0;
+            };
+            if (colorRequirement > 0) {
+                return colorRequirement;
+            }
+            return cards.stream()
+                    .mapToInt(CardView::requiredToComplete)
+                    .filter(required -> required > 0)
+                    .findFirst()
+                    .orElse(cards.size());
+        }
+
+        public String progressLabel() {
+            int required = requiredToComplete();
+            if (required <= 0) {
+                return cards.size() + " cards";
+            }
+            return cards.size() + "/" + required + " cards";
+        }
     }
 
     public record CardView(
@@ -298,7 +378,9 @@ public final class UiSnapshot {
             String targetPlayerId,
             List<String> offeredCardIds,
             List<String> requestedCardIds,
-            String status) {
+            String status,
+            String createdAt,
+            String respondedAt) {
 
         private static PendingTradeView from(Map<String, Object> data) {
             return new PendingTradeView(
@@ -307,7 +389,13 @@ public final class UiSnapshot {
                     text(data.get("targetPlayerId")),
                     strings(data.get("offeredCardIds")),
                     strings(data.get("requestedCardIds")),
-                    text(data.get("status")));
+                    text(data.get("status")),
+                    text(data.get("createdAt")),
+                    text(data.get("respondedAt")));
+        }
+
+        public boolean pending() {
+            return "PENDING".equals(status);
         }
     }
 
@@ -324,7 +412,8 @@ public final class UiSnapshot {
             String offeredCardId,
             String requestedCardId,
             List<String> targetPlayerIds,
-            Map<String, String> responses) {
+            Map<String, String> responses,
+            String createdAt) {
 
         private static PendingActionView from(Map<String, Object> data) {
             return new PendingActionView(
@@ -340,11 +429,15 @@ public final class UiSnapshot {
                     text(data.get("offeredCardId")),
                     text(data.get("requestedCardId")),
                     strings(data.get("targetPlayerIds")),
-                    stringMap(data.get("responses")));
+                    stringMap(data.get("responses")),
+                    text(data.get("createdAt")));
         }
 
         public boolean awaits(String playerId) {
-            return targetPlayerIds.contains(playerId) && !responses.containsKey(playerId);
+            if (playerId == null || !targetPlayerIds.contains(playerId)) {
+                return false;
+            }
+            return "PENDING".equals(responses.getOrDefault(playerId, "PENDING"));
         }
     }
 

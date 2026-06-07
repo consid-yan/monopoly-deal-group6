@@ -1,29 +1,27 @@
-package ie.ucd.bdic.group6.ui;
+package ie.ucd.bdic.group6.app;
 
-import ie.ucd.bdic.group6.app.AppConfig;
 import ie.ucd.bdic.group6.command.CommandType;
 import ie.ucd.bdic.group6.network.client.GameClient;
-import ie.ucd.bdic.group6.network.protocol.ServerNotice;
-import ie.ucd.bdic.group6.network.protocol.ServerResult;
-import ie.ucd.bdic.group6.network.protocol.StateUpdate;
+import ie.ucd.bdic.group6.network.message.ServerNotice;
+import ie.ucd.bdic.group6.network.message.ServerResponse;
+import ie.ucd.bdic.group6.network.message.ServerUpdate;
 import ie.ucd.bdic.group6.network.server.GameServer;
 
 import java.io.IOException;
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.util.Enumeration;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+
+import ie.ucd.bdic.group6.ui.UiSnapshot;
 import javafx.application.Platform;
 
-public final class UiSessionContext implements AutoCloseable {
+import static ie.ucd.bdic.group6.network.NetworkAddressResolver.resolveShareableHost;
+import static ie.ucd.bdic.group6.network.NetworkConfig.DEFAULT_PORT;
+import static ie.ucd.bdic.group6.network.NetworkConfig.requireValidPort;
+
+public final class GameSessionCoordinator implements AutoCloseable {
     private final AppConfig appConfig;
 
     private volatile GameClient client;
@@ -33,15 +31,15 @@ public final class UiSessionContext implements AutoCloseable {
     private volatile Consumer<String> messageListener = _ -> {};
 
     private volatile String host = "";
-    private volatile int port;
     private volatile String playerId = "";
     private volatile String playerName = "";
     private volatile String playerToken = "";
     private volatile String sessionId = "";
-    private volatile String sessionCode = "";
+    private volatile String roomCode = "";
+    private final Map<String, RejoinCredentials> rejoinCredentialsByRoomCode = new ConcurrentHashMap<>();
     private volatile boolean connected;
 
-    public UiSessionContext(AppConfig appConfig) {
+    public GameSessionCoordinator(AppConfig appConfig) {
         this.appConfig = Objects.requireNonNull(appConfig, "appConfig");
     }
 
@@ -57,16 +55,12 @@ public final class UiSessionContext implements AutoCloseable {
         return playerName;
     }
 
-    public String playerToken() {
-        return playerToken;
-    }
-
     public String sessionId() {
         return sessionId;
     }
 
-    public String sessionCode() {
-        return sessionCode;
+    public String roomCode() {
+        return roomCode;
     }
 
     public boolean isConnected() {
@@ -76,20 +70,13 @@ public final class UiSessionContext implements AutoCloseable {
 
     public String connectionLabel() {
         if (isConnected()) {
-            return host + ":" + port;
+            return host + ":" + DEFAULT_PORT;
         }
         return "Disconnected";
     }
 
     public String joinHost() {
         return host;
-    }
-
-    public String joinPort() {
-        if (port <= 0) {
-            return "";
-        }
-        return Integer.toString(port);
     }
 
     public void setSnapshotListener(Consumer<UiSnapshot> listener) {
@@ -106,75 +93,70 @@ public final class UiSessionContext implements AutoCloseable {
         } : listener;
     }
 
-    public CompletableFuture<ServerResult> createHostedSession(String requestedPlayerName, int maxPlayers) {
+    public CompletableFuture<ServerResponse> createHostedSession(String requestedPlayerName, int maxPlayers) {
         String newPlayerName = requireText(requestedPlayerName, "player name");
         String newPlayerId = generatePlayerId(newPlayerName);
 
-        System.out.println("\n[1/5] Starting creation of hosted game session, player name: " + newPlayerName + ", player ID: " + newPlayerId);
+        System.out.println("\n[1/5] Starting hosted game session for player "
+                + newPlayerName + " (" + newPlayerId + ")");
 
         return CompletableFuture.supplyAsync(() -> {
             GameServer server = null;
             try {
                 System.out.println("[2/5] Resetting network state...");
                 resetNetwork();
-                System.out.println("✅ Network state reset completed");
+                System.out.println("Network state reset completed.");
 
-                System.out.println("[3/5] Starting game server, attempting to bind port 8888...");
-                server = appConfig.gameServer(8888);
+                System.out.println("[3/5] Starting game server, attempting to bind port " + DEFAULT_PORT);
+                server = appConfig.gameServer(DEFAULT_PORT);
                 server.startAsync();
 
                 int actualPort = server.port();
                 String serverBindAddress = "0.0.0.0";
-                System.out.println("✅ Server started successfully!");
+                System.out.println("Server started successfully.");
                 System.out.println("   Bind address: " + serverBindAddress + " (0.0.0.0 listens on all network adapters)");
                 System.out.println("   Actual listening port: " + actualPort);
 
                 String shareableHost = resolveShareableHost();
-                System.out.println("✅ Resolved local LAN IP: " + shareableHost);
-                System.out.println("\n📢 Connection address for other players: " + shareableHost + ":" + actualPort);
-                System.out.println("📢 Local connection address: 127.0.0.1:" + actualPort + "\n");
+                System.out.println("Resolved local LAN IP: " + shareableHost);
+                System.out.println("\nConnection address for other players: " + shareableHost + ":" + actualPort);
+                System.out.println("Local connection address: 127.0.0.1:" + actualPort + "\n");
 
                 System.out.println("[4/5] Creating local client and connecting to server...");
                 GameClient newClient = openClient("127.0.0.1", actualPort);
-                System.out.println("✅ Local client connected to server successfully");
+                System.out.println("Local client connected to server successfully.");
 
-                // Assign shared variables
                 hostedServer = server;
                 client = newClient;
                 host = shareableHost;
-                port = actualPort;
                 playerId = newPlayerId;
                 playerName = newPlayerName;
                 connected = true;
-                System.out.println("✅ Local session status initialized");
+                System.out.println("Local session status initialized.");
 
                 return null;
             } catch (IOException e) {
-                System.err.println("\n❌ Failed to start server: IO Exception");
+                System.err.println("\nFailed to start server: I/O exception");
                 System.err.println("   Error message: " + e.getMessage());
-                System.err.println("   Possible reasons: port 8888 occupied, insufficient permissions, firewall block");
+                System.err.printf("   Possible reasons: port %d occupied, insufficient permissions, firewall block\n", DEFAULT_PORT);
                 e.printStackTrace();
 
-                if (server != null) {
-                    try {
-                        server.stop();
-                        System.out.println("✅ Attempted to shut down leftover server process");
-                    } catch (Exception ex) {
-                        System.err.println("⚠️  Failed to close leftover server: " + ex.getMessage());
-                    }
+                try {
+                    server.stop();
+                    System.out.println("Attempted to shut down leftover server process.");
+                } catch (Exception ex) {
+                    System.err.println("Failed to close leftover server: " + ex.getMessage());
                 }
                 throw new CompletionException("Failed to start server: " + e.getMessage(), e);
             } catch (RuntimeException e) {
-                System.err.println("\n❌ Failed to start server: Runtime Exception");
+                System.err.println("\nFailed to start server: runtime exception");
                 System.err.println("   Error message: " + e.getMessage());
                 e.printStackTrace();
 
                 if (server != null) {
                     try {
                         server.stop();
-                    } catch (Exception ex) {
-                        // ignore
-                    }
+                    } catch (Exception _) {}
                 }
                 throw new CompletionException("Failed to start server: " + e.getMessage(), e);
             }
@@ -186,73 +168,63 @@ public final class UiSessionContext implements AutoCloseable {
                     "maxPlayers", maxPlayers
             )).whenComplete((result, throwable) -> {
                 if (throwable != null) {
-                    System.err.println("\n❌ Failed to create game session");
+                    System.err.println("\nFailed to create game session.");
                     System.err.println("   Error message: " + throwable.getMessage());
                     System.err.println("   Possible reasons: no server response, serialization failure, invalid command format");
                     throwable.printStackTrace();
+                } else if (result.accepted()) {
+                    System.out.println("\nGame session created successfully.");
+                    System.out.println("   Session ID: " + result.payload().get("sessionId"));
+                    System.out.println("   Room Code: " + result.payload().get("roomCode"));
+                    System.out.println("Ready to invite other players to join.\n");
                 } else {
-                    if (result.success()) {
-                        System.out.println("\n✅ Game session created successfully!");
-                        System.out.println("   Session ID: " + result.data().get("sessionId"));
-                        System.out.println("   Session Code: " + result.data().get("sessionCode"));
-                        System.out.println("🎉 Ready to invite other players to join!\n");
-                    } else {
-                        System.err.println("\n❌ Server rejected session creation");
-                        System.err.println("   Error Code: " + result.code());
-                        System.err.println("   Error Message: " + result.message());
-                    }
+                    System.err.println("\nServer rejected session creation.");
+                    System.err.println("   Error Code: " + result.code());
+                    System.err.println("   Error Message: " + result.message());
                 }
             });
         });
     }
 
-    public CompletableFuture<ServerResult> joinSession(
+    public CompletableFuture<ServerResponse> joinSession(
             String requestedHost,
-            int requestedPort,
-            String requestedSessionCode,
+            String requestedRoomCode,
             String requestedPlayerName) {
         String newHost = requireText(requestedHost, "host");
-        String newSessionCode = requireText(requestedSessionCode, "session code");
+        String newRoomCode = requireText(requestedRoomCode, "room code");
         String newPlayerName = requireText(requestedPlayerName, "player name");
         String newPlayerId = generatePlayerId(newPlayerName);
-        return connectAs(newHost, requestedPort, newPlayerId, newPlayerName, "")
+        return connectAs(newHost, newPlayerId, newPlayerName, "")
                 .thenCompose(ignored -> sendCommand(CommandType.JOIN_SESSION, Map.of(
-                        "sessionCode", newSessionCode,
+                        "roomCode", newRoomCode,
                         "playerId", newPlayerId,
                         "playerName", newPlayerName
                 )));
     }
 
-    public CompletableFuture<ServerResult> rejoinSession(
-            String requestedHost,
-            int requestedPort,
-            String sessionIdentity,
-            String requestedPlayerId,
-            String requestedPlayerToken) {
-        String rejoinPlayerId = requireText(requestedPlayerId, "player id");
-        String rejoinPlayerToken = requireText(requestedPlayerToken, "player token");
+    public CompletableFuture<ServerResponse> rejoinSession(String requestedRoomCode) {
+        RejoinCredentials credentials = requireSavedRejoinCredentials(requestedRoomCode);
         return connectAs(
-                requireText(requestedHost, "host"),
-                requestedPort,
-                rejoinPlayerId,
-                rejoinPlayerId,
-                rejoinPlayerToken)
+                credentials.host(),
+                credentials.playerId(),
+                credentials.playerId(),
+                credentials.playerToken())
                 .thenCompose(ignored -> sendCommand(CommandType.REJOIN_SESSION, Map.of(
-                        "sessionIdentity", requireText(sessionIdentity, "session identity"),
-                        "playerId", rejoinPlayerId,
-                        "playerToken", rejoinPlayerToken
+                        "sessionIdentity", credentials.roomCode(),
+                        "playerId", credentials.playerId(),
+                        "playerToken", credentials.playerToken()
                 )));
     }
 
-    public CompletableFuture<ServerResult> sendCommand(CommandType commandType, Map<String, Object> payload) {
+    public CompletableFuture<ServerResponse> sendCommand(CommandType commandType, Map<String, Object> payload) {
         GameClient currentClient = client;
         if (currentClient == null || !currentClient.isConnected()) {
-            CompletableFuture<ServerResult> failed = new CompletableFuture<>();
+            CompletableFuture<ServerResponse> failed = new CompletableFuture<>();
             failed.completeExceptionally(new IllegalStateException("Not connected to a game server"));
             failed.whenComplete((_, error) -> notifyError(error));
             return failed;
         }
-        CompletableFuture<ServerResult> future = currentClient.sendCommand(commandType, withPlayerToken(payload));
+        CompletableFuture<ServerResponse> future = currentClient.sendCommand(commandType, withPlayerToken(payload));
         future.whenComplete((result, error) -> {
             if (error != null) {
                 notifyError(error);
@@ -277,7 +249,7 @@ public final class UiSessionContext implements AutoCloseable {
         resetNetwork();
         latestSnapshot = UiSnapshot.empty();
         sessionId = "";
-        sessionCode = "";
+        roomCode = "";
         playerId = "";
         playerName = "";
         playerToken = "";
@@ -286,17 +258,15 @@ public final class UiSessionContext implements AutoCloseable {
 
     private CompletableFuture<Void> connectAs(
             String requestedHost,
-            int requestedPort,
             String newPlayerId,
             String newPlayerName,
             String newPlayerToken) {
         return CompletableFuture.runAsync(() -> {
             try {
                 resetNetwork();
-                client = openClient(requestedHost, requestedPort);
+                client = openClient(requestedHost, DEFAULT_PORT);
                 hostedServer = null;
                 host = requestedHost;
-                port = requestedPort;
                 playerId = newPlayerId;
                 playerName = newPlayerName;
                 playerToken = newPlayerToken == null ? "" : newPlayerToken;
@@ -308,11 +278,9 @@ public final class UiSessionContext implements AutoCloseable {
     }
 
     private GameClient openClient(String requestedHost, int requestedPort) throws IOException {
-        if (requestedPort < 0 || requestedPort > 65535) {
-            throw new IllegalArgumentException("Port must be between 0 and 65535");
-        }
+        requireValidPort(requestedPort);
         GameClient newClient = new GameClient();
-        newClient.addStateUpdateListener(this::handleStateUpdate);
+        newClient.addUpdateListener(this::handleStateUpdate);
         newClient.addNoticeListener(this::handleNotice);
         newClient.connect(requestedHost, requestedPort);
         return newClient;
@@ -333,36 +301,33 @@ public final class UiSessionContext implements AutoCloseable {
         }
     }
 
-    private void handleStateUpdate(StateUpdate update) {
+    private void handleStateUpdate(ServerUpdate update) {
         if (update == null) {
             return;
         }
-        sessionId = update.sessionId();
-        updateSnapshot(update.data());
+        updateSnapshot(update.snapshot());
     }
 
-    private void handleResult(ServerResult result) {
-        if (result == null) {
+    private void handleResult(ServerResponse response) {
+        if (response == null) {
             return;
         }
-        if (result.success()) {
-            rememberPlayerToken(result.data());
-            if (result.data() != null && !result.data().isEmpty()) {
-                updateSnapshot(result.data());
+        if (response.accepted()) {
+            rememberPlayerToken(response.payload());
+            if (response.payload() != null && !response.payload().isEmpty()) {
+                updateSnapshot(response.payload());
             }
             return;
         }
-        notifyMessage(result.code() + ": " + result.message());
+        notifyMessage(response.message());
     }
 
     private void handleNotice(ServerNotice notice) {
         if (notice == null) {
             return;
         }
-        if ("CONNECTION_CLOSED".equals(notice.type()) || "SESSION_REPLACED".equals(notice.type())) {
-            connected = false;
-        }
-        notifyMessage(notice.type() + ": " + notice.message());
+        String message = text(notice.payload().get("message"));
+        notifyMessage(message == null ? notice.type().name() : notice.type().name() + ": " + message);
     }
 
     private void updateSnapshot(Map<String, Object> data) {
@@ -371,8 +336,8 @@ public final class UiSessionContext implements AutoCloseable {
         if (!snapshot.sessionId().isBlank()) {
             sessionId = snapshot.sessionId();
         }
-        if (!snapshot.sessionCode().isBlank()) {
-            sessionCode = snapshot.sessionCode();
+        if (!snapshot.roomCode().isBlank()) {
+            roomCode = snapshot.roomCode();
         }
         notifySnapshot(snapshot);
     }
@@ -395,67 +360,38 @@ public final class UiSessionContext implements AutoCloseable {
         String token = text(data.get("playerToken"));
         if (token != null) {
             playerToken = token;
+            rememberRejoinCredentials(data, token);
         }
     }
 
-    /**
-     * Correctly get local LAN IPv4 address (exclude loopback, virtual adapters, VPN adapters)
-     * Fix issue returning 127.0.0.1 which blocks cross-device connection
-     */
-    private String resolveShareableHost() {
-        try {
-            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-            while (interfaces.hasMoreElements()) {
-                NetworkInterface ni = interfaces.nextElement();
+    private void rememberRejoinCredentials(Map<String, Object> data, String token) {
+        String rememberedSessionId = firstNonBlank(text(data.get("sessionId")), sessionId);
+        String rememberedRoomCode = firstNonBlank(text(data.get("roomCode")), roomCode);
+        String rememberedPlayerId = firstNonBlank(playerId, text(data.get("playerId")));
 
-                // Skip loopback, virtual and disabled network interfaces
-                if (ni.isLoopback() || ni.isVirtual() || !ni.isUp()) {
-                    continue;
-                }
-
-                // Skip common virtual adapters: Docker, VMware, VirtualBox, WSL
-                String interfaceName = ni.getName().toLowerCase();
-                if (interfaceName.contains("docker")
-                        || interfaceName.contains("vmnet")
-                        || interfaceName.contains("vbox")
-                        || interfaceName.contains("wsl")) {
-                    continue;
-                }
-
-                Enumeration<InetAddress> addresses = ni.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress addr = addresses.nextElement();
-
-                    // Only pick valid IPv4, skip IPv6 and loopback
-                    if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
-                        return addr.getHostAddress();
-                    }
-                }
-            }
-
-            // Fallback to loopback if no valid LAN IP found (local-only access)
-            System.err.println("⚠️  No valid LAN IP found, local connection only");
-            return "127.0.0.1";
-        } catch (SocketException e) {
-            throw new RuntimeException("Failed to resolve local host IP", e);
+        if (host.isBlank() || rememberedRoomCode == null || rememberedPlayerId == null || token.isBlank()) {
+            return;
         }
+
+        RejoinCredentials credentials = new RejoinCredentials(
+                host,
+                blankToEmpty(rememberedSessionId),
+                rememberedRoomCode,
+                rememberedPlayerId,
+                token);
+        rejoinCredentialsByRoomCode.put(normalizeRoomCode(rememberedRoomCode), credentials);
     }
 
-    private boolean isUsableNetworkInterface(NetworkInterface networkInterface) {
-        try {
-            return networkInterface.isUp()
-                    && !networkInterface.isLoopback()
-                    && !networkInterface.isVirtual();
-        } catch (SocketException e) {
-            return false;
+    private RejoinCredentials requireSavedRejoinCredentials(String requestedRoomCode) {
+        String normalizedRoomCode = normalizeRoomCode(requireText(requestedRoomCode, "room code"));
+        RejoinCredentials credentials = rejoinCredentialsByRoomCode.get(normalizedRoomCode);
+        if (credentials != null) {
+            return credentials;
         }
-    }
 
-    private boolean isShareableIpv4(InetAddress address) {
-        return address instanceof Inet4Address
-                && !address.isLoopbackAddress()
-                && !address.isLinkLocalAddress()
-                && !address.isAnyLocalAddress();
+        throw new IllegalArgumentException(
+                "No saved player identity is available for room code " + normalizedRoomCode + ". "
+                        + "Create or join the session from this app before rejoining.");
     }
 
     private void notifySnapshot(UiSnapshot snapshot) {
@@ -502,12 +438,37 @@ public final class UiSessionContext implements AutoCloseable {
         return text.isEmpty() ? null : text;
     }
 
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
+    }
+
+    private String blankToEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
+    private String normalizeRoomCode(String value) {
+        return value.trim().toUpperCase(Locale.ROOT);
+    }
+
     private String requireText(String value, String label) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(label + " is required");
         }
         return value.trim();
     }
+
+    private record RejoinCredentials(
+            String host,
+            String sessionId,
+            String roomCode,
+            String playerId,
+            String playerToken) {}
 
     @Override
     public void close() {
