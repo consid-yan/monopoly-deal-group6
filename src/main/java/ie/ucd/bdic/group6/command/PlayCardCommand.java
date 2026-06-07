@@ -48,9 +48,13 @@ public class PlayCardCommand extends AbstractCommand {
         return (String) payload().get("propertyColor");
     }
 
+    @Deprecated
     public String getPropertyRowIndex() {
-        // TODO(command-play-card): Replace row indexes with stable row ids before UI/network persist row references.
-        Object value = payload().get("propertyRowIndex");
-        return value == null ? null : value.toString();
+        String stableRowId = this.getTargetPropertyRowId();
+        if (stableRowId != null && !stableRowId.isEmpty()) {
+            return stableRowId;
+        }
+        Object legacyIndex = payload().get("propertyRowIndex");
+        return legacyIndex == null ? null : legacyIndex.toString();
     }
 }
