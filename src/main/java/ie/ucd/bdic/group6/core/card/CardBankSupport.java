@@ -24,13 +24,6 @@ public final class CardBankSupport {
     }
 
     /**
-     * Whether an action card in the bank may still be played for its effect. Officially: never.
-     */
-    public static boolean canUseBankedCardAsAction(Card card) {
-        return false;
-    }
-
-    /**
      * Whether a banked card contributes monetary value when paying (must have {@link Card#bankValueM()}).
      */
     public static int bankPaymentValueM(Card card) {

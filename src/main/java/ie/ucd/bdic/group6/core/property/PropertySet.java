@@ -212,11 +212,4 @@ public final class PropertySet {
         }
         return RentTable.completeSetRent(anchorColor, house, hotel);
     }
-
-    public void resetImprovementsIfIncomplete() {
-        if (!isComplete()) {
-            house = false;
-            hotel = false;
-        }
-    }
 }

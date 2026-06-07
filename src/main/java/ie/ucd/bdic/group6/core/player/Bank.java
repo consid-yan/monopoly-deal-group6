@@ -13,8 +13,7 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Bank pile: only cards that may be banked as money. Action cards in the bank can never be played for effects
- * (see {@link CardBankSupport#canUseBankedCardAsAction(Card)}).
+ * Bank pile: only cards that may be banked as money. Action cards in the bank can never be played for effects.
  */
 public final class Bank {
 
