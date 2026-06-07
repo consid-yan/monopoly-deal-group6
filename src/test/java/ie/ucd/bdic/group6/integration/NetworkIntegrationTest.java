@@ -5,6 +5,8 @@ import ie.ucd.bdic.group6.command.CommandType;
 import ie.ucd.bdic.group6.controller.GameController;
 import ie.ucd.bdic.group6.controller.mapper.RequestMapper;
 import ie.ucd.bdic.group6.core.engine.GameEngine;
+import ie.ucd.bdic.group6.core.snapshot.CardSnapshot;
+import ie.ucd.bdic.group6.core.snapshot.PlayerStateSnapshot;
 import ie.ucd.bdic.group6.facade.GameFacade;
 import ie.ucd.bdic.group6.network.client.GameClient;
 import ie.ucd.bdic.group6.network.message.NoticeType;
@@ -73,8 +75,9 @@ class NetworkIntegrationTest {
         assertNotNull(sessionId);
         assertNotNull(roomCode);
         assertNotNull(hostToken);
-        assertEquals("host", created.payload().get("hostPlayerId"));
-        assertEquals(2, created.payload().get("maxPlayers"));
+        assertNotNull(created.snapshot());
+        assertEquals("host", created.snapshot().hostPlayerId());
+        assertEquals(2, created.snapshot().maxPlayers());
 
         ServerResponse invalidJoin = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
                 "roomCode", "NOPE",
@@ -108,11 +111,11 @@ class NetworkIntegrationTest {
         ServerUpdate hostActive = await(hostUpdates, activeUpdate(sessionId));
         ServerUpdate player2Active = await(player2Updates, activeUpdate(sessionId));
         assertNotNull(hostActive);
-        assertEquals("ACTIVE", hostActive.snapshot().get("status"));
+        assertEquals("ACTIVE", hostActive.snapshot().status());
         assertNotNull(player2Active);
-        assertEquals("ACTIVE", player2Active.snapshot().get("status"));
-        assertEquals("host", hostActive.snapshot().get("hostPlayerId"));
-        assertEquals(2, hostActive.snapshot().get("maxPlayers"));
+        assertEquals("ACTIVE", player2Active.snapshot().status());
+        assertEquals("host", hostActive.snapshot().hostPlayerId());
+        assertEquals(2, hostActive.snapshot().maxPlayers());
         assertEquals(7, currentPlayerHand(hostActive).size());
         assertEquals(5, currentPlayerHand(player2Active).size());
         assertNotEquals(currentPlayerHand(hostActive), currentPlayerHand(player2Active));
@@ -130,7 +133,7 @@ class NetworkIntegrationTest {
 
         ServerUpdate rejoinedState = await(rejoinedUpdates, activeUpdate(sessionId));
         assertNotNull(rejoinedState);
-        assertEquals("ACTIVE", rejoinedState.snapshot().get("status"));
+        assertEquals("ACTIVE", rejoinedState.snapshot().status());
         assertEquals(5, currentPlayerHand(rejoinedState).size());
     }
 
@@ -181,12 +184,12 @@ class NetworkIntegrationTest {
 
         clock.advance(Duration.ofSeconds(91));
         ServerUpdate finished = await(hostUpdates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
-                && "FINISHED".equals(update.snapshot().get("status")));
+                && "FINISHED".equals(update.snapshot().status()));
 
         assertNotNull(finished);
-        assertEquals("host", finished.snapshot().get("winnerPlayerId"));
-        assertEquals(List.of("player2"), finished.snapshot().get("forfeitedPlayerIds"));
-        assertEquals("DEFEATED", player(finished, "player2").get("playerStatus"));
+        assertEquals("host", finished.snapshot().winnerPlayerId());
+        assertEquals(List.of("player2"), finished.snapshot().forfeitedPlayerIds());
+        assertEquals("DEFEATED", player(finished, "player2").playerStatus());
     }
 
     @Test
@@ -268,7 +271,7 @@ class NetworkIntegrationTest {
 
     private Predicate<ServerUpdate> activeUpdate(String sessionId) {
         return update -> sessionId.equals(text(update.snapshot(), "sessionId"))
-                && "ACTIVE".equals(update.snapshot().get("status"));
+                && "ACTIVE".equals(update.snapshot().status());
     }
 
     private <T> T await(List<T> values, Predicate<T> predicate) throws InterruptedException {
@@ -285,29 +288,33 @@ class NetworkIntegrationTest {
         return null;
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> players(ServerUpdate update) {
-        return (List<Map<String, Object>>) update.snapshot().get("players");
+    private List<PlayerStateSnapshot> players(ServerUpdate update) {
+        return update.snapshot().players();
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> player(ServerUpdate update, String playerId) {
-        return ((List<Map<String, Object>>) update.snapshot().get("players")).stream()
-                .filter(player -> playerId.equals(player.get("playerId")))
+    private PlayerStateSnapshot player(ServerUpdate update, String playerId) {
+        return update.snapshot().players().stream()
+                .filter(player -> playerId.equals(player.playerId()))
                 .findFirst()
                 .orElseThrow();
     }
 
-    @SuppressWarnings("unchecked")
     private boolean playerHasStatus(ServerUpdate update, String playerId, String status) {
-        return ((List<Map<String, Object>>) update.snapshot().get("players")).stream()
-                .anyMatch(player -> playerId.equals(player.get("playerId"))
-                        && status.equals(player.get("playerStatus")));
+        return update.snapshot().players().stream()
+                .anyMatch(player -> playerId.equals(player.playerId())
+                        && status.equals(player.playerStatus()));
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> currentPlayerHand(ServerUpdate update) {
-        return (List<Map<String, Object>>) update.snapshot().get("currentPlayerHand");
+    private List<CardSnapshot> currentPlayerHand(ServerUpdate update) {
+        return update.snapshot().currentPlayerHand();
+    }
+
+    private String text(ie.ucd.bdic.group6.core.snapshot.SessionSnapshot snapshot, String key) {
+        return switch (key) {
+            case "sessionId" -> snapshot.sessionId();
+            case "roomCode" -> snapshot.roomCode();
+            default -> null;
+        };
     }
 
     private String text(Map<String, Object> data, String key) {

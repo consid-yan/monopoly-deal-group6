@@ -3,6 +3,7 @@ package ie.ucd.bdic.group6.network.server;
 import ie.ucd.bdic.group6.command.CommandType;
 import ie.ucd.bdic.group6.controller.GameController;
 import ie.ucd.bdic.group6.controller.dto.ControllerRequest;
+import ie.ucd.bdic.group6.core.snapshot.SessionSnapshot;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 import ie.ucd.bdic.group6.network.message.ClientRequest;
 import ie.ucd.bdic.group6.network.message.Message;
@@ -149,12 +150,16 @@ public class GameServer implements AutoCloseable {
 
         GameResult result = execute(request);
 
-        String sessionId = text(result.getData().get("sessionId"));
+        SessionSnapshot snapshot = result.getSnapshot().orElse(null);
+        String sessionId = snapshot == null ? text(result.getData().get("sessionId")) : text(snapshot.sessionId());
         String playerId = resolvePlayerId(request);
         Map<String, Object> resultData = result.getData();
 
         if (result.isSuccess()) {
-            rememberRoomCode(resultData);
+            if (snapshot != null) {
+                rememberRoomCode(snapshot);
+                resultData = responsePayload(snapshot);
+            }
             resultData = withIssuedPlayerToken(request, sessionId, playerId, resultData);
         }
 
@@ -163,7 +168,8 @@ public class GameServer implements AutoCloseable {
                 result.isSuccess(),
                 result.getCode(),
                 result.getMessage(),
-                resultData
+                resultData,
+                snapshot
         ));
 
         if (!result.isSuccess()) {
@@ -193,7 +199,7 @@ public class GameServer implements AutoCloseable {
                     false,
                     "AUTH_REQUIRED",
                     "A valid player token is required for " + commandType,
-                    Map.of()
+                    Map.of(), null
             );
         }
 
@@ -207,7 +213,7 @@ public class GameServer implements AutoCloseable {
                     false,
                     "UNAUTHORIZED_PLAYER",
                     "Player identity could not be verified",
-                    Map.of()
+                    Map.of(), null
             );
         }
 
@@ -257,13 +263,20 @@ public class GameServer implements AutoCloseable {
         }
     }
 
-    private void rememberRoomCode(Map<String, Object> data) {
-        String sessionId = text(data.get("sessionId"));
-        String roomCode = text(data.get("roomCode"));
+    private void rememberRoomCode(SessionSnapshot snapshot) {
+        String sessionId = text(snapshot.sessionId());
+        String roomCode = text(snapshot.roomCode());
 
         if (sessionId != null && roomCode != null) {
             sessionIdByRoomCode.put(roomCode, sessionId);
         }
+    }
+
+    private Map<String, Object> responsePayload(SessionSnapshot snapshot) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("sessionId", snapshot.sessionId());
+        payload.put("roomCode", snapshot.roomCode());
+        return payload;
     }
 
     private Map<String, Object> withIssuedPlayerToken(
@@ -327,19 +340,19 @@ public class GameServer implements AutoCloseable {
                 continue;
             }
 
-            GameResult snapshot = gameController.rejoinSession(new ControllerRequest(Map.of(
+            GameResult stateResult = gameController.rejoinSession(new ControllerRequest(Map.of(
                     "sessionIdentity", sessionId,
                     "playerId", connection.playerId()
             )));
 
-            if (snapshot.isSuccess()) {
-                connection.send(new ServerUpdate(snapshot.getData()));
+            if (stateResult.isSuccess() && stateResult.getSnapshot().isPresent()) {
+                connection.send(new ServerUpdate(stateResult.getSnapshot().orElseThrow()));
             } else {
                 connection.send(new ServerNotice(
                         NoticeType.STATE_UPDATE_FAILED,
                         Map.of(
-                                "message", snapshot.getMessage(),
-                                "code", snapshot.getCode(),
+                                "message", stateResult.getMessage(),
+                                "code", stateResult.getCode(),
                                 "sessionId", sessionId,
                                 "playerId", connection.playerId()
                         )
@@ -549,9 +562,11 @@ public class GameServer implements AutoCloseable {
                 output.writeObject(message);
                 output.flush();
                 output.reset();
+            } catch (SocketException e) {
+                open.set(false);
+                closeQuietly(socket);
             } catch (IOException e) {
                 LOGGER.log(Level.WARNING, "Failed to send message to client: " + clientAddress(), e);
-                close();
             }
         }
 

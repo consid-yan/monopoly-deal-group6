@@ -4,6 +4,7 @@ import ie.ucd.bdic.group6.command.CreateSessionCommand;
 import ie.ucd.bdic.group6.command.JoinSessionCommand;
 import ie.ucd.bdic.group6.command.PlayerDisconnectedCommand;
 import ie.ucd.bdic.group6.command.StartGameCommand;
+import ie.ucd.bdic.group6.core.snapshot.SessionSnapshot;
 import ie.ucd.bdic.group6.exception.InvalidCommandException;
 import ie.ucd.bdic.group6.exception.InvalidGameStateException;
 import ie.ucd.bdic.group6.exception.PlayerNotFoundException;
@@ -33,13 +34,13 @@ class DomainExceptionTypeTest {
     @Test
     void missingPlayerUsesPlayerNotFoundException() {
         GameEngine engine = new GameEngine();
-        Map<String, Object> created = engine.executeCreateSession(new CreateSessionCommand(Map.of(
+        SessionSnapshot created = engine.executeCreateSession(new CreateSessionCommand(Map.of(
                 "hostPlayerId", "host"
         )));
 
         PlayerNotFoundException error = assertThrows(PlayerNotFoundException.class,
                 () -> engine.executePlayerDisconnected(new PlayerDisconnectedCommand(Map.of(
-                        "sessionId", created.get("sessionId"),
+                        "sessionId", created.sessionId(),
                         "playerId", "missing-player"
                 ))));
 
@@ -59,21 +60,21 @@ class DomainExceptionTypeTest {
     @Test
     void invalidGameStateUsesInvalidGameStateException() {
         GameEngine engine = new GameEngine();
-        Map<String, Object> created = engine.executeCreateSession(new CreateSessionCommand(Map.of(
+        SessionSnapshot created = engine.executeCreateSession(new CreateSessionCommand(Map.of(
                 "hostPlayerId", "host"
         )));
         engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                "roomCode", created.get("roomCode"),
+                "roomCode", created.roomCode(),
                 "playerId", "player2"
         )));
         engine.executeStartGame(new StartGameCommand(Map.of(
-                "sessionId", created.get("sessionId"),
+                "sessionId", created.sessionId(),
                 "playerId", "host"
         )));
 
         InvalidGameStateException error = assertThrows(InvalidGameStateException.class,
                 () -> engine.executeJoinSession(new JoinSessionCommand(Map.of(
-                        "roomCode", created.get("roomCode"),
+                        "roomCode", created.roomCode(),
                         "playerId", "late-player"
                 ))));
 

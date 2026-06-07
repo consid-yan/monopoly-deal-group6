@@ -1,6 +1,7 @@
 package ie.ucd.bdic.group6.app;
 
 import ie.ucd.bdic.group6.command.CommandType;
+import ie.ucd.bdic.group6.core.snapshot.SessionSnapshot;
 import ie.ucd.bdic.group6.network.client.GameClient;
 import ie.ucd.bdic.group6.network.message.ServerNotice;
 import ie.ucd.bdic.group6.network.message.ServerResponse;
@@ -314,8 +315,8 @@ public final class GameSessionCoordinator implements AutoCloseable {
         }
         if (response.accepted()) {
             rememberPlayerToken(response.payload());
-            if (response.payload() != null && !response.payload().isEmpty()) {
-                updateSnapshot(response.payload());
+            if (response.snapshot() != null) {
+                updateSnapshot(response.snapshot());
             }
             return;
         }
@@ -330,16 +331,19 @@ public final class GameSessionCoordinator implements AutoCloseable {
         notifyMessage(message == null ? notice.type().name() : notice.type().name() + ": " + message);
     }
 
-    private void updateSnapshot(Map<String, Object> data) {
-        UiSnapshot snapshot = UiSnapshot.from(data);
-        latestSnapshot = snapshot;
-        if (!snapshot.sessionId().isBlank()) {
-            sessionId = snapshot.sessionId();
+    private void updateSnapshot(SessionSnapshot sessionSnapshot) {
+        if (sessionSnapshot == null) {
+            return;
         }
-        if (!snapshot.roomCode().isBlank()) {
-            roomCode = snapshot.roomCode();
+        UiSnapshot uiSnapshot = UiSnapshot.from(sessionSnapshot);
+        latestSnapshot = uiSnapshot;
+        if (!uiSnapshot.sessionId().isBlank()) {
+            sessionId = uiSnapshot.sessionId();
         }
-        notifySnapshot(snapshot);
+        if (!uiSnapshot.roomCode().isBlank()) {
+            roomCode = uiSnapshot.roomCode();
+        }
+        notifySnapshot(uiSnapshot);
     }
 
     private Map<String, Object> withPlayerToken(Map<String, Object> payload) {

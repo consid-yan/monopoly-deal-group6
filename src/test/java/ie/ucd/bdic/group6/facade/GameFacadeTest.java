@@ -3,6 +3,7 @@ package ie.ucd.bdic.group6.facade;
 import ie.ucd.bdic.group6.command.CreateSessionCommand;
 import ie.ucd.bdic.group6.command.JoinSessionCommand;
 import ie.ucd.bdic.group6.command.StartGameCommand;
+import ie.ucd.bdic.group6.core.snapshot.SessionSnapshot;
 import ie.ucd.bdic.group6.facade.model.GameResult;
 import org.junit.jupiter.api.Test;
 
@@ -23,22 +24,24 @@ class GameFacadeTest {
                 "maxPlayers", 5
         )));
         assertTrue(created.isSuccess());
-        assertEquals("host", created.getData().get("hostPlayerId"));
-        assertEquals(5, created.getData().get("maxPlayers"));
+        SessionSnapshot createdSnapshot = created.getSnapshot().orElseThrow();
+        assertEquals("host", createdSnapshot.hostPlayerId());
+        assertEquals(5, createdSnapshot.maxPlayers());
 
         GameResult joined = facade.execute(new JoinSessionCommand(Map.of(
-                "roomCode", created.getData().get("roomCode"),
+                "roomCode", createdSnapshot.roomCode(),
                 "playerId", "player2"
         )));
         assertTrue(joined.isSuccess());
 
         GameResult started = facade.execute(new StartGameCommand(Map.of(
-                "sessionId", created.getData().get("sessionId"),
+                "sessionId", createdSnapshot.sessionId(),
                 "playerId", "host"
         )));
         assertTrue(started.isSuccess());
-        assertEquals("ACTIVE", started.getData().get("status"));
-        assertEquals("host", started.getData().get("activePlayerId"));
+        SessionSnapshot startedSnapshot = started.getSnapshot().orElseThrow();
+        assertEquals("ACTIVE", startedSnapshot.status());
+        assertEquals("host", startedSnapshot.activePlayerId());
     }
 
     @Test

@@ -14,6 +14,7 @@ import ie.ucd.bdic.group6.core.property.PropertySet;
 import ie.ucd.bdic.group6.core.rules.ActionRule;
 import ie.ucd.bdic.group6.core.rules.PaymentRule;
 import ie.ucd.bdic.group6.core.rules.WinRule;
+import ie.ucd.bdic.group6.core.snapshot.*;
 import ie.ucd.bdic.group6.exception.GameException;
 import ie.ucd.bdic.group6.exception.InvalidCommandException;
 import ie.ucd.bdic.group6.exception.InvalidGameStateException;
@@ -59,7 +60,7 @@ public class GameEngine implements ActionExecutor {
     }
 
     @Override
-    public synchronized Map<String, Object> executeCreateSession(CreateSessionCommand command) {
+    public synchronized SessionSnapshot executeCreateSession(CreateSessionCommand command) {
         String hostPlayerId = requireText(command.getHostPlayerId(), "hostPlayerId");
         int maxPlayers = readMaxPlayers(command.payload().get("maxPlayers"));
         String sessionId = UUID.randomUUID().toString();
@@ -74,7 +75,7 @@ public class GameEngine implements ActionExecutor {
     }
 
     @Override
-    public synchronized Map<String, Object> executeJoinSession(JoinSessionCommand command) {
+    public synchronized SessionSnapshot executeJoinSession(JoinSessionCommand command) {
         String roomCode = requireText(command.roomCode(), "roomCode");
         String playerId = requireText(command.getPlayerId(), "playerId");
         GameSession session = requireRoomCode(roomCode);
@@ -91,7 +92,7 @@ public class GameEngine implements ActionExecutor {
     }
 
     @Override
-    public synchronized Map<String, Object> executeStartGame(StartGameCommand command) {
+    public synchronized SessionSnapshot executeStartGame(StartGameCommand command) {
         GameSession session = requireSessionById(requireText(command.getSessionId(), "sessionId"));
         String playerId = requireText(command.getPlayerId(), "playerId");
         actionRule.requireLobby(session);
@@ -113,7 +114,7 @@ public class GameEngine implements ActionExecutor {
     }
 
     @Override
-    public synchronized Map<String, Object> executePlayCard(PlayCardCommand command) {
+    public synchronized SessionSnapshot executePlayCard(PlayCardCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
         String playerId = requireText(command.getPlayerId(), "playerId");
         String cardId = requireText(command.getCardId(), "cardId");
@@ -143,7 +144,7 @@ public class GameEngine implements ActionExecutor {
     }
 
     @Override
-    public synchronized Map<String, Object> executePayDebt(PayDebtCommand command) {
+    public synchronized SessionSnapshot executePayDebt(PayDebtCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
         ActiveGameState activeGame = requireActiveGame(session);
         PendingDebt debt = resolvePendingDebt(activeGame, command);
@@ -178,7 +179,7 @@ public class GameEngine implements ActionExecutor {
     }
 
     @Override
-    public synchronized Map<String, Object> executeProposeTrade(ProposeTradeCommand command) {
+    public synchronized SessionSnapshot executeProposeTrade(ProposeTradeCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
         ActiveGameState activeGame = requireActiveGame(session);
         String proposerId = requireText(command.getPlayerId(), "playerId");
@@ -215,7 +216,7 @@ public class GameEngine implements ActionExecutor {
     }
 
     @Override
-    public synchronized Map<String, Object> executeRespondTrade(RespondTradeCommand command) {
+    public synchronized SessionSnapshot executeRespondTrade(RespondTradeCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
         ActiveGameState activeGame = requireActiveGame(session);
         String responderId = requireText(command.getPlayerId(), "playerId");
@@ -246,7 +247,7 @@ public class GameEngine implements ActionExecutor {
     }
 
     @Override
-    public synchronized Map<String, Object> executeRespondAction(RespondActionCommand command) {
+    public synchronized SessionSnapshot executeRespondAction(RespondActionCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
         ActiveGameState activeGame = requireActiveGame(session);
         String responderId = requireText(command.getPlayerId(), "playerId");
@@ -275,7 +276,7 @@ public class GameEngine implements ActionExecutor {
     }
 
     @Override
-    public synchronized Map<String, Object> executeDiscardCards(DiscardCardsCommand command) {
+    public synchronized SessionSnapshot executeDiscardCards(DiscardCardsCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
         String playerId = requireText(command.getPlayerId(), "playerId");
         ActiveGameState activeGame = requireActiveGame(session);
@@ -289,7 +290,7 @@ public class GameEngine implements ActionExecutor {
     }
 
     @Override
-    public synchronized Map<String, Object> executeEndTurn(EndTurnCommand command) {
+    public synchronized SessionSnapshot executeEndTurn(EndTurnCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
         String playerId = requireText(command.getPlayerId(), "playerId");
         ActiveGameState activeGame = requireActiveGame(session);
@@ -311,7 +312,7 @@ public class GameEngine implements ActionExecutor {
     }
 
     @Override
-    public synchronized Map<String, Object> executeRejoinSession(RejoinSessionCommand command) {
+    public synchronized SessionSnapshot executeRejoinSession(RejoinSessionCommand command) {
         String sessionIdentity = requireText(command.getSessionIdentity(), "sessionIdentity");
         String playerId = requireText(command.getPlayerId(), "playerId");
         GameSession session = sessionsById.get(sessionIdentity);
@@ -330,7 +331,7 @@ public class GameEngine implements ActionExecutor {
     }
 
     @Override
-    public synchronized Map<String, Object> executePlayerDisconnected(PlayerDisconnectedCommand command) {
+    public synchronized SessionSnapshot executePlayerDisconnected(PlayerDisconnectedCommand command) {
         GameSession session = requireSessionById(requireText(command.getSessionId(), "sessionId"));
         String playerId = requireText(command.getPlayerId(), "playerId");
         requirePlayer(session, playerId);
@@ -1367,7 +1368,7 @@ public class GameEngine implements ActionExecutor {
         }
     }
 
-    private Map<String, Object> snapshot(GameSession session, String requesterPlayerId) {
+    private SessionSnapshot snapshot(GameSession session, String requesterPlayerId) {
         // Centralized win check: every command path that produces a snapshot evaluates win conditions.
         // This guarantees new action types (Sly Deal, Force Deal, etc.) cannot forget to check for victory.
         session.activeGame().ifPresent(ag -> {
@@ -1376,133 +1377,146 @@ public class GameEngine implements ActionExecutor {
             }
         });
 
-        // TODO(engine-snapshot): Replace this map with a typed DTO once UI/network contracts stabilize.
         Optional<ActiveGameState> activeGame = session.activeGame();
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("sessionId", session.sessionId());
-        data.put("roomCode", session.roomCode());
-        data.put("hostPlayerId", session.hostPlayerId());
-        data.put("maxPlayers", session.maxPlayers());
-        data.put("status", session.status().name());
-        data.put("activePlayerId", activeGame.map(game -> game.turnManager().activePlayerId()).orElse(""));
-        data.put("actionsUsed", activeGame.map(game -> game.turnManager().actionsUsed()).orElse(0));
-        data.put("actionsRemaining", activeGame.map(game -> game.turnManager().actionsRemaining()).orElse(0));
-        data.put("winnerPlayerId", activeGame.flatMap(ActiveGameState::winnerPlayerId).orElse(""));
-        data.put("deckSize", activeGame.map(game -> game.drawPile().size()).orElse(0));
-        data.put("discardSize", activeGame.map(ActiveGameState::discardPileSize).orElse(0));
-        data.put("pendingDebts", activeGame
-                .map(game -> game.pendingDebtsView().stream().map(this::pendingDebtSummary).toList())
-                .orElse(List.of()));
-        data.put("pendingTrades", activeGame
-                .map(game -> game.pendingTradesView().stream().map(this::pendingTradeSummary).toList())
-                .orElse(List.of()));
-        data.put("pendingActions", activeGame
-                .map(game -> game.pendingActionsView().stream().map(this::pendingActionSummary).toList())
-                .orElse(List.of()));
-        data.put("forfeitedPlayerIds", session.forfeitedPlayerIds());
-        data.put("players", session.players().stream().map(player -> playerSummary(session, player)).toList());
 
-        List<Map<String, Object>> currentPlayerHand = session.findPlayer(blankToEmpty(requesterPlayerId))
+        List<CardSnapshot> currentPlayerHand = session.findPlayer(blankToEmpty(requesterPlayerId))
                 .map(player -> player.handView().stream().map(this::cardSummary).toList())
                 .orElse(List.of());
-        data.put("currentPlayerHand", currentPlayerHand);
-        return Map.copyOf(data);
+
+        return new SessionSnapshot(
+                session.sessionId(),
+                session.roomCode(),
+                session.hostPlayerId(),
+                session.maxPlayers(),
+                session.status().name(),
+                activeGame.map(game -> game.turnManager().activePlayerId()).orElse(""),
+                activeGame.map(game -> game.turnManager().actionsUsed()).orElse(0),
+                activeGame.map(game -> game.turnManager().actionsRemaining()).orElse(0),
+                activeGame.flatMap(ActiveGameState::winnerPlayerId).orElse(""),
+                activeGame.map(game -> game.drawPile().size()).orElse(0),
+                activeGame.map(ActiveGameState::discardPileSize).orElse(0),
+                activeGame
+                        .map(game -> game.pendingDebtsView().stream().map(this::pendingDebtSummary).toList())
+                        .orElse(List.of()),
+                activeGame
+                        .map(game -> game.pendingTradesView().stream().map(this::pendingTradeSummary).toList())
+                        .orElse(List.of()),
+                activeGame
+                        .map(game -> game.pendingActionsView().stream().map(this::pendingActionSummary).toList())
+                        .orElse(List.of()),
+                session.forfeitedPlayerIds(),
+                session.players().stream().map(player -> playerSummary(session, player)).toList(),
+                currentPlayerHand
+        );
     }
 
-    private Map<String, Object> pendingDebtSummary(PendingDebt debt) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("debtId", debt.debtId());
-        data.put("creditorPlayerId", debt.creditorPlayerId());
-        data.put("debtorPlayerId", debt.debtorPlayerId());
-        data.put("amountM", debt.amountM());
-        data.put("sourceAction", debt.sourceAction() == null ? "" : debt.sourceAction().name());
-        data.put("sourceCardId", debt.sourceCardId() == null ? "" : debt.sourceCardId());
-        return Map.copyOf(data);
+    private PendingDebtSnapshot pendingDebtSummary(PendingDebt debt) {
+        return new PendingDebtSnapshot(
+                debt.debtId(),
+                debt.creditorPlayerId(),
+                debt.debtorPlayerId(),
+                debt.amountM(),
+                debt.sourceAction() == null ? "" : debt.sourceAction().name(),
+                debt.sourceCardId() == null ? "" : debt.sourceCardId()
+        );
     }
 
-    private Map<String, Object> pendingTradeSummary(PendingTrade trade) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("tradeId", trade.tradeId());
-        data.put("proposerPlayerId", trade.proposerPlayerId());
-        data.put("targetPlayerId", trade.targetPlayerId());
-        data.put("offeredCardIds", trade.offeredCardIds());
-        data.put("requestedCardIds", trade.requestedCardIds());
-        data.put("status", trade.status().name());
-        data.put("createdAt", trade.createdAt().toString());
-        data.put("respondedAt", trade.respondedAt() == null ? "" : trade.respondedAt().toString());
-        return Map.copyOf(data);
+    private PendingTradeSnapshot pendingTradeSummary(PendingTrade trade) {
+        return new PendingTradeSnapshot(
+                trade.tradeId(),
+                trade.proposerPlayerId(),
+                trade.targetPlayerId(),
+                trade.offeredCardIds(),
+                trade.requestedCardIds(),
+                trade.status().name(),
+                trade.createdAt().toString(),
+                trade.respondedAt() == null ? "" : trade.respondedAt().toString()
+        );
     }
 
-    private Map<String, Object> pendingActionSummary(PendingAction action) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("actionId", action.actionId());
-        data.put("actorPlayerId", action.actorPlayerId());
-        data.put("actionType", action.actionType().name());
-        data.put("actionCardId", action.actionCardId());
-        data.put("doubleRentCardId", action.doubleRentCardId().orElse(""));
-        data.put("propertyColor", action.propertyColor().map(Enum::name).orElse(""));
-        data.put("amountM", action.amountM());
-        data.put("targetCardId", action.targetCardId().orElse(""));
-        data.put("targetPropertyRowId", action.targetPropertyRowId().orElse(""));
-        data.put("offeredCardId", action.offeredCardId().orElse(""));
-        data.put("requestedCardId", action.requestedCardId().orElse(""));
-        data.put("targetPlayerIds", action.targetPlayerIds());
-        data.put("responses", action.responsesView().entrySet().stream()
-                .collect(java.util.stream.Collectors.toMap(
-                        Map.Entry::getKey,
-                        entry -> entry.getValue().name())));
-        data.put("createdAt", action.createdAt().toString());
-        return Map.copyOf(data);
+    private PendingActionSnapshot pendingActionSummary(PendingAction action) {
+        return new PendingActionSnapshot(
+                action.actionId(),
+                action.actorPlayerId(),
+                action.actionType().name(),
+                action.actionCardId(),
+                action.doubleRentCardId().orElse(""),
+                action.propertyColor().map(Enum::name).orElse(""),
+                action.amountM(),
+                action.targetCardId().orElse(""),
+                action.targetPropertyRowId().orElse(""),
+                action.offeredCardId().orElse(""),
+                action.requestedCardId().orElse(""),
+                action.targetPlayerIds(),
+                action.responsesView().entrySet().stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                Map.Entry::getKey,
+                                entry -> entry.getValue().name())),
+                action.createdAt().toString()
+        );
     }
 
-    private Map<String, Object> playerSummary(GameSession session, Player player) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("playerId", player.id());
-        data.put("name", player.name());
-        data.put("playerStatus", session.playerStatus(player.id()));
-        data.put("connected", session.isConnected(player.id()));
-        data.put("disconnectedAt", session.disconnectedAt(player.id()).map(Instant::toString).orElse(""));
-        data.put("defeated", session.isDefeated(player.id()));
-        data.put("handCount", player.hand().size());
-        data.put("bankTotalValueM", player.bankTotalValueM());
-        data.put("bankCards", player.bankView().stream().map(this::cardSummary).toList());
-        data.put("propertyRows", player.propertyBoard().rowsView().stream().map(this::propertyRowSummary).toList());
-        return Map.copyOf(data);
+    private PlayerStateSnapshot playerSummary(GameSession session, Player player) {
+        return new PlayerStateSnapshot(
+                player.id(),
+                player.name(),
+                session.playerStatus(player.id()),
+                session.isConnected(player.id()),
+                session.disconnectedAt(player.id()).map(Instant::toString).orElse(""),
+                session.isDefeated(player.id()),
+                player.hand().size(),
+                player.bankTotalValueM(),
+                player.bankView().stream().map(this::cardSummary).toList(),
+                player.propertyBoard().rowsView().stream().map(this::propertyRowSummary).toList()
+        );
     }
 
-    private Map<String, Object> propertyRowSummary(PropertySet row) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("rowId", row.rowId());
-        data.put("anchorColor", row.anchorColor().name());
-        data.put("complete", row.isComplete());
-        data.put("rentValue", row.rentValue());
-        data.put("hasHouse", row.hasHouse());
-        data.put("hasHotel", row.hasHotel());
-        data.put("cards", row.cardsView().stream().map(this::cardSummary).toList());
-        return Map.copyOf(data);
+    private PropertyRowSnapshot propertyRowSummary(PropertySet row) {
+        return new PropertyRowSnapshot(
+                row.rowId(),
+                row.anchorColor().name(),
+                row.isComplete(),
+                row.rentValue(),
+                row.hasHouse(),
+                row.hasHotel(),
+                row.cardsView().stream().map(this::cardSummary).toList()
+        );
     }
 
-    private Map<String, Object> cardSummary(Card card) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("id", card.id());
-        data.put("type", card.type().name());
-        data.put("displayName", card.displayName());
-        data.put("bankValueM", card.bankValueM().orElse(0));
+    private CardSnapshot cardSummary(Card card) {
+        int valueM = 0;
+        String propertyColor = "";
+        int requiredToComplete = 0;
+        List<String> allowedColors = List.of();
+        String actionType = "";
+        List<String> rentColorOptions = List.of();
+
         if (card instanceof MoneyCard moneyCard) {
-            data.put("valueM", moneyCard.valueM());
+            valueM = moneyCard.valueM();
         }
         if (card instanceof PropertyCard propertyCard) {
-            data.put("propertyColor", propertyCard.color().name());
-            data.put("requiredToComplete", propertyCard.requiredToComplete());
+            propertyColor = propertyCard.color().name();
+            requiredToComplete = propertyCard.requiredToComplete();
         }
         if (card instanceof PropertyWildCard wildCard) {
-            data.put("allowedColors", wildCard.allowedColors().stream().map(Enum::name).toList());
+            allowedColors = wildCard.allowedColors().stream().map(Enum::name).toList();
         }
         if (card instanceof ActionCard actionCard) {
-            data.put("actionType", actionCard.actionType().name());
-            data.put("rentColorOptions", actionCard.rentColorOptions().stream().map(Enum::name).toList());
+            actionType = actionCard.actionType().name();
+            rentColorOptions = actionCard.rentColorOptions().stream().map(Enum::name).toList();
         }
-        return Map.copyOf(data);
+        return new CardSnapshot(
+                card.id(),
+                card.type().name(),
+                card.displayName(),
+                card.bankValueM().orElse(0),
+                valueM,
+                propertyColor,
+                requiredToComplete,
+                allowedColors,
+                actionType,
+                rentColorOptions
+        );
     }
 
     private int readMaxPlayers(Object raw) {
