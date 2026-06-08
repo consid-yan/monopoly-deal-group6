@@ -58,7 +58,7 @@ public class GameUI {
     @FXML
     private TextArea gameLogArea;
     @FXML
-    private TextArea feedbackArea;
+    private Label statusMessageLabel;
     @FXML
     private Button playSelectedButton;
     @FXML
@@ -67,16 +67,11 @@ public class GameUI {
     private Button endTurnButton;
     @FXML
     private Button proposeTradeButton;
-    @FXML
-    private Button payDebtButton;
-    @FXML
-    private Button acceptTradeButton;
-    @FXML
-    private Button rejectTradeButton;
-    @FXML
-    private Button acceptActionButton;
-    @FXML
-    private Button rejectActionButton;
+
+    private final Set<String> dismissedActionPrompts = new HashSet<>();
+    private final Set<String> dismissedDebtPrompts = new HashSet<>();
+    private final Set<String> dismissedTradePrompts = new HashSet<>();
+    private boolean pendingPromptShowing;
 
     public GameUI(GameSessionCoordinator context) {
         this.context = context;
@@ -86,7 +81,7 @@ public class GameUI {
     private void initialize() {
         configurePropertyRowsScrolling();
         context.setSnapshotListener(this::render);
-        context.setMessageListener(this::showFeedback);
+        context.setMessageListener(this::showServerMessage);
         render(context.latestSnapshot());
     }
 
@@ -172,35 +167,6 @@ public class GameUI {
     }
 
     @FXML
-    private void payDebt() {
-        List<UiSnapshot.PendingDebtView> debts = snapshot.pendingDebtsForDebtor(context.playerId());
-        if (debts.isEmpty()) {
-            showFeedback("You do not have a pending debt to pay.");
-            return;
-        }
-        Optional<UiSnapshot.PendingDebtView> debt = chooseOne("Pay Debt", debts,
-                value -> snapshot.playerName(value.creditorPlayerId()) + " - $" + value.amountM() + "M");
-        if (debt.isEmpty()) {
-            return;
-        }
-        List<UiSnapshot.CardView> paymentOptions = snapshot.currentPlayer(context.playerId())
-                .map(UiSnapshot.PlayerView::paymentCards)
-                .orElse(List.of());
-        List<UiSnapshot.CardView> selected = List.of();
-        if (!paymentOptions.isEmpty()) {
-            selected = chooseCards("Select Payment Cards ($" + debt.get().amountM() + "M due)", paymentOptions, 1);
-            if (selected.isEmpty()) {
-                return;
-            }
-        }
-
-        Map<String, Object> payload = basePayload();
-        payload.put("debtId", debt.get().debtId());
-        payload.put("paymentCardIds", selected.stream().map(UiSnapshot.CardView::id).toList());
-        submit(CommandType.PAY_DEBT, payload, "Submitted payment.");
-    }
-
-    @FXML
     private void proposeTrade() {
         UiSnapshot.PlayerView currentPlayer = snapshot.currentPlayer(context.playerId()).orElse(null);
         if (currentPlayer == null) {
@@ -238,26 +204,6 @@ public class GameUI {
         payload.put("offeredCardIds", List.of(offered.get().id()));
         payload.put("requestedCardIds", List.of(requested.get().id()));
         submit(CommandType.PROPOSE_TRADE, payload, "Proposed trade to " + target.get().displayName() + ".");
-    }
-
-    @FXML
-    private void acceptTrade() {
-        respondToTrade(true);
-    }
-
-    @FXML
-    private void rejectTrade() {
-        respondToTrade(false);
-    }
-
-    @FXML
-    private void acceptAction() {
-        respondToAction(true);
-    }
-
-    @FXML
-    private void rejectAction() {
-        respondToAction(false);
     }
 
     @FXML
@@ -303,6 +249,8 @@ public class GameUI {
         layoutHand(null);
         updateSelectedCardSummary();
         updateButtonStates();
+        pruneDismissedPrompts();
+        maybeShowPendingPrompts();
     }
 
     private void renderOwnZones() {
@@ -628,46 +576,254 @@ public class GameUI {
                 value -> value.label() + " (" + value.rowId() + ")");
     }
 
-    private void respondToTrade(boolean accepted) {
-        if (!isYourTurn()) {
-            showFeedback("Trade responses are available on your turn.");
+    private void pruneDismissedPrompts() {
+        if (snapshot == null || snapshot.isEmpty()) {
+            dismissedActionPrompts.clear();
+            dismissedDebtPrompts.clear();
+            dismissedTradePrompts.clear();
             return;
         }
-        List<UiSnapshot.PendingTradeView> trades = snapshot.pendingTradesForTarget(context.playerId());
-        Optional<UiSnapshot.PendingTradeView> trade = chooseOne("Trade Response", trades,
-                value -> snapshot.playerName(value.proposerPlayerId()));
-        if (trade.isEmpty()) {
-            showFeedback("No pending trade is waiting for your response.");
-            return;
-        }
-        Map<String, Object> payload = basePayload();
-        payload.put("tradeId", trade.get().tradeId());
-        payload.put("accepted", accepted);
-        submit(CommandType.RESPOND_TRADE, payload, accepted ? "Accepted trade." : "Rejected trade.");
+        Set<String> awaitingActions = snapshot.pendingActionsAwaiting(context.playerId()).stream()
+                .map(UiSnapshot.PendingActionView::actionId)
+                .collect(java.util.stream.Collectors.toSet());
+        dismissedActionPrompts.retainAll(awaitingActions);
+
+        Set<String> pendingDebts = snapshot.pendingDebtsForDebtor(context.playerId()).stream()
+                .map(UiSnapshot.PendingDebtView::debtId)
+                .collect(java.util.stream.Collectors.toSet());
+        dismissedDebtPrompts.retainAll(pendingDebts);
+
+        Set<String> pendingTrades = snapshot.pendingTradesForTarget(context.playerId()).stream()
+                .map(UiSnapshot.PendingTradeView::tradeId)
+                .collect(java.util.stream.Collectors.toSet());
+        dismissedTradePrompts.retainAll(pendingTrades);
     }
 
-    private void respondToAction(boolean accepted) {
-        List<UiSnapshot.PendingActionView> actions = snapshot.pendingActionsAwaiting(context.playerId());
-        Optional<UiSnapshot.PendingActionView> action = chooseOne("Action Response", actions,
-                value -> UiSnapshot.humanize(value.actionType()) + " from " + snapshot.playerName(value.actorPlayerId()));
-        if (action.isEmpty()) {
-            showFeedback("No pending action is waiting for your response.");
+    private void maybeShowPendingPrompts() {
+        if (pendingPromptShowing || snapshot == null || snapshot.isEmpty()) {
             return;
         }
+        Platform.runLater(this::showNextPendingPrompt);
+    }
+
+    private void showNextPendingPrompt() {
+        if (pendingPromptShowing || snapshot == null || snapshot.isEmpty()) {
+            return;
+        }
+        for (UiSnapshot.PendingActionView action : snapshot.pendingActionsAwaiting(context.playerId())) {
+            if (!dismissedActionPrompts.contains(action.actionId())) {
+                showActionPrompt(action);
+                return;
+            }
+        }
+        for (UiSnapshot.PendingDebtView debt : snapshot.pendingDebtsForDebtor(context.playerId())) {
+            if (!dismissedDebtPrompts.contains(debt.debtId())) {
+                showDebtPrompt(debt);
+                return;
+            }
+        }
+        if (snapshot.canRespondToTrade(context.playerId())) {
+            for (UiSnapshot.PendingTradeView trade : snapshot.pendingTradesForTarget(context.playerId())) {
+                if (!dismissedTradePrompts.contains(trade.tradeId())) {
+                    showTradePrompt(trade);
+                    return;
+                }
+            }
+        }
+    }
+
+    private void showActionPrompt(UiSnapshot.PendingActionView action) {
+        pendingPromptShowing = true;
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Action Response");
+        dialog.setHeaderText(UiSnapshot.humanize(action.actionType()) + " from "
+                + snapshot.playerName(action.actorPlayerId()));
+        dialog.setContentText(buildActionPromptDetails(action));
+
+        ButtonType allow = new ButtonType("Allow", ButtonBar.ButtonData.OK_DONE);
+        ButtonType justSayNo = new ButtonType("Just Say No", ButtonBar.ButtonData.NO);
+        ButtonType later = new ButtonType("Later", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().addAll(allow, justSayNo, later);
+
+        boolean hasJustSayNo = snapshot.currentPlayerHand().stream()
+                .anyMatch(card -> card.isAction("JUST_SAY_NO"));
+        Button justSayNoButton = (Button) dialog.getDialogPane().lookupButton(justSayNo);
+        if (justSayNoButton != null) {
+            justSayNoButton.setDisable(!hasJustSayNo);
+        }
+
+        Optional<ButtonType> result = dialog.showAndWait();
+        pendingPromptShowing = false;
+
+        if (result.isEmpty() || result.get() == later) {
+            dismissedActionPrompts.add(action.actionId());
+            maybeShowPendingPrompts();
+            return;
+        }
+        if (result.get() == allow) {
+            submitActionResponse(action, true);
+            return;
+        }
+        submitActionResponse(action, false);
+    }
+
+    private void showDebtPrompt(UiSnapshot.PendingDebtView debt) {
+        pendingPromptShowing = true;
+        Alert dialog = new Alert(Alert.AlertType.CONFIRMATION);
+        dialog.setTitle("Payment Required");
+        dialog.setHeaderText("You owe " + snapshot.playerName(debt.creditorPlayerId())
+                + " $" + debt.amountM() + "M");
+        dialog.setContentText(buildDebtPromptDetails(debt));
+        dialog.getButtonTypes().setAll(ButtonType.OK, new ButtonType("Later", ButtonBar.ButtonData.CANCEL_CLOSE));
+
+        Optional<ButtonType> result = dialog.showAndWait();
+        pendingPromptShowing = false;
+
+        if (result.isEmpty() || result.get().getButtonData() == ButtonBar.ButtonData.CANCEL_CLOSE) {
+            dismissedDebtPrompts.add(debt.debtId());
+            maybeShowPendingPrompts();
+            return;
+        }
+        payDebtFor(debt);
+    }
+
+    private void showTradePrompt(UiSnapshot.PendingTradeView trade) {
+        pendingPromptShowing = true;
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Trade Offer");
+        dialog.setHeaderText(snapshot.playerName(trade.proposerPlayerId()) + " proposed a trade");
+        dialog.setContentText(describeTrade(trade));
+
+        ButtonType accept = new ButtonType("Accept", ButtonBar.ButtonData.OK_DONE);
+        ButtonType reject = new ButtonType("Reject", ButtonBar.ButtonData.NO);
+        ButtonType later = new ButtonType("Later", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().addAll(accept, reject, later);
+
+        Optional<ButtonType> result = dialog.showAndWait();
+        pendingPromptShowing = false;
+
+        if (result.isEmpty() || result.get() == later) {
+            dismissedTradePrompts.add(trade.tradeId());
+            maybeShowPendingPrompts();
+            return;
+        }
+        submitTradeResponse(trade, result.get() == accept);
+    }
+
+    private void payDebtFor(UiSnapshot.PendingDebtView debt) {
+        List<UiSnapshot.CardView> paymentOptions = snapshot.currentPlayer(context.playerId())
+                .map(UiSnapshot.PlayerView::paymentCards)
+                .orElse(List.of());
+        List<UiSnapshot.CardView> selected = List.of();
+        if (!paymentOptions.isEmpty()) {
+            selected = chooseCards(
+                    "Select Payment Cards ($" + debt.amountM() + "M due)",
+                    paymentOptions,
+                    1);
+            if (selected.isEmpty()) {
+                dismissedDebtPrompts.add(debt.debtId());
+                maybeShowPendingPrompts();
+                return;
+            }
+        } else {
+            showFeedback("No bank or property cards are available to pay this debt.");
+            dismissedDebtPrompts.add(debt.debtId());
+            maybeShowPendingPrompts();
+            return;
+        }
+
         Map<String, Object> payload = basePayload();
-        payload.put("actionId", action.get().actionId());
+        payload.put("debtId", debt.debtId());
+        payload.put("paymentCardIds", selected.stream().map(UiSnapshot.CardView::id).toList());
+        dismissedDebtPrompts.remove(debt.debtId());
+        submit(CommandType.PAY_DEBT, payload, "Submitted payment.");
+    }
+
+    private void submitActionResponse(UiSnapshot.PendingActionView action, boolean accepted) {
+        Map<String, Object> payload = basePayload();
+        payload.put("actionId", action.actionId());
         payload.put("accepted", accepted);
         if (!accepted) {
             List<UiSnapshot.CardView> justSayNoCards = snapshot.currentPlayerHand().stream()
                     .filter(card -> card.isAction("JUST_SAY_NO"))
                     .toList();
-            Optional<UiSnapshot.CardView> justSayNo = chooseOne("Just Say No Card", justSayNoCards, this::cardChoiceLabel);
-            if (justSayNo.isEmpty()) {
+            if (justSayNoCards.isEmpty()) {
+                showFeedback("You need a Just Say No card to reject this action.");
+                maybeShowPendingPrompts();
                 return;
             }
-            payload.put("justSayNoCardId", justSayNo.get().id());
+            if (justSayNoCards.size() == 1) {
+                payload.put("justSayNoCardId", justSayNoCards.getFirst().id());
+            } else {
+                Optional<UiSnapshot.CardView> justSayNo = chooseOne(
+                        "Just Say No Card", justSayNoCards, this::cardChoiceLabel);
+                if (justSayNo.isEmpty()) {
+                    maybeShowPendingPrompts();
+                    return;
+                }
+                payload.put("justSayNoCardId", justSayNo.get().id());
+            }
         }
+        dismissedActionPrompts.remove(action.actionId());
         submit(CommandType.RESPOND_ACTION, payload, accepted ? "Accepted action." : "Played Just Say No.");
+    }
+
+    private void submitTradeResponse(UiSnapshot.PendingTradeView trade, boolean accepted) {
+        Map<String, Object> payload = basePayload();
+        payload.put("tradeId", trade.tradeId());
+        payload.put("accepted", accepted);
+        dismissedTradePrompts.remove(trade.tradeId());
+        submit(CommandType.RESPOND_TRADE, payload, accepted ? "Accepted trade." : "Rejected trade.");
+    }
+
+    private String buildActionPromptDetails(UiSnapshot.PendingActionView action) {
+        StringBuilder details = new StringBuilder();
+        details.append(snapshot.playerName(action.actorPlayerId()))
+                .append(" played ")
+                .append(UiSnapshot.humanize(action.actionType()));
+        if (action.amountM() > 0) {
+            details.append(" for $").append(action.amountM()).append("M");
+        }
+        if (action.propertyColor() != null && !action.propertyColor().isBlank()) {
+            details.append(" on ").append(UiSnapshot.humanize(action.propertyColor()));
+        }
+        if (action.targetCardId() != null && !action.targetCardId().isBlank()) {
+            snapshot.card(action.targetCardId()).ifPresentOrElse(
+                    card -> details.append(". Target property: ").append(card.title()),
+                    () -> details.append(". Target card: ").append(action.targetCardId()));
+        }
+        if (action.targetPropertyRowId() != null && !action.targetPropertyRowId().isBlank()) {
+            details.append(". Target set: ").append(action.targetPropertyRowId());
+        }
+        return details.toString();
+    }
+
+    private String buildDebtPromptDetails(UiSnapshot.PendingDebtView debt) {
+        StringBuilder details = new StringBuilder();
+        details.append("Source: ").append(UiSnapshot.humanize(debt.sourceAction()));
+        if (debt.sourceCardId() != null && !debt.sourceCardId().isBlank()) {
+            snapshot.card(debt.sourceCardId()).ifPresentOrElse(
+                    card -> details.append(" (").append(card.title()).append(")"),
+                    () -> details.append(" (").append(debt.sourceCardId()).append(")"));
+        }
+        details.append(". Select bank or property cards to pay.");
+        return details.toString();
+    }
+
+    private String describeTrade(UiSnapshot.PendingTradeView trade) {
+        String offered = formatCardIds(trade.offeredCardIds());
+        String requested = formatCardIds(trade.requestedCardIds());
+        return "Offered: " + offered + "\nRequested: " + requested;
+    }
+
+    private String formatCardIds(List<String> cardIds) {
+        if (cardIds == null || cardIds.isEmpty()) {
+            return "none";
+        }
+        return cardIds.stream()
+                .map(id -> snapshot.card(id).map(UiSnapshot.CardView::title).orElse(id))
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("none");
     }
 
     private Optional<UiSnapshot.CardView> selectedHandCard() {
@@ -879,11 +1035,9 @@ public class GameUI {
             selectedCardSummaryLabel.setText("Select a card from your private hand, then choose Play Selected.");
             return;
         }
-        String pendingTradeHint = hasPendingTradeForCurrentPlayer()
-                ? " Trade responses are available on your turn."
-                : "";
-        selectedCardSummaryLabel.setText("Waiting for " + snapshot.playerName(snapshot.activePlayerId())
-                + ". You can still answer pending debt or action prompts." + pendingTradeHint);
+        String pendingHint = pendingResponseHint();
+        selectedCardSummaryLabel.setText("Waiting for " + snapshot.playerName(snapshot.activePlayerId()) + "."
+                + pendingHint);
     }
 
     private String selectedCardHint(UiSnapshot.CardView card) {
@@ -918,11 +1072,28 @@ public class GameUI {
         setButtonDisabled(discardSelectedButton, !yourTurn || cardsToDiscard <= 0);
         setButtonDisabled(endTurnButton, !yourTurn);
         setButtonDisabled(proposeTradeButton, !yourTurn || !canProposeTrade());
-        setButtonDisabled(payDebtButton, !hasPendingDebtForCurrentPlayer());
-        setButtonDisabled(acceptTradeButton, !canRespondToTrade());
-        setButtonDisabled(rejectTradeButton, !canRespondToTrade());
-        setButtonDisabled(acceptActionButton, !hasPendingActionForCurrentPlayer());
-        setButtonDisabled(rejectActionButton, !canRejectActionWithJustSayNo());
+    }
+
+    private String pendingResponseHint() {
+        if (snapshot == null || snapshot.isEmpty()) {
+            return "";
+        }
+        List<String> hints = new ArrayList<>();
+        if (!snapshot.pendingActionsAwaiting(context.playerId()).isEmpty()) {
+            hints.add("action response");
+        }
+        if (!snapshot.pendingDebtsForDebtor(context.playerId()).isEmpty()) {
+            hints.add("debt payment");
+        }
+        if (hasPendingTradeForCurrentPlayer()) {
+            hints.add(snapshot.canRespondToTrade(context.playerId())
+                    ? "trade response"
+                    : "trade response on your turn");
+        }
+        if (hints.isEmpty()) {
+            return "";
+        }
+        return " Respond to pending " + String.join(" and ", hints) + " in the popup.";
     }
 
     private boolean isYourTurn() {
@@ -933,25 +1104,8 @@ public class GameUI {
         return snapshot.canProposeTrade(context.playerId());
     }
 
-    private boolean hasPendingDebtForCurrentPlayer() {
-        return !snapshot.pendingDebtsForDebtor(context.playerId()).isEmpty();
-    }
-
     private boolean hasPendingTradeForCurrentPlayer() {
         return !snapshot.pendingTradesForTarget(context.playerId()).isEmpty();
-    }
-
-    private boolean canRespondToTrade() {
-        return snapshot != null && snapshot.canRespondToTrade(context.playerId());
-    }
-
-    private boolean hasPendingActionForCurrentPlayer() {
-        return !snapshot.pendingActionsAwaiting(context.playerId()).isEmpty();
-    }
-
-    private boolean canRejectActionWithJustSayNo() {
-        return hasPendingActionForCurrentPlayer()
-                && snapshot.currentPlayerHand().stream().anyMatch(card -> card.isAction("JUST_SAY_NO"));
     }
 
     private void setButtonDisabled(Button button, boolean disabled) {
@@ -1115,7 +1269,21 @@ public class GameUI {
     }
 
     private void showFeedback(String message) {
-        MessageUI.show(feedbackArea, message);
+        setLabelText(statusMessageLabel, message);
+    }
+
+    private void showServerMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return;
+        }
+        Platform.runLater(() -> {
+            showFeedback(message);
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Action Failed");
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.show();
+        });
     }
 
     private record Choice<T>(String label, T value) {

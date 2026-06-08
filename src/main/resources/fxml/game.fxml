@@ -174,68 +174,22 @@
                     </Button>
 
                     <Separator prefWidth="238.0"/>
-                    <Label styleClass="game-section-title" text="Trade and Payment"/>
-                    <HBox alignment="CENTER" spacing="8.0">
-                        <Button fx:id="proposeTradeButton" graphicTextGap="6.0" mnemonicParsing="false"
-                                onAction="#proposeTrade" prefWidth="115.0"
-                                styleClass="menu-primary-button game-command-button" text="Propose">
-                            <graphic>
-                                <FontIcon iconLiteral="bx-log-in-circle" styleClass="menu-icon-primary"/>
-                            </graphic>
-                        </Button>
-                        <Button fx:id="payDebtButton" graphicTextGap="6.0" mnemonicParsing="false" onAction="#payDebt"
-                                prefWidth="115.0" styleClass="menu-secondary-button game-command-button"
-                                text="Pay Debt">
-                            <graphic>
-                                <FontIcon iconLiteral="bx-check" styleClass="menu-icon-secondary"/>
-                            </graphic>
-                        </Button>
-                    </HBox>
-                    <HBox alignment="CENTER" spacing="8.0">
-                        <Button fx:id="acceptTradeButton" graphicTextGap="6.0" mnemonicParsing="false"
-                                onAction="#acceptTrade" prefWidth="115.0"
-                                styleClass="menu-outline-button game-command-button" text="Accept">
-                            <graphic>
-                                <FontIcon iconLiteral="bx-check" styleClass="menu-icon-outline"/>
-                            </graphic>
-                        </Button>
-                        <Button fx:id="rejectTradeButton" graphicTextGap="6.0" mnemonicParsing="false"
-                                onAction="#rejectTrade" prefWidth="115.0"
-                                styleClass="menu-danger-button game-command-button" text="Reject">
-                            <graphic>
-                                <FontIcon iconLiteral="bx-x" styleClass="menu-icon-danger"/>
-                            </graphic>
-                        </Button>
-                    </HBox>
+                    <Label styleClass="game-section-title" text="Trade"/>
+                    <Button fx:id="proposeTradeButton" graphicTextGap="6.0" mnemonicParsing="false"
+                            onAction="#proposeTrade" prefHeight="38.0" prefWidth="238.0"
+                            styleClass="menu-primary-button game-command-button" text="Propose Trade">
+                        <graphic>
+                            <FontIcon iconLiteral="bx-log-in-circle" styleClass="menu-icon-primary"/>
+                        </graphic>
+                    </Button>
 
                     <Separator prefWidth="238.0"/>
-                    <Label styleClass="game-section-title" text="Action Response"/>
-                    <HBox alignment="CENTER" spacing="8.0">
-                        <Button fx:id="acceptActionButton" graphicTextGap="6.0" mnemonicParsing="false"
-                                onAction="#acceptAction" prefWidth="115.0"
-                                styleClass="menu-outline-button game-command-button" text="Allow">
-                            <graphic>
-                                <FontIcon iconLiteral="bx-check" styleClass="menu-icon-outline"/>
-                            </graphic>
-                        </Button>
-                        <Button fx:id="rejectActionButton" graphicTextGap="6.0" mnemonicParsing="false"
-                                onAction="#rejectAction" prefWidth="115.0"
-                                styleClass="menu-danger-button game-command-button" text="Just Say No">
-                            <graphic>
-                                <FontIcon iconLiteral="bx-x" styleClass="menu-icon-danger"/>
-                            </graphic>
-                        </Button>
-                    </HBox>
-
-                    <Separator prefWidth="238.0"/>
-                    <Label styleClass="game-section-title" text="Feedback"/>
-                    <TextArea fx:id="feedbackArea"
-                              editable="false"
-                              focusTraversable="false"
-                              prefHeight="92.0"
-                              promptText="Move feedback appears here."
-                              styleClass="lobby-status-area game-feedback-area"
-                              wrapText="true"/>
+                    <Label styleClass="game-section-title" text="Status"/>
+                    <Label fx:id="statusMessageLabel"
+                           maxWidth="238.0"
+                           styleClass="game-status-message"
+                           text="Pending responses open automatically."
+                           wrapText="true"/>
                     <Label styleClass="game-section-title" text="Game Log"/>
                     <TextArea fx:id="gameLogArea"
                               editable="false"
