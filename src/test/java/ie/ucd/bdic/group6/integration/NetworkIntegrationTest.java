@@ -321,6 +321,24 @@ class NetworkIntegrationTest {
         assertTrue(legitimateStart.accepted());
     }
 
+    @Test
+    void clientDisconnectListenerFiresWhenServerStops() throws Exception {
+        server = new AppConfig().gameServer(DEFAULT_PORT);
+        server.startAsync();
+
+        GameClient host = client();
+        List<Throwable> disconnects = new CopyOnWriteArrayList<>();
+        host.addDisconnectListener(disconnects::add);
+        connect(host);
+
+        assertTrue(host.isConnected());
+        server.stop();
+
+        Throwable disconnect = await(disconnects, value -> value != null);
+        assertNotNull(disconnect);
+        assertFalse(host.isConnected());
+    }
+
     private GameClient connectedClient() throws IOException {
         GameClient client = client();
         connect(client);

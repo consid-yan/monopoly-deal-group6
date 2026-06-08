@@ -33,6 +33,7 @@ public final class GameSessionCoordinator implements AutoCloseable {
     private volatile UiSnapshot latestSnapshot = UiSnapshot.empty();
     private volatile Consumer<UiSnapshot> snapshotListener = _ -> {};
     private volatile Consumer<String> messageListener = _ -> {};
+    private volatile Consumer<String> disconnectListener = _ -> {};
 
     private volatile String host = "";
     private volatile String playerId = "";
@@ -87,6 +88,11 @@ public final class GameSessionCoordinator implements AutoCloseable {
 
     public void setMessageListener(Consumer<String> listener) {
         messageListener = listener == null ? _ -> {
+        } : listener;
+    }
+
+    public void setDisconnectListener(Consumer<String> listener) {
+        disconnectListener = listener == null ? _ -> {
         } : listener;
     }
 
@@ -234,7 +240,9 @@ public final class GameSessionCoordinator implements AutoCloseable {
         CompletableFuture<ServerResponse> future = currentClient.sendCommand(commandType, withPlayerToken(payload));
         future.whenComplete((result, error) -> {
             if (error != null) {
-                notifyError(error);
+                if (connected) {
+                    notifyError(error);
+                }
                 return;
             }
             handleResult(result);
@@ -289,6 +297,7 @@ public final class GameSessionCoordinator implements AutoCloseable {
         GameClient newClient = new GameClient();
         newClient.addUpdateListener(this::handleStateUpdate);
         newClient.addNoticeListener(this::handleNotice);
+        newClient.addDisconnectListener(this::handleClientDisconnect);
         newClient.connect(requestedHost, requestedPort);
         return newClient;
     }
@@ -335,6 +344,49 @@ public final class GameSessionCoordinator implements AutoCloseable {
         }
         String message = text(notice.payload().get("message"));
         notifyMessage(message == null ? notice.type().name() : notice.type().name() + ": " + message);
+    }
+
+    private void handleClientDisconnect(Throwable cause) {
+        if (!resetAfterUnexpectedDisconnect()) {
+            return;
+        }
+        if (cause == null) {
+            LOGGER.warning("Lost connection to the game server.");
+        } else {
+            LOGGER.log(Level.WARNING, "Lost connection to the game server.", cause);
+        }
+        runOnFx(() -> disconnectListener.accept(
+                "Connection to the game server was lost. Returning to the main menu."));
+    }
+
+    private synchronized boolean resetAfterUnexpectedDisconnect() {
+        if (!connected && client == null) {
+            return false;
+        }
+
+        connected = false;
+        latestSnapshot = UiSnapshot.empty();
+        host = "";
+        playerId = "";
+        playerName = "";
+        playerToken = "";
+        sessionId = "";
+        roomCode = "";
+
+        GameClient currentClient = client;
+        client = null;
+        if (currentClient != null) {
+            currentClient.close();
+        }
+
+        GameServer currentServer = hostedServer;
+        hostedServer = null;
+        if (currentServer != null) {
+            currentServer.stop();
+        }
+
+        notifySnapshot(latestSnapshot);
+        return true;
     }
 
     private void updateSnapshot(SessionSnapshot sessionSnapshot) {

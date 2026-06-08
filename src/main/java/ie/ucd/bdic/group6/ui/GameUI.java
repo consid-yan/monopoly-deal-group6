@@ -45,8 +45,6 @@ public class GameUI {
     @FXML
     private HBox opponentsRow;
     @FXML
-    private ScrollPane handScrollPane;
-    @FXML
     private HBox handCardsHBox;
     @FXML
     private ScrollPane bankScrollPane;
@@ -458,15 +456,15 @@ public class GameUI {
             case "FORCED_DEAL" -> configureForcedDeal(payload);
             case "DEAL_BREAKER" -> configureDealBreaker(payload);
             case "JUST_SAY_NO" -> {
-                showFeedback("Use Just Say No when responding to a pending action.");
+                showActionFailed("Use Just Say No when responding to a pending action.");
                 yield false;
             }
             case "DOUBLE_THE_RENT" -> {
-                showFeedback("Double The Rent must be paired with a rent card, or banked.");
+                showActionFailed("Double The Rent must be paired with a rent card, or banked.");
                 yield false;
             }
             default -> {
-                showFeedback("Unsupported action card: " + card.actionType());
+                showActionFailed("Unsupported action card: " + card.actionType());
                 yield false;
             }
         };
@@ -602,15 +600,16 @@ public class GameUI {
 
     private void showActionPrompt(UiSnapshot.PendingActionView action) {
         pendingPromptShowing = true;
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Action Response");
-        dialog.setHeaderText(UiSnapshot.humanize(action.actionType()) + " from "
-                + snapshot.playerName(action.actorPlayerId()));
-        dialog.setContentText(buildActionPromptDetails(action));
+        Dialog<ButtonType> dialog = UiDialogs.createDialog("Action Response");
+        dialog.getDialogPane().setContent(UiDialogs.messageContent(
+                UiSnapshot.humanize(action.actionType()) + " from "
+                        + snapshot.playerName(action.actorPlayerId()),
+                buildActionPromptDetails(action)));
 
-        ButtonType allow = new ButtonType("Allow", ButtonBar.ButtonData.OK_DONE);
-        ButtonType justSayNo = new ButtonType("Just Say No", ButtonBar.ButtonData.NO);
-        dialog.getDialogPane().getButtonTypes().addAll(allow, justSayNo);
+        ButtonType allow = UiDialogs.confirmButton("Allow");
+        ButtonType justSayNo = UiDialogs.secondaryButton("Just Say No");
+        dialog.getDialogPane().getButtonTypes().setAll(allow, justSayNo);
+        UiDialogs.styleButtons(dialog, allow, justSayNo);
 
         boolean hasJustSayNo = snapshot.currentPlayerHand().stream()
                 .anyMatch(card -> card.isAction("JUST_SAY_NO"));
@@ -678,13 +677,14 @@ public class GameUI {
     }
 
     private boolean showDebtConfirmation(UiSnapshot.PendingDebtView debt) {
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Payment Required");
-        dialog.setHeaderText("You owe " + snapshot.playerName(debt.creditorPlayerId())
-                + " $" + debt.amountM() + "M");
-        dialog.setContentText(buildDebtPromptDetails(debt));
-        ButtonType payNow = new ButtonType("Pay Now", ButtonBar.ButtonData.OK_DONE);
+        Dialog<ButtonType> dialog = UiDialogs.createDialog("Payment Required");
+        dialog.getDialogPane().setContent(UiDialogs.messageContent(
+                "You owe " + snapshot.playerName(debt.creditorPlayerId())
+                        + " $" + debt.amountM() + "M",
+                buildDebtPromptDetails(debt)));
+        ButtonType payNow = UiDialogs.confirmButton("Pay Now");
         dialog.getDialogPane().getButtonTypes().setAll(payNow);
+        UiDialogs.styleButtons(dialog, payNow);
         return dialog.showAndWait().filter(payNow::equals).isPresent();
     }
 
@@ -696,22 +696,23 @@ public class GameUI {
         }
         int maxPayableM = options.stream().mapToInt(this::paymentValueM).sum();
 
-        Dialog<List<UiSnapshot.CardView>> dialog = new Dialog<>();
-        dialog.setTitle("Select Payment Cards ($" + dueAmountM + "M due)");
-        dialog.setHeaderText("Tick one or more cards to pay. No Ctrl key needed.");
-        ButtonType okButtonType = englishOkButton();
-        ButtonType cancelButtonType = englishCancelButton();
+        Dialog<List<UiSnapshot.CardView>> dialog = UiDialogs.createDialog("Select Payment Cards");
+        UiDialogs.setDialogWidth(dialog, 500);
+        ButtonType okButtonType = UiDialogs.confirmButton("OK");
+        ButtonType cancelButtonType = UiDialogs.cancelButton("Cancel");
         dialog.getDialogPane().getButtonTypes().setAll(okButtonType, cancelButtonType);
+        UiDialogs.styleButtons(dialog, okButtonType, cancelButtonType);
 
-        VBox content = new VBox(8);
+        VBox content = new VBox(10);
         content.setPadding(new Insets(4, 0, 0, 0));
-        Label summaryLabel = new Label(formatPaymentSelectionSummary(0, dueAmountM));
-        summaryLabel.setWrapText(true);
+        Label heading = UiDialogs.headingLabel("Tick one or more cards to pay. No Ctrl key needed.");
+        Label summaryLabel = UiDialogs.bodyLabel(formatPaymentSelectionSummary(0, dueAmountM));
+        content.getChildren().add(heading);
         content.getChildren().add(summaryLabel);
 
         Label paymentErrorLabel = new Label();
         paymentErrorLabel.setWrapText(true);
-        paymentErrorLabel.getStyleClass().add("game-helper-text");
+        paymentErrorLabel.getStyleClass().addAll("game-helper-text", "app-dialog-error-text");
         content.getChildren().add(paymentErrorLabel);
 
         VBox cardRows = new VBox(4);
@@ -733,6 +734,7 @@ public class GameUI {
         };
         for (UiSnapshot.CardView card : options) {
             CheckBox checkBox = new CheckBox(paymentChoiceLabel(card));
+            checkBox.getStyleClass().add("app-dialog-check-box");
             checkBox.setUserData(card);
             checkBox.selectedProperty().addListener((obs, wasSelected, isSelected) ->
                     refreshPaymentSelection.run());
@@ -741,6 +743,7 @@ public class GameUI {
         }
 
         ScrollPane scrollPane = new ScrollPane(cardRows);
+        scrollPane.getStyleClass().add("app-dialog-scroll-pane");
         scrollPane.setFitToWidth(true);
         scrollPane.setPrefViewportHeight(Math.min(280, options.size() * 32.0 + 8));
         content.getChildren().add(scrollPane);
@@ -789,14 +792,15 @@ public class GameUI {
 
     private void showTradePrompt(UiSnapshot.PendingTradeView trade) {
         pendingPromptShowing = true;
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Trade Offer");
-        dialog.setHeaderText(snapshot.playerName(trade.proposerPlayerId()) + " proposed a trade");
-        dialog.setContentText(describeTrade(trade));
+        Dialog<ButtonType> dialog = UiDialogs.createDialog("Trade Offer");
+        dialog.getDialogPane().setContent(UiDialogs.messageContent(
+                snapshot.playerName(trade.proposerPlayerId()) + " proposed a trade",
+                describeTrade(trade)));
 
-        ButtonType accept = new ButtonType("Accept", ButtonBar.ButtonData.OK_DONE);
-        ButtonType reject = new ButtonType("Reject", ButtonBar.ButtonData.NO);
-        dialog.getDialogPane().getButtonTypes().addAll(accept, reject);
+        ButtonType accept = UiDialogs.confirmButton("Accept");
+        ButtonType reject = UiDialogs.secondaryButton("Reject");
+        dialog.getDialogPane().getButtonTypes().setAll(accept, reject);
+        UiDialogs.styleButtons(dialog, accept, reject);
 
         Optional<ButtonType> result = dialog.showAndWait();
         pendingPromptShowing = false;
@@ -914,7 +918,7 @@ public class GameUI {
 
     private <T> Optional<T> chooseOne(String title, List<T> values, Function<T, String> labeler) {
         if (values == null || values.isEmpty()) {
-            showFeedback("No choices available for " + title + ".");
+            showActionFailed("No choices available for " + title + ".");
             return Optional.empty();
         }
         return chooseChoice(title, values.stream()
@@ -924,30 +928,42 @@ public class GameUI {
     }
 
     private <T> Optional<Choice<T>> chooseChoice(String title, List<Choice<T>> choices) {
-        ChoiceDialog<Choice<T>> dialog = new ChoiceDialog<>(choices.getFirst(), choices);
-        dialog.setTitle(title);
-        dialog.setHeaderText(null);
-        dialog.setContentText(title);
+        Dialog<Choice<T>> dialog = UiDialogs.createDialog(title);
+        ComboBox<Choice<T>> comboBox = new ComboBox<>(FXCollections.observableArrayList(choices));
+        comboBox.getSelectionModel().selectFirst();
+        comboBox.setMaxWidth(Double.MAX_VALUE);
+        comboBox.getStyleClass().add("app-dialog-choice-box");
+        VBox content = new VBox(12, UiDialogs.headingLabel(title), comboBox);
+        dialog.getDialogPane().setContent(content);
+        ButtonType okButtonType = UiDialogs.confirmButton("OK");
+        ButtonType cancelButtonType = UiDialogs.cancelButton("Cancel");
+        dialog.getDialogPane().getButtonTypes().setAll(okButtonType, cancelButtonType);
+        UiDialogs.styleButtons(dialog, okButtonType, cancelButtonType);
+        dialog.setResultConverter(button -> button == okButtonType
+                ? comboBox.getSelectionModel().getSelectedItem()
+                : null);
         return dialog.showAndWait();
     }
 
     private List<UiSnapshot.CardView> chooseCards(String title, List<UiSnapshot.CardView> options, int minimum) {
         if (options == null || options.isEmpty()) {
-            showFeedback("No cards are available for " + title + ".");
+            showActionFailed("No cards are available for " + title + ".");
             return List.of();
         }
-        Dialog<List<UiSnapshot.CardView>> dialog = new Dialog<>();
-        dialog.setTitle(title);
-        dialog.setHeaderText("Select at least " + minimum + " card(s).");
-        ButtonType okButtonType = englishOkButton();
-        ButtonType cancelButtonType = englishCancelButton();
+        Dialog<List<UiSnapshot.CardView>> dialog = UiDialogs.createDialog(title);
+        UiDialogs.setDialogWidth(dialog, 500);
+        ButtonType okButtonType = UiDialogs.confirmButton("OK");
+        ButtonType cancelButtonType = UiDialogs.cancelButton("Cancel");
         dialog.getDialogPane().getButtonTypes().setAll(okButtonType, cancelButtonType);
+        UiDialogs.styleButtons(dialog, okButtonType, cancelButtonType);
         ListView<Choice<UiSnapshot.CardView>> listView = new ListView<>();
+        listView.getStyleClass().add("app-dialog-list-view");
         listView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         listView.setItems(FXCollections.observableArrayList(options.stream()
                 .map(card -> new Choice<>(cardChoiceLabel(card), card))
                 .toList()));
-        dialog.getDialogPane().setContent(listView);
+        VBox content = new VBox(12, UiDialogs.headingLabel("Select at least " + minimum + " card(s)."), listView);
+        dialog.getDialogPane().setContent(content);
         dialog.setResultConverter(button -> {
             if (button != okButtonType) {
                 return List.of();
@@ -958,18 +974,10 @@ public class GameUI {
         });
         List<UiSnapshot.CardView> selected = dialog.showAndWait().orElse(List.of());
         if (selected.size() < minimum) {
-            showFeedback("Select at least " + minimum + " card(s).");
+            showActionFailed("Select at least " + minimum + " card(s).");
             return List.of();
         }
         return selected;
-    }
-
-    private static ButtonType englishOkButton() {
-        return new ButtonType("OK", ButtonBar.ButtonData.OK_DONE);
-    }
-
-    private static ButtonType englishCancelButton() {
-        return new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
     }
 
     private Node createCardNode(UiSnapshot.CardView card, boolean compact, boolean selectable) {
@@ -1339,17 +1347,20 @@ public class GameUI {
         setLabelText(statusMessageLabel, message);
     }
 
+    private void showActionFailed(String message) {
+        if (message == null || message.isBlank()) {
+            return;
+        }
+        showFeedback(message);
+        UiDialogs.showWarning("Action Failed", message);
+    }
+
     private void showServerMessage(String message) {
         if (message == null || message.isBlank()) {
             return;
         }
         Platform.runLater(() -> {
-            showFeedback(message);
-            Alert alert = new Alert(Alert.AlertType.WARNING);
-            alert.setTitle("Action Failed");
-            alert.setHeaderText(null);
-            alert.setContentText(message);
-            alert.show();
+            showActionFailed(message);
         });
     }
 

@@ -27,6 +27,7 @@ public class GameClient implements AutoCloseable {
     private final Map<String, CompletableFuture<ServerResponse>> pendingRequests = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<Consumer<ServerUpdate>> updateListeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Consumer<ServerNotice>> noticeListeners = new CopyOnWriteArrayList<>();
+    private final CopyOnWriteArrayList<Consumer<Throwable>> disconnectListeners = new CopyOnWriteArrayList<>();
 
     private ObjectOutputStream output;
     private ObjectInputStream input;
@@ -102,8 +103,6 @@ public class GameClient implements AutoCloseable {
         try {
             send(new ClientRequest(requestId, commandType, payload));
         } catch (IOException e) {
-            pendingRequests.remove(requestId);
-            future.completeExceptionally(e);
             LOGGER.log(Level.SEVERE, "Failed to send command " + commandType, e);
             handleDisconnect(e);
         }
@@ -117,6 +116,10 @@ public class GameClient implements AutoCloseable {
 
     public void addNoticeListener(Consumer<ServerNotice> listener) {
         noticeListeners.add(Objects.requireNonNull(listener, "listener"));
+    }
+
+    public void addDisconnectListener(Consumer<Throwable> listener) {
+        disconnectListeners.add(Objects.requireNonNull(listener, "listener"));
     }
 
     void handleMessage(Object inputObject) {
@@ -164,8 +167,6 @@ public class GameClient implements AutoCloseable {
             cancellation.initCause(cause);
         }
 
-        failPendingRequests(cancellation);
-
         if (cause == null) {
             LOGGER.info("Disconnected from server normally");
         } else {
@@ -173,6 +174,8 @@ public class GameClient implements AutoCloseable {
         }
 
         closeConnection();
+        notifyListeners(disconnectListeners, cancellation);
+        failPendingRequests(cancellation);
     }
 
     private <T> void notifyListeners(CopyOnWriteArrayList<Consumer<T>> listeners, T event) {
