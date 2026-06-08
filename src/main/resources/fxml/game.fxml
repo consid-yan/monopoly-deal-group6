@@ -116,16 +116,15 @@
                         <Label styleClass="game-helper-text" text="End your turn with 3 complete property sets to win"/>
                     </HBox>
 
-                    <HBox alignment="CENTER" spacing="10.0" styleClass="game-board-row clean-game-board-row">
-                        <VBox HBox.hgrow="ALWAYS" minWidth="260.0" spacing="5.0" styleClass="game-zone-panel clean-zone-panel">
-                            <Label styleClass="zone-heading" text="Bank"/>
-                            <FlowPane fx:id="bankZone" hgap="7.0" prefHeight="118.0" styleClass="drop-zone symbolic-drop-zone bank-drop-zone game-drop-zone clean-drop-zone" vgap="7.0"/>
-                        </VBox>
-                        <VBox HBox.hgrow="ALWAYS" minWidth="360.0" spacing="5.0" styleClass="game-zone-panel clean-zone-panel">
-                            <Label styleClass="zone-heading" text="Activity"/>
-                            <FlowPane fx:id="tableActivityZone" hgap="7.0" prefHeight="118.0" styleClass="drop-zone action-drop-zone game-drop-zone clean-activity-zone" vgap="7.0"/>
-                        </VBox>
-                    </HBox>
+                    <VBox spacing="5.0" styleClass="game-board-row clean-game-board-row game-zone-panel clean-zone-panel">
+                        <Label styleClass="zone-heading" text="Bank"/>
+                        <ScrollPane fx:id="bankScrollPane" fitToHeight="true" hbarPolicy="AS_NEEDED" prefHeight="130.0"
+                                    styleClass="game-bank-scroll" vbarPolicy="NEVER">
+                            <HBox fx:id="bankZone" alignment="CENTER_LEFT" minHeight="118.0" prefHeight="118.0"
+                                  spacing="7.0"
+                                  styleClass="drop-zone symbolic-drop-zone bank-drop-zone game-drop-zone clean-drop-zone"/>
+                        </ScrollPane>
+                    </VBox>
 
                     <VBox spacing="6.0" styleClass="game-zone-panel clean-property-panel" VBox.vgrow="ALWAYS">
                         <HBox alignment="CENTER_LEFT" spacing="10.0">
