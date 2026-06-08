@@ -1430,6 +1430,50 @@
     -fx-text-fill: rgba(250, 250, 242, 0.70);
 }
 
+.opponent-bank-chip {
+    -fx-font-weight: bold;
+}
+
+.opponent-set-chip.property-brown {
+    -fx-text-fill: #c4884a;
+}
+
+.opponent-set-chip.property-light-blue {
+    -fx-text-fill: #8ad8ff;
+}
+
+.opponent-set-chip.property-pink {
+    -fx-text-fill: #f06cbc;
+}
+
+.opponent-set-chip.property-orange {
+    -fx-text-fill: #f5a04a;
+}
+
+.opponent-set-chip.property-red {
+    -fx-text-fill: #f25560;
+}
+
+.opponent-set-chip.property-yellow {
+    -fx-text-fill: #f2d64b;
+}
+
+.opponent-set-chip.property-green {
+    -fx-text-fill: #4ecf7a;
+}
+
+.opponent-set-chip.property-dark-blue {
+    -fx-text-fill: #6b9cff;
+}
+
+.opponent-set-chip.property-railroad {
+    -fx-text-fill: #e2e8f0;
+}
+
+.opponent-set-chip.property-utility {
+    -fx-text-fill: #b8c0cc;
+}
+
 .game-screen-root .zone-caption {
     -fx-text-fill: rgba(250, 250, 242, 0.50);
 }
