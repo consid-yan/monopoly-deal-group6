@@ -6,14 +6,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-public class GameResult {
+public class CommandResult {
     private final boolean success;
     private final String code;
     private final String message;
     private final Map<String, Object> data;
     private final SessionSnapshot snapshot;
 
-    private GameResult(
+    private CommandResult(
             boolean success,
             String code,
             String message,
@@ -26,12 +26,12 @@ public class GameResult {
         this.snapshot = snapshot;
     }
 
-    public static GameResult success(Map<String, Object> data) {
-        return new GameResult(true, "SUCCESS", "Operation succeeded", data, null);
+    public static CommandResult success(Map<String, Object> data) {
+        return new CommandResult(true, "SUCCESS", "Operation succeeded", data, null);
     }
 
-    public static GameResult success(SessionSnapshot snapshot) {
-        return new GameResult(
+    public static CommandResult success(SessionSnapshot snapshot) {
+        return new CommandResult(
                 true,
                 "SUCCESS",
                 "Operation succeeded",
@@ -40,18 +40,12 @@ public class GameResult {
         );
     }
 
-    public static GameResult success() {
+    public static CommandResult success() {
         return success(Map.of());
     }
 
-    public static GameResult failure(String code, String message) {
-        return new GameResult(false, code, message, Map.of(), null);
-    }
-
-    public static GameResult notImplemented(String feature) {
-        Objects.requireNonNull(feature, "feature must not be null");
-        return new GameResult(false, "NOT_IMPLEMENTED:" + feature,
-                feature + " is not implemented yet", Map.of(), null);
+    public static CommandResult failure(String code, String message) {
+        return new CommandResult(false, code, message, Map.of(), null);
     }
 
     public boolean isSuccess() {
