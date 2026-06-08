@@ -131,7 +131,7 @@
                         <HBox alignment="CENTER_LEFT" spacing="10.0">
                             <Label styleClass="zone-heading" text="Properties"/>
                         </HBox>
-                        <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" styleClass="game-property-scroll" VBox.vgrow="ALWAYS">
+                        <ScrollPane fx:id="propertyRowsScroll" fitToHeight="false" fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="game-property-scroll" VBox.vgrow="ALWAYS">
                             <FlowPane fx:id="propertyRowsZone" hgap="10.0" minHeight="150.0" styleClass="property-board clean-property-rows" vgap="10.0">
                                 <padding>
                                     <Insets bottom="2.0" left="2.0" right="2.0" top="2.0"/>
