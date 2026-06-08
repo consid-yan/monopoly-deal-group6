@@ -8,7 +8,6 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
-import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -610,7 +609,6 @@ public class GameUI {
         ButtonType allow = new ButtonType("Allow", ButtonBar.ButtonData.OK_DONE);
         ButtonType justSayNo = new ButtonType("Just Say No", ButtonBar.ButtonData.NO);
         dialog.getDialogPane().getButtonTypes().addAll(allow, justSayNo);
-        dialog.setOnCloseRequest(event -> event.consume());
 
         boolean hasJustSayNo = snapshot.currentPlayerHand().stream()
                 .anyMatch(card -> card.isAction("JUST_SAY_NO"));
@@ -685,7 +683,6 @@ public class GameUI {
         dialog.setContentText(buildDebtPromptDetails(debt));
         ButtonType payNow = new ButtonType("Pay Now", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().setAll(payNow);
-        dialog.setOnCloseRequest(event -> event.consume());
         return dialog.showAndWait().filter(payNow::equals).isPresent();
     }
 
@@ -710,15 +707,33 @@ public class GameUI {
         summaryLabel.setWrapText(true);
         content.getChildren().add(summaryLabel);
 
+        Label paymentErrorLabel = new Label();
+        paymentErrorLabel.setWrapText(true);
+        paymentErrorLabel.getStyleClass().add("game-helper-text");
+        content.getChildren().add(paymentErrorLabel);
+
         VBox cardRows = new VBox(4);
         List<CheckBox> checkBoxes = new ArrayList<>();
+        Runnable refreshPaymentSelection = () -> {
+            int totalSelectedM = selectedPaymentValueM(checkBoxes);
+            summaryLabel.setText(formatPaymentSelectionSummary(totalSelectedM, dueAmountM));
+            boolean canSubmit = totalSelectedM >= dueAmountM || totalSelectedM >= maxPayableM;
+            Node okNode = dialog.getDialogPane().lookupButton(okButtonType);
+            if (okNode instanceof Button okButton) {
+                okButton.setDisable(!canSubmit);
+            }
+            if (canSubmit || totalSelectedM == 0) {
+                paymentErrorLabel.setText("");
+            } else {
+                paymentErrorLabel.setText("Selected cards total $" + totalSelectedM
+                        + "M. Pay at least $" + dueAmountM + "M or use all available cards.");
+            }
+        };
         for (UiSnapshot.CardView card : options) {
             CheckBox checkBox = new CheckBox(paymentChoiceLabel(card));
             checkBox.setUserData(card);
             checkBox.selectedProperty().addListener((obs, wasSelected, isSelected) ->
-                    summaryLabel.setText(formatPaymentSelectionSummary(
-                            selectedPaymentValueM(checkBoxes),
-                            dueAmountM)));
+                    refreshPaymentSelection.run());
             checkBoxes.add(checkBox);
             cardRows.getChildren().add(checkBox);
         }
@@ -728,19 +743,7 @@ public class GameUI {
         scrollPane.setPrefViewportHeight(Math.min(280, options.size() * 32.0 + 8));
         content.getChildren().add(scrollPane);
         dialog.getDialogPane().setContent(content);
-        dialog.setOnCloseRequest(event -> event.consume());
-
-        Button okButton = (Button) dialog.getDialogPane().lookupButton(okButtonType);
-        okButton.addEventFilter(ActionEvent.ACTION, event -> {
-            List<UiSnapshot.CardView> selected = selectedPaymentCards(checkBoxes);
-            int totalSelectedM = selected.stream().mapToInt(this::paymentValueM).sum();
-            if (totalSelectedM < dueAmountM && totalSelectedM < maxPayableM) {
-                event.consume();
-                showFeedback("Selected cards total $" + totalSelectedM
-                        + "M. Pay at least $" + dueAmountM + "M or use all available cards.");
-                summaryLabel.setText(formatPaymentSelectionSummary(totalSelectedM, dueAmountM));
-            }
-        });
+        dialog.setOnShown(event -> refreshPaymentSelection.run());
 
         dialog.setResultConverter(button -> {
             if (button == cancelButtonType) {
@@ -792,7 +795,6 @@ public class GameUI {
         ButtonType accept = new ButtonType("Accept", ButtonBar.ButtonData.OK_DONE);
         ButtonType reject = new ButtonType("Reject", ButtonBar.ButtonData.NO);
         dialog.getDialogPane().getButtonTypes().addAll(accept, reject);
-        dialog.setOnCloseRequest(event -> event.consume());
 
         Optional<ButtonType> result = dialog.showAndWait();
         pendingPromptShowing = false;

@@ -142,7 +142,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         }
 
         for (int i = 0; i < actionCost; i++) {
-            turnManager.recordAction();
+        turnManager.recordAction();
         }
         return snapshot(session, playerId);
     }
@@ -161,7 +161,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         DebtPaymentSelection payment = resolveDebtPayment(debtor, paymentCardIds);
         int availableValueM = availableDebtPaymentValueM(debtor);
         if (payment.totalValueM() < debt.amountM() && payment.totalValueM() < availableValueM) {
-            throw new GameException(
+        throw new GameException(
                     "INSUFFICIENT_PAYMENT",
                     "Selected cards total " + payment.totalValueM()
                             + "M but debtor can still pay up to " + availableValueM + "M");
