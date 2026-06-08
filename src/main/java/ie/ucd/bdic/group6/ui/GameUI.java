@@ -296,7 +296,6 @@ public class GameUI {
         heading.setMaxWidth(206);
 
         Label summary = new Label("Hand " + opponent.handCount()
-                + " | Bank $" + opponent.bankTotalValueM() + "M"
                 + " | Sets " + opponent.completedSetCount() + "/3");
         summary.getStyleClass().add("zone-caption");
         summary.setMaxWidth(206);
@@ -308,28 +307,38 @@ public class GameUI {
 
         FlowPane publicChips = new FlowPane(4, 4);
         publicChips.getStyleClass().add("opponent-public-chips");
-        if (opponent.bankCards().isEmpty()) {
-            publicChips.getChildren().add(opponentChip("Bank empty"));
-        } else {
-            opponent.bankCards().stream()
-                    .limit(2)
-                    .map(card -> opponentChip("Bank: " + card.title()))
-                    .forEach(publicChips.getChildren()::add);
-            addOverflowChip(publicChips, opponent.bankCards().size(), 2, "bank");
-        }
-
+        publicChips.getChildren().add(opponentBankChip(opponent));
         if (opponent.propertyRows().isEmpty()) {
             publicChips.getChildren().add(opponentChip("No properties"));
         } else {
-            opponent.propertyRows().stream()
-                    .limit(3)
-                    .map(row -> opponentChip(row.label() + " (" + row.cards().size() + ")"))
-                    .forEach(publicChips.getChildren()::add);
-            addOverflowChip(publicChips, opponent.propertyRows().size(), 3, "sets");
+            opponent.propertyRows().forEach(row -> publicChips.getChildren().add(opponentSetChip(row)));
         }
 
         seat.getChildren().addAll(heading, summary, handBacks, publicChips);
         return seat;
+    }
+
+    private Label opponentBankChip(UiSnapshot.PlayerView opponent) {
+        String text = opponent.bankCards().isEmpty()
+                ? "Bank: empty"
+                : "Bank: $" + opponent.bankTotalValueM() + "M · " + opponent.bankCards().size() + " cards";
+        Label label = opponentChip(text);
+        label.getStyleClass().add("opponent-bank-chip");
+        label.setMaxWidth(200);
+        return label;
+    }
+
+    private Label opponentSetChip(UiSnapshot.PropertyRowView row) {
+        StringBuilder text = new StringBuilder(UiSnapshot.humanize(row.anchorColor()))
+                .append(' ')
+                .append(row.cards().size());
+        if (row.complete()) {
+            text.append(" ✓");
+        }
+        Label label = opponentChip(text.toString());
+        label.getStyleClass().addAll("opponent-set-chip", propertyLabelStyle(row.anchorColor()));
+        label.setMaxWidth(112);
+        return label;
     }
 
     private Label opponentChip(String text) {
@@ -339,13 +348,6 @@ public class GameUI {
         label.getStyleClass().add("opponent-public-chip");
         Tooltip.install(label, new Tooltip(text));
         return label;
-    }
-
-    private void addOverflowChip(FlowPane pane, int size, int visibleCount, String label) {
-        int overflow = size - visibleCount;
-        if (overflow > 0) {
-            pane.getChildren().add(opponentChip("+" + overflow + " " + label));
-        }
     }
 
     private void renderPropertyRows(List<UiSnapshot.PropertyRowView> rows) {
