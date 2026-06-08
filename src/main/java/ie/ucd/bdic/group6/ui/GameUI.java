@@ -50,7 +50,7 @@ public class GameUI {
     @FXML
     private HBox handCardsHBox;
     @FXML
-    private HBox bankZone;
+    private ScrollPane bankScrollPane;
     @FXML
     private HBox bankZone;
     @FXML
