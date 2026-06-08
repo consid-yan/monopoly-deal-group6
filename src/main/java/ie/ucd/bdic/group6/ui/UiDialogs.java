@@ -95,7 +95,16 @@ final class UiDialogs {
         if (errorGraphic != null) {
             alert.setGraphic(errorGraphic);
         }
+        styleErrorDialogButton(alert);
         alert.showAndWait();
+    }
+
+    private static void styleErrorDialogButton(Dialog<?> dialog) {
+        Node okNode = dialog.getDialogPane().lookupButton(ButtonType.OK);
+        if (okNode instanceof Button okButton) {
+            okButton.setText("Ok");
+            okButton.getStyleClass().add("app-dialog-confirm-button");
+        }
     }
 
     private static ImageView errorGraphic() {

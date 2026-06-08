@@ -48,7 +48,7 @@ public class GameUI {
     @FXML
     private HBox handCardsHBox;
     @FXML
-    private FlowPane bankZone;
+    private HBox bankZone;
     @FXML
     private FlowPane tableActivityZone;
     @FXML
@@ -948,7 +948,7 @@ public class GameUI {
         setLabelText(discardPileSummaryLabel, "0 cards");
     }
 
-    private void clearZone(FlowPane zone) {
+    private void clearZone(Pane zone) {
         if (zone != null) {
             zone.getChildren().clear();
         }
