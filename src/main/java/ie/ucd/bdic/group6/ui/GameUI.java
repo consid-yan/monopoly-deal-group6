@@ -52,6 +52,8 @@ public class GameUI {
     @FXML
     private FlowPane tableActivityZone;
     @FXML
+    private ScrollPane propertyRowsScroll;
+    @FXML
     private FlowPane propertyRowsZone;
     @FXML
     private TextArea gameLogArea;
@@ -82,9 +84,24 @@ public class GameUI {
 
     @FXML
     private void initialize() {
+        configurePropertyRowsScrolling();
         context.setSnapshotListener(this::render);
         context.setMessageListener(this::showFeedback);
         render(context.latestSnapshot());
+    }
+
+    private void configurePropertyRowsScrolling() {
+        if (propertyRowsScroll == null || propertyRowsZone == null) {
+            return;
+        }
+        Runnable updateWrapLength = () -> {
+            double width = propertyRowsScroll.getViewportBounds().getWidth();
+            if (width > 0) {
+                propertyRowsZone.setPrefWrapLength(width);
+            }
+        };
+        propertyRowsScroll.viewportBoundsProperty().addListener((obs, oldBounds, newBounds) -> updateWrapLength.run());
+        Platform.runLater(updateWrapLength);
     }
 
     @FXML
