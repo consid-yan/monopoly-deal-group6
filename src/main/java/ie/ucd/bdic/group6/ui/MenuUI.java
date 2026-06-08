@@ -5,8 +5,6 @@ import ie.ucd.bdic.group6.network.message.ServerResponse;
 import javafx.fxml.FXML;
 import javafx.application.Platform;
 
-import java.util.concurrent.CompletionException;
-
 public class MenuUI {
 
     private final GameSessionCoordinator context;
@@ -49,10 +47,8 @@ public class MenuUI {
     private void openNextScreen(ServerResponse result, Throwable error) {
         Platform.runLater(() -> {
             if (error != null) {
-                Throwable cause = error instanceof CompletionException && error.getCause() != null
-                        ? error.getCause()
-                        : error;
-                UiDialogs.showError("Connection Failed", cause.getMessage());
+                UiDialogs.showError("Connection Failed", "Unable to connect to the game server. " +
+                        "\nCheck the host address and make sure the host has started a game.");
                 return;
             }
             if (!result.accepted()) {

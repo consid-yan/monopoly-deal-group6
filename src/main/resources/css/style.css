@@ -860,6 +860,8 @@
 .game-action-scroll > .viewport,
 .game-property-scroll,
 .game-property-scroll > .viewport,
+.bank-scroll-pane,
+.bank-scroll-pane > .viewport,
 .game-table-scroll,
 .game-table-scroll > .viewport,
 .game-outer-scroll,
@@ -965,6 +967,22 @@
 
 .bank-drop-zone {
     -fx-border-color: rgba(26, 122, 74, 0.72);
+}
+
+.bank-cards-row {
+    -fx-alignment: center-left;
+    -fx-fill-height: false;
+    -fx-padding: 1;
+}
+
+.bank-scroll-pane .scroll-bar:horizontal {
+    -fx-pref-height: 10;
+    -fx-opacity: 0.88;
+}
+
+.bank-scroll-pane .scroll-bar:vertical {
+    -fx-opacity: 0;
+    -fx-pref-width: 0;
 }
 
 .property-drop-zone {
