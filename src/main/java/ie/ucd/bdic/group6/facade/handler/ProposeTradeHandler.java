@@ -3,7 +3,7 @@ package ie.ucd.bdic.group6.facade.handler;
 
 import ie.ucd.bdic.group6.command.ProposeTradeCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
-import ie.ucd.bdic.group6.facade.model.GameResult;
+import ie.ucd.bdic.group6.facade.model.CommandResult;
 
 public class ProposeTradeHandler extends AbstractCommandHandler<ProposeTradeCommand> {
     public ProposeTradeHandler(ActionExecutor actionExecutor) {
@@ -16,7 +16,7 @@ public class ProposeTradeHandler extends AbstractCommandHandler<ProposeTradeComm
     }
 
     @Override
-    protected GameResult execute(ProposeTradeCommand command) {
-        return GameResult.success(actionExecutor.executeProposeTrade(command));
+    protected CommandResult execute(ProposeTradeCommand command) {
+        return CommandResult.success(actionExecutor.executeProposeTrade(command));
     }
 }

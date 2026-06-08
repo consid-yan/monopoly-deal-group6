@@ -3,7 +3,7 @@ package ie.ucd.bdic.group6.facade.handler;
 
 import ie.ucd.bdic.group6.command.PlayCardCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
-import ie.ucd.bdic.group6.facade.model.GameResult;
+import ie.ucd.bdic.group6.facade.model.CommandResult;
 
 public class PlayCardHandler extends AbstractCommandHandler<PlayCardCommand> {
     public PlayCardHandler(ActionExecutor actionExecutor) {
@@ -16,7 +16,7 @@ public class PlayCardHandler extends AbstractCommandHandler<PlayCardCommand> {
     }
 
     @Override
-    protected GameResult execute(PlayCardCommand command) {
-        return GameResult.success(actionExecutor.executePlayCard(command));
+    protected CommandResult execute(PlayCardCommand command) {
+        return CommandResult.success(actionExecutor.executePlayCard(command));
     }
 }

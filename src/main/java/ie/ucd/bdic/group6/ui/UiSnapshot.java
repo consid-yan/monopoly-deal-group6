@@ -196,6 +196,10 @@ public final class UiSnapshot {
                 .toList();
     }
 
+    public boolean canRespondToTrade(String playerId) {
+        return isTurnFor(playerId) && !pendingTradesForTarget(playerId).isEmpty();
+    }
+
     public List<PendingActionView> pendingActionsAwaiting(String playerId) {
         return pendingActions.stream()
                 .filter(action -> action.awaits(playerId))
@@ -203,9 +207,10 @@ public final class UiSnapshot {
     }
 
     public boolean canProposeTrade(String playerId) {
-        return opponents(playerId).stream().anyMatch(player -> !player.defeated())
-                && currentPlayer(playerId)
-                .map(player -> !player.visibleCards().isEmpty())
+        return currentPlayer(playerId)
+                .map(player -> opponents(playerId).stream()
+                        .filter(opponent -> !opponent.defeated())
+                        .anyMatch(player::canTradeWith))
                 .orElse(false);
     }
 
@@ -267,11 +272,73 @@ public final class UiSnapshot {
             return propertyRows.stream().flatMap(row -> row.cards().stream()).toList();
         }
 
+        public List<CardView> paymentCards() {
+            return visibleCards().stream()
+                    .filter(CardView::canUseForDebtPayment)
+                    .toList();
+        }
+
+        public List<CardView> stealablePropertyCards() {
+            return propertyRows.stream()
+                    .filter(row -> !row.complete())
+                    .flatMap(row -> row.cards().stream())
+                    .toList();
+        }
+
+        public List<PropertyRowView> improvableRows(String actionType) {
+            return propertyRows.stream()
+                    .filter(row -> row.canAcceptImprovement(actionType))
+                    .toList();
+        }
+
+        public List<String> rentableColorsFor(CardView rentCard) {
+            return propertyRows.stream()
+                    .filter(row -> row.rentValue() > 0)
+                    .map(PropertyRowView::anchorColor)
+                    .distinct()
+                    .filter(color -> rentCard.rentColorOptions().isEmpty()
+                            || rentCard.rentColorOptions().contains(color))
+                    .toList();
+        }
+
+        public boolean canTradeWith(PlayerView target) {
+            return visibleCards().stream()
+                    .anyMatch(offered -> !target.supportedTradeRequestsFor(offered, this).isEmpty());
+        }
+
+        public List<CardView> supportedTradeRequestsFor(CardView offered, PlayerView offeredOwner) {
+            String offeredKind = offeredOwner.tradeKind(offered).orElse("");
+            return visibleCards().stream()
+                    .filter(requested -> isSupportedTradeKind(offeredKind, tradeKind(requested).orElse("")))
+                    .toList();
+        }
+
         public List<CardView> visibleCards() {
             List<CardView> cards = new ArrayList<>();
             cards.addAll(bankCards);
             cards.addAll(propertyCards());
             return List.copyOf(cards);
+        }
+
+        private Optional<String> tradeKind(CardView card) {
+            if (card == null) {
+                return Optional.empty();
+            }
+            boolean inBank = bankCards.stream().anyMatch(candidate -> candidate.id().equals(card.id()));
+            if (inBank && "MONEY".equals(card.type())) {
+                return Optional.of("MONEY");
+            }
+            boolean inProperties = propertyCards().stream().anyMatch(candidate -> candidate.id().equals(card.id()));
+            if (inProperties && card.isPropertyLike()) {
+                return Optional.of("PROPERTY");
+            }
+            return Optional.empty();
+        }
+
+        private static boolean isSupportedTradeKind(String offeredKind, String requestedKind) {
+            return ("PROPERTY".equals(offeredKind) && "MONEY".equals(requestedKind))
+                    || ("MONEY".equals(offeredKind) && "PROPERTY".equals(requestedKind))
+                    || ("PROPERTY".equals(offeredKind) && "PROPERTY".equals(requestedKind));
         }
     }
 
@@ -333,6 +400,23 @@ public final class UiSnapshot {
             }
             return cards.size() + "/" + required + " cards";
         }
+
+        public boolean canAcceptImprovement(String actionType) {
+            if (!complete || isRailOrUtility(anchorColor)) {
+                return false;
+            }
+            if ("HOUSE".equals(actionType)) {
+                return !hasHouse && !hasHotel;
+            }
+            if ("HOTEL".equals(actionType)) {
+                return hasHouse && !hasHotel;
+            }
+            return false;
+        }
+
+        private static boolean isRailOrUtility(String color) {
+            return "RAILROAD".equals(color) || "UTILITY".equals(color);
+        }
     }
 
     public record CardView(
@@ -374,6 +458,10 @@ public final class UiSnapshot {
 
         public boolean isPropertyLike() {
             return "PROPERTY".equals(type) || "PROPERTY_WILD".equals(type);
+        }
+
+        public boolean canUseForDebtPayment() {
+            return bankValueM > 0 || (isPropertyLike() && valueM > 0);
         }
     }
 

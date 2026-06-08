@@ -200,6 +200,76 @@ class NetworkIntegrationTest {
     }
 
     @Test
+    void expiredRejoinRejectsPlayerAndBroadcastsForfeitedSnapshot() throws Exception {
+        MutableClock clock = new MutableClock();
+        GameEngine engine = new GameEngine(clock);
+        server = new GameServer(new GameController(new GameFacade(engine), new RequestMapper()), DEFAULT_PORT);
+        server.startAsync();
+
+        GameClient host = client();
+        List<ServerNotice> hostNotices = notices(host);
+        List<ServerUpdate> hostUpdates = updates(host);
+        connect(host);
+
+        GameClient player2 = client();
+        List<ServerNotice> player2Notices = notices(player2);
+        connect(player2);
+        await(hostNotices, notice -> notice.type() == NoticeType.CONNECTED);
+        await(player2Notices, notice -> notice.type() == NoticeType.CONNECTED);
+
+        ServerResponse created = host.sendCommand(CommandType.CREATE_SESSION, Map.of(
+                "hostPlayerId", "host",
+                "playerName", "Host",
+                "maxPlayers", 2
+        )).get(3, TimeUnit.SECONDS);
+        assertTrue(created.accepted());
+        String sessionId = text(created.payload(), "sessionId");
+        String roomCode = text(created.payload(), "roomCode");
+        String hostToken = text(created.payload(), "playerToken");
+
+        assertNotNull(roomCode);
+        ServerResponse joined = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
+                "roomCode", roomCode,
+                "playerId", "player2",
+                "playerName", "Player 2"
+        )).get(3, TimeUnit.SECONDS);
+        assertTrue(joined.accepted());
+        String player2Token = text(joined.payload(), "playerToken");
+        assertNotNull(sessionId);
+        assertNotNull(hostToken);
+        assertNotNull(player2Token);
+
+        assertTrue(host.sendCommand(CommandType.START_GAME, Map.of(
+                "sessionId", sessionId,
+                "playerId", "host",
+                "playerToken", hostToken
+        )).get(3, TimeUnit.SECONDS).accepted());
+        await(hostUpdates, activeUpdate(sessionId));
+
+        player2.close();
+        await(hostUpdates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
+                && playerHasStatus(update, "player2", "DISCONNECTED"));
+
+        GameClient rejoiningPlayer2 = client();
+        connect(rejoiningPlayer2);
+        clock.advance(Duration.ofSeconds(91));
+        ServerResponse rejected = rejoiningPlayer2.sendCommand(CommandType.REJOIN_SESSION, Map.of(
+                "sessionIdentity", sessionId,
+                "playerId", "player2",
+                "playerToken", player2Token
+        )).get(3, TimeUnit.SECONDS);
+
+        assertFalse(rejected.accepted());
+        assertEquals("PLAYER_FORFEITED", rejected.code());
+        ServerUpdate finished = await(hostUpdates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
+                && "FINISHED".equals(update.snapshot().status())
+                && List.of("player2").equals(update.snapshot().forfeitedPlayerIds()));
+        assertNotNull(finished);
+        assertEquals("host", finished.snapshot().winnerPlayerId());
+        assertEquals("DEFEATED", player(finished, "player2").playerStatus());
+    }
+
+    @Test
     void serverRejectsCommandsWhenPlayerTokenIsMissingOrWrong() throws Exception {
         server = new AppConfig().gameServer(DEFAULT_PORT);
         server.startAsync();

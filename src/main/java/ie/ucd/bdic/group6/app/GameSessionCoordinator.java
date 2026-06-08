@@ -14,6 +14,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import ie.ucd.bdic.group6.ui.UiSnapshot;
 import javafx.application.Platform;
@@ -23,6 +25,7 @@ import static ie.ucd.bdic.group6.network.NetworkConfig.DEFAULT_PORT;
 import static ie.ucd.bdic.group6.network.NetworkConfig.requireValidPort;
 
 public final class GameSessionCoordinator implements AutoCloseable {
+    private static final Logger LOGGER = Logger.getLogger(GameSessionCoordinator.class.getName());
     private final AppConfig appConfig;
 
     private volatile GameClient client;
@@ -91,34 +94,36 @@ public final class GameSessionCoordinator implements AutoCloseable {
         String newPlayerName = requireText(requestedPlayerName, "player name");
         String newPlayerId = generatePlayerId(newPlayerName);
 
-        System.out.println("\n[1/5] Starting hosted game session for player "
+        LOGGER.info("\n[1/5] Starting hosted game session for player "
                 + newPlayerName + " (" + newPlayerId + ")");
 
         return CompletableFuture.supplyAsync(() -> {
             GameServer server = null;
             try {
-                System.out.println("[2/5] Resetting network state...");
+                LOGGER.info("[2/5] Resetting network state...");
                 resetNetwork();
-                System.out.println("Network state reset completed.");
+                LOGGER.info("Network state reset completed.");
 
-                System.out.println("[3/5] Starting game server, attempting to bind port " + DEFAULT_PORT);
+                LOGGER.info(() -> "[3/5] Starting game server, attempting to bind port " + DEFAULT_PORT);
                 server = appConfig.gameServer(DEFAULT_PORT);
                 server.startAsync();
 
                 int actualPort = server.port();
                 String serverBindAddress = "0.0.0.0";
-                System.out.println("Server started successfully.");
-                System.out.println("   Bind address: " + serverBindAddress + " (0.0.0.0 listens on all network adapters)");
-                System.out.println("   Actual listening port: " + actualPort);
+
+                LOGGER.info("Server started successfully.");
+                LOGGER.info(() -> "Bind address: " + serverBindAddress + " (0.0.0.0 listens on all network adapters)");
+                LOGGER.info(() -> "Actual listening port: " + actualPort);
 
                 String shareableHost = resolveShareableHost();
-                System.out.println("Resolved local LAN IP: " + shareableHost);
-                System.out.println("\nConnection address for other players: " + shareableHost + ":" + actualPort);
-                System.out.println("Local connection address: 127.0.0.1:" + actualPort + "\n");
 
-                System.out.println("[4/5] Creating local client and connecting to server...");
+                LOGGER.info(() -> "Resolved local LAN IP: " + shareableHost);
+                LOGGER.info(() -> "Connection address for other players: " + shareableHost + ":" + actualPort);
+                LOGGER.info(() -> "Local connection address: 127.0.0.1:" + actualPort);
+
+                LOGGER.info("[4/5] Creating local client and connecting to server...");
                 GameClient newClient = openClient("127.0.0.1", actualPort);
-                System.out.println("Local client connected to server successfully.");
+                LOGGER.info("Local client connected to server successfully.");
 
                 hostedServer = server;
                 client = newClient;
@@ -126,55 +131,63 @@ public final class GameSessionCoordinator implements AutoCloseable {
                 playerId = newPlayerId;
                 playerName = newPlayerName;
                 connected = true;
-                System.out.println("Local session status initialized.");
+
+                LOGGER.info("Local session status initialized.");
 
                 return null;
             } catch (IOException e) {
-                System.err.println("\nFailed to start server: I/O exception");
-                System.err.println("   Error message: " + e.getMessage());
-                System.err.printf("   Possible reasons: port %d occupied, insufficient permissions, firewall block\n", DEFAULT_PORT);
-                e.printStackTrace();
+                LOGGER.log(
+                        Level.SEVERE,
+                        "Failed to start server: I/O exception. Possible reasons: port "
+                                + DEFAULT_PORT
+                                + " occupied, insufficient permissions, or firewall block.",
+                        e);
 
                 try {
                     server.stop();
-                    System.out.println("Attempted to shut down leftover server process.");
+                    LOGGER.info("Attempted to shut down leftover server process.");
                 } catch (Exception ex) {
-                    System.err.println("Failed to close leftover server: " + ex.getMessage());
+                    LOGGER.log(Level.WARNING, "Failed to close leftover server.", ex);
                 }
+
                 throw new CompletionException("Failed to start server: " + e.getMessage(), e);
-            } catch (RuntimeException e) {
-                System.err.println("\nFailed to start server: runtime exception");
-                System.err.println("   Error message: " + e.getMessage());
-                e.printStackTrace();
+            } catch (RuntimeException runtimeException) {
+                LOGGER.log(Level.SEVERE, "Failed to start server: runtime exception.", runtimeException);
 
                 if (server != null) {
                     try {
                         server.stop();
-                    } catch (Exception _) {}
+                    } catch (Exception exception) {
+                        LOGGER.log(Level.WARNING, "Failed to close leftover server after runtime exception.", exception);
+                    }
                 }
-                throw new CompletionException("Failed to start server: " + e.getMessage(), e);
+
+                throw new CompletionException("Failed to start server: " + runtimeException.getMessage(), runtimeException);
             }
         }).thenCompose(ignored -> {
-            System.out.println("[5/5] Sending create session command to server...");
+            LOGGER.info("[5/5] Sending create session command to server...");
+
             return sendCommand(CommandType.CREATE_SESSION, Map.of(
                     "hostPlayerId", newPlayerId,
                     "playerName", newPlayerName,
                     "maxPlayers", maxPlayers
             )).whenComplete((result, throwable) -> {
                 if (throwable != null) {
-                    System.err.println("\nFailed to create game session.");
-                    System.err.println("   Error message: " + throwable.getMessage());
-                    System.err.println("   Possible reasons: no server response, serialization failure, invalid command format");
-                    throwable.printStackTrace();
+                    LOGGER.log(
+                            Level.SEVERE,
+                            "Failed to create game session. Possible reasons: no server response, "
+                                    + "serialization failure, or invalid command format.",
+                            throwable);
                 } else if (result.accepted()) {
-                    System.out.println("\nGame session created successfully.");
-                    System.out.println("   Session ID: " + result.payload().get("sessionId"));
-                    System.out.println("   Room Code: " + result.payload().get("roomCode"));
-                    System.out.println("Ready to invite other players to join.\n");
+                    LOGGER.info("Game session created successfully.");
+                    LOGGER.info(() -> "Session ID: " + result.payload().get("sessionId"));
+                    LOGGER.info(() -> "Room Code: " + result.payload().get("roomCode"));
+                    LOGGER.info("Ready to invite other players to join.");
                 } else {
-                    System.err.println("\nServer rejected session creation.");
-                    System.err.println("   Error Code: " + result.code());
-                    System.err.println("   Error Message: " + result.message());
+                    LOGGER.warning(() -> "Server rejected session creation. Error Code: "
+                            + result.code()
+                            + ", Error Message: "
+                            + result.message());
                 }
             });
         });

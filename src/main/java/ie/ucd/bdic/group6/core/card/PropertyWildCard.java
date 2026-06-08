@@ -41,4 +41,9 @@ public final class PropertyWildCard extends Card {
     public OptionalInt bankValueM() {
         return bankValueM == null ? OptionalInt.empty() : OptionalInt.of(bankValueM);
     }
+
+    @Override
+    public int faceValueM() {
+        return bankValueM == null ? 0 : bankValueM;
+    }
 }

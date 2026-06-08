@@ -9,9 +9,6 @@ import java.util.Map;
  */
 public final class RentTable {
 
-    private RentTable() {
-    }
-
     /**
      * Rent for a row with {@code cards} property cards placed (including wilds counting as one card each),
      * before the set is complete. When {@code cards == PropertyColor.fullSetSize(color)}, this equals the
@@ -24,7 +21,7 @@ public final class RentTable {
         int cap = PropertyColor.fullSetSize(color);
         int n = Math.min(cards, cap);
         return switch (color) {
-            case BROWN -> n == 1 ? 1 : 2;
+            case BROWN, UTILITY -> n == 1 ? 1 : 2;
             case LIGHT_BLUE -> n == 1 ? 1 : (n == 2 ? 2 : 3);
             case PINK -> n == 1 ? 1 : (n == 2 ? 2 : 4);
             case ORANGE -> n == 1 ? 1 : (n == 2 ? 3 : 5);
@@ -38,7 +35,6 @@ public final class RentTable {
                 case 3 -> 3;
                 default -> 4;
             };
-            case UTILITY -> n == 1 ? 1 : 2;
         };
     }
 

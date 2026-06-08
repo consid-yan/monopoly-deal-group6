@@ -3,7 +3,7 @@ package ie.ucd.bdic.group6.facade.handler;
 import ie.ucd.bdic.group6.command.Command;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.exception.GameException;
-import ie.ucd.bdic.group6.facade.model.GameResult;
+import ie.ucd.bdic.group6.facade.model.CommandResult;
 
 public abstract class AbstractCommandHandler<C extends Command> implements CommandHandler<C> {
     protected final ActionExecutor actionExecutor;
@@ -13,16 +13,16 @@ public abstract class AbstractCommandHandler<C extends Command> implements Comma
     }
 
     @Override
-    public GameResult handle(C command) {
+    public CommandResult handle(C command) {
         try {
             return execute(command);
         } catch (GameException e) {
-            return GameResult.failure(e.getErrorCode(), e.getMessage());
+            return CommandResult.failure(e.getErrorCode(), e.getMessage());
         } catch (Exception e) {
-            return GameResult.failure("INTERNAL_ERROR",
+            return CommandResult.failure("INTERNAL_ERROR",
                     "Failed to execute " + command.getCommandType() + ": " + e.getMessage());
         }
     }
 
-    protected abstract GameResult execute(C command);
+    protected abstract CommandResult execute(C command);
 }

@@ -13,9 +13,17 @@ import java.util.Optional;
 /**
  * Engine-level composition for moving property / wild cards between players' boards (atomic with rollback).
  */
-public final class PlayerPropertyTransfers {
+public final class PropertyTransferService {
 
-    private PlayerPropertyTransfers() {
+    private PropertyTransferService() {
+    }
+
+    public static OperationResult<Void> transferPropertyCardToRow(
+            Player sender,
+            Player receiver,
+            Card card,
+            PropertySet receiverRow) {
+        return transferPropertyCardToRow(sender, receiver, card, receiverRow, null);
     }
 
     public static OperationResult<Void> transferPropertyCardToRow(
@@ -23,7 +31,7 @@ public final class PlayerPropertyTransfers {
             Player receiver,
             Card card,
             PropertySet receiverRow,
-            Optional<PropertyColor> wildChoice) {
+            PropertyColor wildChoice) {
         Objects.requireNonNull(sender, "sender");
         Objects.requireNonNull(receiver, "receiver");
         Objects.requireNonNull(card, "card");
@@ -35,10 +43,10 @@ public final class PlayerPropertyTransfers {
         if (origin.isEmpty()) {
             return OperationResult.fail(OperationError.CARD_NOT_ON_PROPERTY_BOARD, "card not on sender board");
         }
-        Optional<PropertyColor> priorWild = Optional.empty();
+        PropertyColor priorWild = null;
         if (card instanceof PropertyWildCard wc) {
-            priorWild = origin.get().wildAssignmentFor(wc.id());
-            if (priorWild.isEmpty()) {
+            priorWild = origin.get().wildAssignmentFor(wc.id()).orElse(null);
+            if (priorWild == null) {
                 return OperationResult.fail(OperationError.WILD_COLOR_INVALID, "missing wild assignment on sender row");
             }
         }
@@ -67,8 +75,16 @@ public final class PlayerPropertyTransfers {
             Player sender,
             Player receiver,
             Card card,
+            PropertyColor anchorColor) {
+        return transferPropertyCardToNewRow(sender, receiver, card, anchorColor, null);
+    }
+
+    public static OperationResult<PropertySet> transferPropertyCardToNewRow(
+            Player sender,
+            Player receiver,
+            Card card,
             PropertyColor anchorColor,
-            Optional<PropertyColor> wildChoice) {
+            PropertyColor wildChoice) {
         Objects.requireNonNull(anchorColor, "anchorColor");
         PropertySet receiverRow = receiver.propertyBoard().startNewRow(anchorColor);
         OperationResult<Void> moved = transferPropertyCardToRow(sender, receiver, card, receiverRow, wildChoice);
@@ -78,7 +94,7 @@ public final class PlayerPropertyTransfers {
                 receiver.propertyBoard().compactEmptyRows();
             }
             return OperationResult.fail(
-                    moved.errorCode().orElse(OperationError.GENERIC),
+                    moved.errorCode().orElse(OperationError.INTERNAL_ERROR),
                     moved.errorMessage().orElse(""));
         }
         return OperationResult.ok(receiverRow);
@@ -92,13 +108,13 @@ public final class PlayerPropertyTransfers {
         if (!sender.propertyBoard().ownsRow(sourceRow)) {
             return OperationResult.fail(OperationError.ROW_NOT_OWNED_BY_PLAYER, "source row not on sender board");
         }
-        PlayerSnapshot.PropertyRowSnapshot snap = PlayerSnapshot.PropertyRowSnapshot.from(sourceRow);
+        PlayerRollbackSnapshot.PropertyRowSnapshot snap = PlayerRollbackSnapshot.PropertyRowSnapshot.from(sourceRow);
         if (!sender.propertyBoard().removeRow(sourceRow)) {
             return OperationResult.fail(OperationError.CARD_NOT_ON_PROPERTY_BOARD, "could not remove source row");
         }
         PropertySet target = new PropertySet(snap.anchorColor(), snap.rowId());
         for (Card c : snap.cardsInOrder()) {
-            Optional<PropertyColor> wild = Optional.empty();
+            PropertyColor wild = null;
             if (c instanceof PropertyWildCard wc) {
                 PropertyColor choice = snap.wildAssignments().get(wc.id());
                 if (choice == null) {
@@ -106,7 +122,7 @@ public final class PlayerPropertyTransfers {
                     return OperationResult.fail(
                             OperationError.WILD_COLOR_INVALID, "missing wild assignment for " + wc.id());
                 }
-                wild = Optional.of(choice);
+                wild = choice;
             }
             if (!target.tryAdd(c, wild)) {
                 rollbackEntireRowRestore(sender, receiver, snap, target);
@@ -123,15 +139,15 @@ public final class PlayerPropertyTransfers {
     private static void rollbackEntireRowRestore(
             Player sender,
             Player receiver,
-            PlayerSnapshot.PropertyRowSnapshot snap,
+            PlayerRollbackSnapshot.PropertyRowSnapshot snap,
             PropertySet partialTarget) {
         receiver.propertyBoard().removeRow(partialTarget);
         receiver.propertyBoard().compactEmptyRows();
         PropertySet restored = new PropertySet(snap.anchorColor(), snap.rowId());
         for (Card c : snap.cardsInOrder()) {
-            Optional<PropertyColor> wild = Optional.empty();
+            PropertyColor wild = null;
             if (c instanceof PropertyWildCard wc) {
-                wild = Optional.of(snap.wildAssignments().get(wc.id()));
+                wild = snap.wildAssignments().get(wc.id());
             }
             restored.tryAdd(c, wild);
         }

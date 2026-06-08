@@ -115,16 +115,8 @@ public class GameClient implements AutoCloseable {
         updateListeners.add(Objects.requireNonNull(listener, "listener"));
     }
 
-    public void removeUpdateListener(Consumer<ServerUpdate> listener) {
-        updateListeners.remove(listener);
-    }
-
     public void addNoticeListener(Consumer<ServerNotice> listener) {
         noticeListeners.add(Objects.requireNonNull(listener, "listener"));
-    }
-
-    public void removeNoticeListener(Consumer<ServerNotice> listener) {
-        noticeListeners.remove(listener);
     }
 
     void handleMessage(Object inputObject) {

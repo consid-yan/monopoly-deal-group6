@@ -14,11 +14,11 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Supplier;
 
 /**
- * Aggregates {@link Hand}, {@link Bank}, and {@link PropertyBoard}. Multi-step transactions should be composed
- * by the engine using {@link PlayerSnapshot} plus atomic helpers such as {@link PlayerPropertyTransfers}.
+ * Aggregates {@link Hand}, {@link Bank}, and {@link PropertyBoard}. Multistep transactions should be composed
+ * by the engine using {@link PlayerRollbackSnapshot} plus atomic helpers such as {@link PropertyTransferService}.
  * For a stable integration surface, prefer {@link ie.ucd.bdic.group6.facade.PlayerTableFacade}.
  */
 public final class Player {
@@ -28,24 +28,10 @@ public final class Player {
     private final Hand hand = new Hand();
     private final Bank bank = new Bank();
     private final PropertyBoard propertyBoard = new PropertyBoard();
-    private final List<PlayerZoneListener> zoneListeners = new CopyOnWriteArrayList<>();
 
     public Player(String id, String name) {
         this.id = Objects.requireNonNull(id, "id");
         this.name = Objects.requireNonNull(name, "name");
-        hand.addMutationListener(() -> zoneListeners.forEach(l -> l.onHandChanged(this)));
-        bank.addMutationListener(() -> zoneListeners.forEach(l -> l.onBankChanged(this)));
-        propertyBoard.addMutationListener(() -> zoneListeners.forEach(l -> l.onPropertyBoardChanged(this)));
-    }
-
-    public void addZoneListener(PlayerZoneListener listener) {
-        if (listener != null) {
-            zoneListeners.add(listener);
-        }
-    }
-
-    public void removeZoneListener(PlayerZoneListener listener) {
-        zoneListeners.remove(listener);
     }
 
     public String id() {
@@ -84,8 +70,8 @@ public final class Player {
         return bank.totalValueM();
     }
 
-    public boolean canDeclareVictory(boolean isMyTurn) {
-        return isMyTurn && propertyBoard.completeDistinctColorCount() >= 3;
+    public boolean canDeclareVictory() {
+        return propertyBoard.completeDistinctColorCount() >= 3;
     }
 
     public void addToHand(Card card) {
@@ -93,13 +79,8 @@ public final class Player {
     }
 
     public OperationResult<Void> tryBankFromHand(Card card) {
-        Objects.requireNonNull(card, "card");
-        if (!hand.contains(card)) {
+        if (!tryRemoveFromHand(card))
             return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "card not in hand: " + card.id());
-        }
-        if (!hand.remove(card)) {
-            return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "card not in hand: " + card.id());
-        }
         OperationResult<Void> deposited = bank.depositAsMoney(card);
         if (!deposited.isSuccess()) {
             hand.add(card);
@@ -108,7 +89,11 @@ public final class Player {
         return OperationResult.ok();
     }
 
-    public OperationResult<Void> tryPlayPropertyFromHand(PropertySet row, Card card, Optional<PropertyColor> wildChoice) {
+    public void tryPlayPropertyFromHand(PropertySet row, Card card) {
+        tryPlayPropertyFromHand(row, card, null);
+    }
+
+    public OperationResult<Void> tryPlayPropertyFromHand(PropertySet row, Card card, PropertyColor wildChoice) {
         Objects.requireNonNull(row, "row");
         Objects.requireNonNull(card, "card");
         if (!propertyBoard.ownsRow(row)) {
@@ -128,15 +113,14 @@ public final class Player {
         return OperationResult.ok();
     }
 
-    public OperationResult<Void> tryStartNewPropertyRowFromHand(PropertyColor anchorColor, Card card, Optional<PropertyColor> wildChoice) {
+    public void tryStartNewPropertyRowFromHand(PropertyColor anchorColor, Card card) {
+        tryStartNewPropertyRowFromHand(anchorColor, card, null);
+    }
+
+    public OperationResult<Void> tryStartNewPropertyRowFromHand(PropertyColor anchorColor, Card card, PropertyColor wildChoice) {
         Objects.requireNonNull(anchorColor, "anchorColor");
-        Objects.requireNonNull(card, "card");
-        if (!hand.contains(card)) {
+        if (!tryRemoveFromHand(card))
             return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "card not in hand: " + card.id());
-        }
-        if (!hand.remove(card)) {
-            return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "card not in hand: " + card.id());
-        }
         PropertySet row = propertyBoard.startNewRow(anchorColor);
         OperationResult<Void> placed = propertyBoard.tryAddCardToRow(row, card, wildChoice);
         if (!placed.isSuccess()) {
@@ -148,6 +132,11 @@ public final class Player {
             return placed;
         }
         return OperationResult.ok();
+    }
+
+    private boolean tryRemoveFromHand(Card card) {
+        Objects.requireNonNull(card, "card");
+        return hand.remove(card);
     }
 
     public OperationResult<ActionCard> trySpendHouseCardOnRow(ActionCard houseFromHand, PropertySet row) {
@@ -162,7 +151,7 @@ public final class Player {
             ActionCard actionFromHand,
             PropertySet row,
             ActionType expected,
-            java.util.function.BooleanSupplier placeStructural) {
+            Supplier<OperationResult<Void>> placeStructural) {
         Objects.requireNonNull(actionFromHand, "actionFromHand");
         Objects.requireNonNull(row, "row");
         if (actionFromHand.actionType() != expected) {
@@ -177,16 +166,14 @@ public final class Player {
         if (!hand.remove(actionFromHand)) {
             return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "action card not in hand");
         }
-        if (!placeStructural.getAsBoolean()) {
+        OperationResult<Void> placed = placeStructural.get();
+        if (!placed.isSuccess()) {
             hand.add(actionFromHand);
             return OperationResult.fail(
-                    OperationError.NOT_COMPLETE_SET, "row cannot accept " + expected + " improvement right now");
+                    placed.errorCode().orElse(OperationError.INTERNAL_ERROR),
+                    placed.errorMessage().orElse("row cannot accept " + expected + " improvement right now"));
         }
         return OperationResult.ok(actionFromHand);
-    }
-
-    public OperationResult<Void> tryDiscardHandDownTo(int maxHandSize, List<Card> selectionOrder, CardDiscardSink discardSink) {
-        return hand.discardDownTo(maxHandSize, selectionOrder, discardSink);
     }
 
     /**
@@ -229,11 +216,11 @@ public final class Player {
         return OperationResult.ok();
     }
 
-    public PlayerSnapshot snapshot() {
-        return PlayerSnapshot.capture(this);
+    public PlayerRollbackSnapshot snapshot() {
+        return PlayerRollbackSnapshot.capture(this);
     }
 
-    public void restore(PlayerSnapshot snap) {
-        PlayerSnapshot.restore(this, snap);
+    public void restore(PlayerRollbackSnapshot snap) {
+        PlayerRollbackSnapshot.restore(this, snap);
     }
 }

@@ -48,7 +48,7 @@ final class UiDialogs {
         TextField roomCodeField = field("Room code");
         TextField hostField = field("Server host");
         TextField playerNameField = field("Player name");
-        Optional<ButtonType> result = showForm("Join Game", "Connect to an existing session",
+        Optional<ButtonType> result = showForm("Join Game", "Connect to an existing room",
                 row("Room Code", roomCodeField),
                 row("Host IP", hostField),
                 row("Player Name", playerNameField));

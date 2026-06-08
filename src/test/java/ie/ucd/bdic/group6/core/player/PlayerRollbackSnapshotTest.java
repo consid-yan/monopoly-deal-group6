@@ -6,12 +6,10 @@ import ie.ucd.bdic.group6.core.property.PropertyColor;
 import ie.ucd.bdic.group6.core.property.PropertySet;
 import org.junit.jupiter.api.Test;
 
-import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class PlayerSnapshotTest {
+class PlayerRollbackSnapshotTest {
 
     @Test
     void snapshotRoundTripPreservesZones() {
@@ -22,9 +20,9 @@ class PlayerSnapshotTest {
         p.bank().forceAddForTestsOrMigration(new MoneyCard("m-2", "2M", 2));
         PropertySet row = p.propertyBoard().startNewRow(PropertyColor.BROWN);
         String rowId = row.rowId();
-        assertTrue(row.tryAdd(prop, Optional.empty()));
+        assertTrue(row.tryAdd(prop));
 
-        PlayerSnapshot snap = p.snapshot();
+        PlayerRollbackSnapshot snap = p.snapshot();
         Player p2 = new Player("p1", "B");
         p2.restore(snap);
 
@@ -41,9 +39,9 @@ class PlayerSnapshotTest {
         PropertyCard b1 = new PropertyCard("b1", "B1", PropertyColor.BROWN, 2);
         PropertyCard b2 = new PropertyCard("b2", "B2", PropertyColor.BROWN, 2);
         PropertySet row = new PropertySet(PropertyColor.BROWN);
-        assertTrue(row.tryAdd(b1, Optional.empty()));
-        assertTrue(row.tryAdd(b2, Optional.empty()));
-        assertTrue(row.tryPlaceHouseStructuralOnly());
+        assertTrue(row.tryAdd(b1));
+        assertTrue(row.tryAdd(b2));
+        assertTrue(row.tryPlaceHouseStructuralOnly().isSuccess());
         p.propertyBoard().addRow(row);
 
         Player p2 = new Player("p1", "B");

@@ -4,7 +4,7 @@ import ie.ucd.bdic.group6.command.CommandType;
 import ie.ucd.bdic.group6.controller.GameController;
 import ie.ucd.bdic.group6.controller.dto.ControllerRequest;
 import ie.ucd.bdic.group6.core.snapshot.SessionSnapshot;
-import ie.ucd.bdic.group6.facade.model.GameResult;
+import ie.ucd.bdic.group6.facade.model.CommandResult;
 import ie.ucd.bdic.group6.network.message.ClientRequest;
 import ie.ucd.bdic.group6.network.message.Message;
 import ie.ucd.bdic.group6.network.message.NoticeType;
@@ -148,10 +148,13 @@ public class GameServer implements AutoCloseable {
             return;
         }
 
-        GameResult result = execute(request);
+        CommandResult result = execute(request);
 
         SessionSnapshot snapshot = result.getSnapshot().orElse(null);
-        String sessionId = snapshot == null ? text(result.getData().get("sessionId")) : text(snapshot.sessionId());
+        String authenticatedSessionId = authenticatedSessionId(request);
+        String sessionId = snapshot == null
+                ? firstNonBlank(text(result.getData().get("sessionId")), authenticatedSessionId)
+                : text(snapshot.sessionId());
         String playerId = resolvePlayerId(request);
         Map<String, Object> resultData = result.getData();
 
@@ -173,6 +176,9 @@ public class GameServer implements AutoCloseable {
         ));
 
         if (!result.isSuccess()) {
+            if (request.commandType() == CommandType.REJOIN_SESSION && sessionId != null) {
+                broadcastSessionState(sessionId);
+            }
             return;
         }
 
@@ -234,7 +240,7 @@ public class GameServer implements AutoCloseable {
         return text(request.payload().get("sessionId"));
     }
 
-    private GameResult execute(ClientRequest request) {
+    private CommandResult execute(ClientRequest request) {
         try {
             ControllerRequest controllerRequest = new ControllerRequest(request.payload());
 
@@ -256,7 +262,7 @@ public class GameServer implements AutoCloseable {
         } catch (RuntimeException e) {
             LOGGER.log(Level.WARNING, "Failed to execute command " + request.commandType(), e);
 
-            return GameResult.failure(
+            return CommandResult.failure(
                     "NETWORK_COMMAND_FAILED",
                     "Failed to execute " + request.commandType() + ": " + e.getMessage()
             );
@@ -340,7 +346,7 @@ public class GameServer implements AutoCloseable {
                 continue;
             }
 
-            GameResult stateResult = gameController.rejoinSession(new ControllerRequest(Map.of(
+            CommandResult stateResult = gameController.rejoinSession(new ControllerRequest(Map.of(
                     "sessionIdentity", sessionId,
                     "playerId", connection.playerId()
             )));
@@ -366,7 +372,7 @@ public class GameServer implements AutoCloseable {
             return;
         }
 
-        GameResult result = gameController.processDisconnectTimeouts(new ControllerRequest(Map.of()));
+        CommandResult result = gameController.processDisconnectTimeouts(new ControllerRequest(Map.of()));
 
         if (!result.isSuccess()) {
             return;
@@ -416,6 +422,16 @@ public class GameServer implements AutoCloseable {
 
         String text = value.toString().trim();
         return text.isEmpty() ? null : text;
+    }
+
+    private static String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
     }
 
     private synchronized void closeServerSocket() {
@@ -541,7 +557,7 @@ public class GameServer implements AutoCloseable {
         }
 
         private void markPlayerDisconnected(String sessionId, String playerId) {
-            GameResult result = gameController.playerDisconnected(new ControllerRequest(Map.of(
+            CommandResult result = gameController.playerDisconnected(new ControllerRequest(Map.of(
                     "sessionId", sessionId,
                     "playerId", playerId
             )));

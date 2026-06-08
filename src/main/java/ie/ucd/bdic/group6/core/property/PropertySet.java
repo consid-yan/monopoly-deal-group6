@@ -3,6 +3,8 @@ package ie.ucd.bdic.group6.core.property;
 import ie.ucd.bdic.group6.core.card.Card;
 import ie.ucd.bdic.group6.core.card.PropertyCard;
 import ie.ucd.bdic.group6.core.card.PropertyWildCard;
+import ie.ucd.bdic.group6.core.common.OperationError;
+import ie.ucd.bdic.group6.core.common.OperationResult;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,7 +33,7 @@ public final class PropertySet {
     }
 
     /**
-     * Restores or transfers a row while preserving {@code rowId} (snapshots, Deal Breaker, etc.).
+     * Restores or transfers a row while preserving {@code rowId} (snapshots, dealbreaker, etc.).
      */
     public PropertySet(PropertyColor anchorColor, String rowId) {
         this.anchorColor = Objects.requireNonNull(anchorColor, "anchorColor");
@@ -85,29 +87,32 @@ public final class PropertySet {
         return hotel;
     }
 
-    /**
-     * @param wildChoice required when {@code card} is a {@link PropertyWildCard}; must equal {@link #anchorColor()}
-     *                   and be allowed by the wild card.
-     */
-    public boolean canAdd(Card card, Optional<PropertyColor> wildChoice) {
+    public boolean canAdd(Card card) {
+        return canAdd(card, null);
+    }
+
+    public boolean canAdd(Card card, PropertyColor wildChoice) {
         Objects.requireNonNull(card, "card");
         if (size() >= capacity()) {
             return false;
         }
         if (card instanceof PropertyCard pc) {
-            return wildChoice.isEmpty() && pc.color() == anchorColor;
+            return wildChoice == null && pc.color() == anchorColor;
         }
         if (card instanceof PropertyWildCard wc) {
-            if (wildChoice.isEmpty()) {
+            if (wildChoice == null) {
                 return false;
             }
-            PropertyColor choice = wildChoice.get();
-            return wc.allows(choice) && choice == anchorColor;
+            return wc.allows(wildChoice) && wildChoice == anchorColor;
         }
         return false;
     }
 
-    public boolean tryAdd(Card card, Optional<PropertyColor> wildChoice) {
+    public boolean tryAdd(Card card) {
+        return tryAdd(card, null);
+    }
+
+    public boolean tryAdd(Card card, PropertyColor wildChoice) {
         if (!canAdd(card, wildChoice)) {
             return false;
         }
@@ -116,9 +121,8 @@ public final class PropertySet {
             return true;
         }
         if (card instanceof PropertyWildCard wc) {
-            PropertyColor choice = wildChoice.orElseThrow();
             cards.add(wc);
-            wildAssignments.put(wc.id(), choice);
+            wildAssignments.put(wc.id(), wildChoice);
             return true;
         }
         return false;
@@ -141,43 +145,75 @@ public final class PropertySet {
      * Gameplay must spend a House action card via {@code Player.trySpendHouseCardOnRow}.
      */
     public boolean canBuildHouseStructure() {
-        return isComplete()
-                && !PropertyColor.isRailOrUtility(anchorColor)
-                && !house
-                && !hotel;
+        return validateHouseStructure().isSuccess();
     }
 
     /**
      * Structural rules: complete, not rail/util, has house, no hotel.
      */
     public boolean canBuildHotelStructure() {
-        return isComplete()
-                && !PropertyColor.isRailOrUtility(anchorColor)
-                && house
-                && !hotel;
+        return validateHotelStructure().isSuccess();
+    }
+
+    public OperationResult<Void> validateHouseStructure() {
+        if (!isComplete()) {
+            return OperationResult.fail(OperationError.NOT_COMPLETE_SET, "row is not a complete property set");
+        }
+        if (PropertyColor.isRailOrUtility(anchorColor)) {
+            return OperationResult.fail(
+                    OperationError.RAIL_OR_UTILITY_CANNOT_BUILD,
+                    "railroad and utility sets cannot receive houses");
+        }
+        if (house) {
+            return OperationResult.fail(OperationError.HOUSE_ALREADY_BUILT, "row already has a house");
+        }
+        if (hotel) {
+            return OperationResult.fail(OperationError.HOTEL_ALREADY_BUILT, "row already has a hotel");
+        }
+        return OperationResult.ok();
+    }
+
+    public OperationResult<Void> validateHotelStructure() {
+        if (!isComplete()) {
+            return OperationResult.fail(OperationError.NOT_COMPLETE_SET, "row is not a complete property set");
+        }
+        if (PropertyColor.isRailOrUtility(anchorColor)) {
+            return OperationResult.fail(
+                    OperationError.RAIL_OR_UTILITY_CANNOT_BUILD,
+                    "railroad and utility sets cannot receive hotels");
+        }
+        if (!house) {
+            return OperationResult.fail(OperationError.HOUSE_REQUIRED_BEFORE_HOTEL, "a house is required before a hotel");
+        }
+        if (hotel) {
+            return OperationResult.fail(OperationError.HOTEL_ALREADY_BUILT, "row already has a hotel");
+        }
+        return OperationResult.ok();
     }
 
     /**
      * Places a house token on this row after the House action card has been spent by the engine/player layer.
      * Does not validate the House card itself.
      */
-    public boolean tryPlaceHouseStructuralOnly() {
-        if (!canBuildHouseStructure()) {
-            return false;
+    public OperationResult<Void> tryPlaceHouseStructuralOnly() {
+        OperationResult<Void> validation = validateHouseStructure();
+        if (!validation.isSuccess()) {
+            return validation;
         }
         house = true;
-        return true;
+        return OperationResult.ok();
     }
 
     /**
      * Places a hotel token after the Hotel action card has been spent and a house already exists.
      */
-    public boolean tryPlaceHotelStructuralOnly() {
-        if (!canBuildHotelStructure()) {
-            return false;
+    public OperationResult<Void> tryPlaceHotelStructuralOnly() {
+        OperationResult<Void> validation = validateHotelStructure();
+        if (!validation.isSuccess()) {
+            return validation;
         }
         hotel = true;
-        return true;
+        return OperationResult.ok();
     }
 
     /**

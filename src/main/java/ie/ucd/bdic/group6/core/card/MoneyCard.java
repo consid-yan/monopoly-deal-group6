@@ -22,4 +22,9 @@ public final class MoneyCard extends Card {
     public OptionalInt bankValueM() {
         return OptionalInt.of(valueM);
     }
+
+    @Override
+    public int faceValueM() {
+        return valueM;
+    }
 }

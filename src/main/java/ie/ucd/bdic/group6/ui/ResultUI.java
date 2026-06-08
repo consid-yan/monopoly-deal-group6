@@ -82,7 +82,13 @@ public class ResultUI {
         String winnerName = winner == null ? snapshot.winnerPlayerId() : winner.displayName();
 
         List<String> lines = new ArrayList<>();
-        lines.add(winnerName + " wins by completing " + completedSets + " full property sets.");
+        if (completedSets >= 3) {
+            lines.add(winnerName + " wins by completing " + completedSets + " full property sets.");
+        } else if (!snapshot.forfeitedPlayerIds().isEmpty()) {
+            lines.add(winnerName + " wins as the last active player after forfeits.");
+        } else {
+            lines.add(winnerName + " wins as the last active player.");
+        }
         lines.add("Final score: " + completedSets + " full sets, Bank $" + bankTotalValueM + "M.");
         if (snapshot.forfeitedPlayerIds().isEmpty()) {
             lines.add("No players forfeited.");

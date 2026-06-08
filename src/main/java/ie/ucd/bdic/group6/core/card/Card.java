@@ -1,5 +1,8 @@
 package ie.ucd.bdic.group6.core.card;
 
+import ie.ucd.bdic.group6.core.card.deck.StandardDeckFactory;
+import ie.ucd.bdic.group6.core.rules.CardBankingRule;
+
 import java.util.Objects;
 
 /**
@@ -31,9 +34,14 @@ public sealed abstract class Card permits MoneyCard, PropertyCard, PropertyWildC
 
     /**
      * Value in millions (M) when this card is placed in a bank pile, or empty if it cannot be banked as money.
-     * For official banking rules (what may enter a bank pile, paying from bank, etc.), see {@link CardBankSupport}.
+     * For official banking rules (what may enter a bank pile, paying from bank, etc.), see {@link CardBankingRule}.
      */
     public abstract java.util.OptionalInt bankValueM();
+
+    /**
+     * Printed corner value used when a card is paid as an asset.
+     */
+    public abstract int faceValueM();
 
     @Override
     public final boolean equals(Object o) {

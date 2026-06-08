@@ -154,11 +154,11 @@
                     </TitledPane>
                     <TitledPane animated="false" collapsible="false" styleClass="help-rule-pane" text="Winning and Result">
                         <TextFlow styleClass="help-rule-flow">
-                            <Text styleClass="help-rule-text" text="The game continuously checks for the "/>
+                            <Text styleClass="help-rule-text" text="The game checks the "/>
                             <Text styleClass="help-rule-text" text="win condition"/>
-                            <Text styleClass="help-rule-text" text=". When a player completes "/>
+                            <Text styleClass="help-rule-text" text=" only when a turn is ending. If a player still has "/>
                             <Text styleClass="help-rule-quantity" text="3 full property sets"/>
-                            <Text styleClass="help-rule-text" text=", gameplay ends and the "/>
+                            <Text styleClass="help-rule-text" text=" at that end-of-turn check, gameplay ends and the "/>
                             <Text styleClass="help-rule-good" text="winner is displayed"/>
                             <Text styleClass="help-rule-text" text="."/>
                         </TextFlow>

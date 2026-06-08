@@ -1,7 +1,7 @@
 package ie.ucd.bdic.group6.core.engine;
 
 import ie.ucd.bdic.group6.core.card.Card;
-import ie.ucd.bdic.group6.core.card.Deck;
+import ie.ucd.bdic.group6.core.card.deck.Deck;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,24 +34,19 @@ public final class ActiveGameState {
         discardPile.add(Objects.requireNonNull(card, "card"));
     }
 
-    public List<Card> discardPileView() {
-        return List.copyOf(discardPile);
-    }
-
     public int discardPileSize() {
         return discardPile.size();
     }
 
-    public boolean reshuffleDiscardIntoDraw() {
+    public void reshuffleDiscardIntoDraw() {
         if (!drawPile.isEmpty() || discardPile.isEmpty()) {
-            return false;
+            return;
         }
         java.util.Collections.shuffle(discardPile);
         for (int i = discardPile.size() - 1; i >= 0; i--) {
             drawPile.discardToBottom(discardPile.get(i));
         }
         discardPile.clear();
-        return true;
     }
 
     public Optional<String> winnerPlayerId() {
@@ -95,11 +90,6 @@ public final class ActiveGameState {
                 .toList();
     }
 
-    public boolean hasPendingDebtForPlayer(String playerId) {
-        return pendingDebts.stream()
-                .anyMatch(debt -> debt.isPending() && debt.debtorPlayerId().equals(playerId));
-    }
-
     public void clearAllDebtsForPlayer(String playerId) {
         pendingDebts.removeIf(debt -> debt.debtorPlayerId().equals(playerId)
                 || debt.creditorPlayerId().equals(playerId));
@@ -126,21 +116,9 @@ public final class ActiveGameState {
                 .findFirst();
     }
 
-    public List<PendingTrade> pendingTradesForProposer(String proposerPlayerId) {
-        return pendingTrades.stream()
-                .filter(trade -> trade.isPending() && trade.proposerPlayerId().equals(proposerPlayerId))
-                .toList();
-    }
-
     public List<PendingTrade> pendingTradesForTarget(String targetPlayerId) {
         return pendingTrades.stream()
                 .filter(trade -> trade.isPending() && trade.targetPlayerId().equals(targetPlayerId))
-                .toList();
-    }
-
-    public List<PendingTrade> pendingTradesInvolving(String playerId) {
-        return pendingTrades.stream()
-                .filter(trade -> trade.isPending() && trade.involvesPlayer(playerId))
                 .toList();
     }
 

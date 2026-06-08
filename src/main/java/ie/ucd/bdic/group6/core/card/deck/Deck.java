@@ -1,4 +1,7 @@
-package ie.ucd.bdic.group6.core.card;
+package ie.ucd.bdic.group6.core.card.deck;
+
+import ie.ucd.bdic.group6.core.card.Card;
+import ie.ucd.bdic.group6.core.rules.DrawPileRule;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -77,32 +80,8 @@ public final class Deck {
     }
 
     /**
-     * Discards in chronological order: first discarded card becomes deepest at the bottom of the draw pile.
-     */
-    public void discardAllToBottom(Collection<Card> chronologicalDiscards) {
-        Objects.requireNonNull(chronologicalDiscards, "chronologicalDiscards");
-        List<Card> list = chronologicalDiscards instanceof List<Card> l ? new ArrayList<>(l) : new ArrayList<>(chronologicalDiscards);
-        for (int i = list.size() - 1; i >= 0; i--) {
-            discardToBottom(list.get(i));
-        }
-    }
-
-    public void shuffle(Random random) {
-        List<Card> tmp = new ArrayList<>(cards);
-        Collections.shuffle(tmp, random);
-        cards.clear();
-        for (Card c : tmp) {
-            cards.addLast(c);
-        }
-    }
-
-    public void shuffle() {
-        shuffle(new Random());
-    }
-
-    /**
      * Rebuilds an empty draw pile from {@code source}, shuffled. Used when the draw pile is exhausted and the
-     * session discard pile is reshuffled into a new draw pile (see {@link DrawPileRules}).
+     * session discard pile is reshuffled into a new draw pile (see {@link DrawPileRule}).
      */
     public void refillFromShuffled(Collection<Card> source, Random random) {
         Objects.requireNonNull(source, "source");

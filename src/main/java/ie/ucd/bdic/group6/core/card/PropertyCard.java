@@ -28,6 +28,16 @@ public final class PropertyCard extends Card {
         return requiredToComplete;
     }
 
+    @Override
+    public int faceValueM() {
+        return switch (color) {
+            case BROWN, LIGHT_BLUE -> 1;
+            case PINK, ORANGE, RAILROAD, UTILITY -> 2;
+            case RED, YELLOW -> 3;
+            case GREEN, DARK_BLUE -> 4;
+        };
+    }
+
     /**
      * Property cards are never banked as money in Monopoly Deal (only used as properties or payment as properties).
      */

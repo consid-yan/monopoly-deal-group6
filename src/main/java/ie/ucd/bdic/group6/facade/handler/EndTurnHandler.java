@@ -3,7 +3,7 @@ package ie.ucd.bdic.group6.facade.handler;
 
 import ie.ucd.bdic.group6.command.EndTurnCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
-import ie.ucd.bdic.group6.facade.model.GameResult;
+import ie.ucd.bdic.group6.facade.model.CommandResult;
 
 public class EndTurnHandler extends AbstractCommandHandler<EndTurnCommand> {
     public EndTurnHandler(ActionExecutor actionExecutor) {
@@ -16,7 +16,7 @@ public class EndTurnHandler extends AbstractCommandHandler<EndTurnCommand> {
     }
 
     @Override
-    protected GameResult execute(EndTurnCommand command) {
-        return GameResult.success(actionExecutor.executeEndTurn(command));
+    protected CommandResult execute(EndTurnCommand command) {
+        return CommandResult.success(actionExecutor.executeEndTurn(command));
     }
 }

@@ -150,11 +150,6 @@ public final class PendingTrade {
             return this;
         }
 
-        public Builder createdAt(Instant createdAt) {
-            this.createdAt = createdAt;
-            return this;
-        }
-
         public PendingTrade build() {
             return new PendingTrade(this);
         }

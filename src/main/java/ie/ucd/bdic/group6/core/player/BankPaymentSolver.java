@@ -1,7 +1,7 @@
 package ie.ucd.bdic.group6.core.player;
 
 import ie.ucd.bdic.group6.core.card.Card;
-import ie.ucd.bdic.group6.core.card.CardBankSupport;
+import ie.ucd.bdic.group6.core.rules.CardBankingRule;
 import ie.ucd.bdic.group6.core.common.OperationError;
 import ie.ucd.bdic.group6.core.common.OperationResult;
 
@@ -16,15 +16,8 @@ import java.util.Objects;
  */
 public final class BankPaymentSolver {
 
-    private BankPaymentSolver() {
-    }
-
     public static int totalBankPaymentValue(List<Card> bankCards) {
-        return bankCards.stream().mapToInt(CardBankSupport::bankPaymentValueM).sum();
-    }
-
-    public static boolean canCoverWithBank(List<Card> bankCards, int dueM) {
-        return totalBankPaymentValue(bankCards) >= dueM;
+        return bankCards.stream().mapToInt(CardBankingRule::bankPaymentValueM).sum();
     }
 
     /**
@@ -50,7 +43,7 @@ public final class BankPaymentSolver {
             for (int i = 0; i < n; i++) {
                 if ((mask & (1 << i)) != 0) {
                     Card c = usable.get(i);
-                    sum += CardBankSupport.bankPaymentValueM(c);
+                    sum += CardBankingRule.bankPaymentValueM(c);
                     chosen.add(c);
                 }
             }

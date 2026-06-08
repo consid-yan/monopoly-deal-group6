@@ -1,4 +1,4 @@
-package ie.ucd.bdic.group6.core.card;
+package ie.ucd.bdic.group6.core.card.deck;
 
 /**
  * Declarative composition of the standard 106-card play deck. {@link StandardDeckFactory} reads these constants.
@@ -38,7 +38,4 @@ public final class DeckDefinition {
 
     public static final int RENT_DUAL_EACH = 2;
     public static final int RENT_WILD = 3;
-
-    private DeckDefinition() {
-    }
 }

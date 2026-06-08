@@ -3,7 +3,7 @@ package ie.ucd.bdic.group6.facade.handler;
 
 import ie.ucd.bdic.group6.command.PayDebtCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
-import ie.ucd.bdic.group6.facade.model.GameResult;
+import ie.ucd.bdic.group6.facade.model.CommandResult;
 
 public class PayDebtHandler extends AbstractCommandHandler<PayDebtCommand> {
     public PayDebtHandler(ActionExecutor actionExecutor) {
@@ -16,7 +16,7 @@ public class PayDebtHandler extends AbstractCommandHandler<PayDebtCommand> {
     }
 
     @Override
-    protected GameResult execute(PayDebtCommand command) {
-        return GameResult.success(actionExecutor.executePayDebt(command));
+    protected CommandResult execute(PayDebtCommand command) {
+        return CommandResult.success(actionExecutor.executePayDebt(command));
     }
 }

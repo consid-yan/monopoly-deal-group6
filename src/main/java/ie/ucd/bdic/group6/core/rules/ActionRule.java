@@ -3,6 +3,7 @@ package ie.ucd.bdic.group6.core.rules;
 import ie.ucd.bdic.group6.core.card.ActionCard;
 import ie.ucd.bdic.group6.core.card.ActionType;
 import ie.ucd.bdic.group6.core.card.Card;
+import ie.ucd.bdic.group6.core.common.OperationResult;
 import ie.ucd.bdic.group6.core.engine.GameSession;
 import ie.ucd.bdic.group6.core.engine.SessionStatus;
 import ie.ucd.bdic.group6.core.engine.TurnManager;
@@ -38,10 +39,6 @@ public class ActionRule {
         if (!turnManager.isActivePlayer(playerId)) {
             throw new InvalidGameStateException("NOT_ACTIVE_PLAYER", "It is not this player's turn");
         }
-    }
-
-    public void requireActionAvailable(TurnManager turnManager) {
-        requireActionsAvailable(turnManager, 1);
     }
 
     public void requireActionsAvailable(TurnManager turnManager, int requiredActions) {
@@ -165,13 +162,13 @@ public class ActionRule {
     public void validateImprovementTarget(PropertySet row, ActionType improvementType) {
         Objects.requireNonNull(row, "row");
         Objects.requireNonNull(improvementType, "improvementType");
-        boolean canBuild = improvementType == ActionType.HOUSE
-                ? row.canBuildHouseStructure()
-                : row.canBuildHotelStructure();
-        if (!canBuild) {
+        OperationResult<Void> validation = improvementType == ActionType.HOUSE
+                ? row.validateHouseStructure()
+                : row.validateHotelStructure();
+        if (!validation.isSuccess()) {
             throw new GameException(
-                    "NOT_COMPLETE_SET",
-                    "row cannot accept " + improvementType + " improvement right now");
+                    validation.errorCode().map(Enum::name).orElse("OPERATION_FAILED"),
+                    validation.errorMessage().orElse("row cannot accept " + improvementType + " improvement right now"));
         }
     }
 

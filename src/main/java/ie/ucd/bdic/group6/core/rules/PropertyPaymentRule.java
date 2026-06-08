@@ -1,21 +1,19 @@
-package ie.ucd.bdic.group6.core.property;
+package ie.ucd.bdic.group6.core.rules;
 
 import ie.ucd.bdic.group6.core.card.Card;
 import ie.ucd.bdic.group6.core.card.PropertyCard;
 import ie.ucd.bdic.group6.core.card.PropertyWildCard;
 import ie.ucd.bdic.group6.core.common.OperationError;
 import ie.ucd.bdic.group6.core.common.OperationResult;
+import ie.ucd.bdic.group6.core.property.PropertySet;
 
 import java.util.Objects;
 
 /**
- * Monopoly Deal property-as-payment rules: value credited toward a debt is the rent of the row
- * containing the card at payment time (before the card leaves the row).
+ * Monopoly Deal property-as-payment rules: value credited toward a debt is the printed corner
+ * value of the card being paid. The row is still required to prove the card is currently in play.
  */
-public final class PropertyPaymentSupport {
-
-    private PropertyPaymentSupport() {
-    }
+public final class PropertyPaymentRule {
 
     public static boolean canUseAsPropertyPayment(Card card) {
         return card instanceof PropertyCard || card instanceof PropertyWildCard;
@@ -38,6 +36,6 @@ public final class PropertyPaymentSupport {
             return OperationResult.fail(
                     OperationError.CARD_NOT_ON_PROPERTY_BOARD, "card is not on the given property row: " + card.id());
         }
-        return OperationResult.ok(row.rentValue());
+        return OperationResult.ok(card.faceValueM());
     }
 }

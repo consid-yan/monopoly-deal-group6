@@ -50,10 +50,6 @@ public class PlayCardCommand extends AbstractCommand {
 
     @Deprecated
     public String getPropertyRowIndex() {
-        String stableRowId = this.getTargetPropertyRowId();
-        if (stableRowId != null && !stableRowId.isEmpty()) {
-            return stableRowId;
-        }
         Object legacyIndex = payload().get("propertyRowIndex");
         return legacyIndex == null ? null : legacyIndex.toString();
     }
