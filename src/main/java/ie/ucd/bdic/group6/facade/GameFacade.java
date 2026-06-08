@@ -17,7 +17,7 @@ import ie.ucd.bdic.group6.facade.handler.RejoinSessionHandler;
 import ie.ucd.bdic.group6.facade.handler.RespondActionHandler;
 import ie.ucd.bdic.group6.facade.handler.RespondTradeHandler;
 import ie.ucd.bdic.group6.facade.handler.StartGameHandler;
-import ie.ucd.bdic.group6.facade.model.GameResult;
+import ie.ucd.bdic.group6.facade.model.CommandResult;
 
 import java.util.List;
 import java.util.Map;
@@ -58,14 +58,14 @@ public class GameFacade implements Facade {
     }
 
     @Override
-    public GameResult execute(Command command) {
+    public CommandResult execute(Command command) {
         if (command == null) {
-            return GameResult.failure("COMMAND_REQUIRED", "Command must not be null");
+            return CommandResult.failure("COMMAND_REQUIRED", "Command must not be null");
         }
 
         CommandHandler<? extends Command> handler = handlers.get(command.getClass());
         if (handler == null) {
-            return GameResult.failure(
+            return CommandResult.failure(
                     "UNSUPPORTED_COMMAND",
                     "Unsupported command type: " + command.getCommandType()
             );
@@ -75,7 +75,7 @@ public class GameFacade implements Facade {
     }
 
     @SuppressWarnings("unchecked")
-    private <C extends Command> GameResult dispatch(CommandHandler<C> handler, Command command) {
+    private <C extends Command> CommandResult dispatch(CommandHandler<C> handler, Command command) {
         return handler.handle((C) command);
     }
 }

@@ -1,5 +1,7 @@
-package ie.ucd.bdic.group6.core.card;
+package ie.ucd.bdic.group6.core.rules;
 
+import ie.ucd.bdic.group6.core.card.Card;
+import ie.ucd.bdic.group6.core.card.deck.Deck;
 import ie.ucd.bdic.group6.core.common.OperationError;
 import ie.ucd.bdic.group6.core.common.OperationResult;
 
@@ -12,10 +14,7 @@ import java.util.Random;
  * Session-level draw/discard rules. The engine owns the discard pile list; this class defines how to refill an empty
  * {@link Deck} from that list.
  */
-public final class DrawPileRules {
-
-    private DrawPileRules() {
-    }
+public final class DrawPileRule {
 
     /**
      * When the draw pile is empty, moves all cards from {@code discardPile} into {@code drawPile} after shuffling.

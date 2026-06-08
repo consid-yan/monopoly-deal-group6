@@ -5,8 +5,6 @@ import ie.ucd.bdic.group6.core.player.Player;
 import ie.ucd.bdic.group6.core.property.PropertyColor;
 import org.junit.jupiter.api.Test;
 
-import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -17,25 +15,25 @@ class WinRuleTest {
     @Test
     void playerWithThreeCompleteSetsOnTheirTurnWins() {
         Player player = playerWithCompleteSets(PropertyColor.BROWN, PropertyColor.DARK_BLUE, PropertyColor.UTILITY);
-        assertTrue(winRule.hasWon(player, true));
+        assertTrue(winRule.hasWon(player));
     }
 
     @Test
-    void playerWithThreeCompleteSetsOnOpponentTurnDoesNotWin() {
+    void playerWithThreeCompleteSetsOffTurnSatisfiesWinRule() {
         Player player = playerWithCompleteSets(PropertyColor.BROWN, PropertyColor.DARK_BLUE, PropertyColor.UTILITY);
-        assertFalse(winRule.hasWon(player, false));
+        assertTrue(winRule.hasWon(player));
     }
 
     @Test
     void playerWithTwoCompleteSetsDoesNotWin() {
         Player player = playerWithCompleteSets(PropertyColor.BROWN, PropertyColor.DARK_BLUE);
-        assertFalse(winRule.hasWon(player, true));
+        assertFalse(winRule.hasWon(player));
     }
 
     @Test
     void playerWithNoSetsDoesNotWin() {
         Player player = new Player("p1", "Player 1");
-        assertFalse(winRule.hasWon(player, true));
+        assertFalse(winRule.hasWon(player));
     }
 
     private Player playerWithCompleteSets(PropertyColor... colors) {
@@ -48,13 +46,13 @@ class WinRuleTest {
                 PropertyCard card = new PropertyCard(id, color.name(), color, need);
                 player.addToHand(card);
                 if (i == 0) {
-                    player.tryStartNewPropertyRowFromHand(color, card, Optional.empty());
+                    player.tryStartNewPropertyRowFromHand(color, card);
                 } else {
                     var row = player.propertyBoard().rowsView().stream()
-                            .filter(r -> r.anchorColor() == color && r.canAdd(card, Optional.empty()))
+                            .filter(r -> r.anchorColor() == color && r.canAdd(card))
                             .findFirst()
                             .orElseThrow();
-                    player.tryPlayPropertyFromHand(row, card, Optional.empty());
+                    player.tryPlayPropertyFromHand(row, card);
                 }
             }
         }

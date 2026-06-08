@@ -9,13 +9,12 @@ import ie.ucd.bdic.group6.core.property.PropertySet;
 import org.junit.jupiter.api.Test;
 
 import java.util.EnumSet;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class PlayerPropertyTransfersTest {
+class PropertyTransferServiceTest {
 
     @Test
     void transferToNewRowCreatesReceiverRowAndMovesCard() {
@@ -23,10 +22,10 @@ class PlayerPropertyTransfersTest {
         Player receiver = new Player("p2", "Receiver");
         PropertyCard b1 = new PropertyCard("b1", "B1", PropertyColor.BROWN, 2);
         sender.addToHand(b1);
-        sender.tryStartNewPropertyRowFromHand(PropertyColor.BROWN, b1, Optional.empty());
+        sender.tryStartNewPropertyRowFromHand(PropertyColor.BROWN, b1);
 
-        var moved = PlayerPropertyTransfers.transferPropertyCardToNewRow(
-                sender, receiver, b1, PropertyColor.BROWN, Optional.empty());
+        var moved = PropertyTransferService.transferPropertyCardToNewRow(
+                sender, receiver, b1, PropertyColor.BROWN);
 
         assertTrue(moved.isSuccess());
         assertTrue(moved.value().orElseThrow().contains(b1));
@@ -42,12 +41,12 @@ class PlayerPropertyTransfersTest {
         String rowId = row.rowId();
         PropertyCard b1 = new PropertyCard("b1", "B1", PropertyColor.BROWN, 2);
         PropertyCard b2 = new PropertyCard("b2", "B2", PropertyColor.BROWN, 2);
-        assertTrue(row.tryAdd(b1, Optional.empty()));
-        assertTrue(row.tryAdd(b2, Optional.empty()));
-        assertTrue(row.tryPlaceHouseStructuralOnly());
+        assertTrue(row.tryAdd(b1));
+        assertTrue(row.tryAdd(b2));
+        assertTrue(row.tryPlaceHouseStructuralOnly().isSuccess());
         sender.propertyBoard().addRow(row);
 
-        var moved = PlayerPropertyTransfers.transferEntireRow(sender, receiver, row);
+        var moved = PropertyTransferService.transferEntireRow(sender, receiver, row);
         assertTrue(moved.isSuccess());
         assertEquals(rowId, moved.value().orElseThrow().rowId());
         assertTrue(moved.value().orElseThrow().hasHouse());
@@ -61,11 +60,11 @@ class PlayerPropertyTransfersTest {
         Player receiver = new Player("r", "Receiver");
         PropertyCard card = new PropertyCard("p1", "Brown 1", PropertyColor.BROWN, 2);
         sender.addToHand(card);
-        sender.tryStartNewPropertyRowFromHand(PropertyColor.BROWN, card, Optional.empty());
+        sender.tryStartNewPropertyRowFromHand(PropertyColor.BROWN, card);
 
         PropertySet receiverRow = receiver.propertyBoard().startNewRow(PropertyColor.BROWN);
-        OperationResult<Void> result = PlayerPropertyTransfers.transferPropertyCardToRow(
-                sender, receiver, card, receiverRow, Optional.empty());
+        OperationResult<Void> result = PropertyTransferService.transferPropertyCardToRow(
+                sender, receiver, card, receiverRow);
 
         assertTrue(result.isSuccess());
         assertFalse(sender.propertyBoard().findRowContaining(card).isPresent());
@@ -79,8 +78,8 @@ class PlayerPropertyTransfersTest {
         PropertyCard card = new PropertyCard("p1", "Brown 1", PropertyColor.BROWN, 2);
         PropertySet receiverRow = receiver.propertyBoard().startNewRow(PropertyColor.BROWN);
 
-        OperationResult<Void> result = PlayerPropertyTransfers.transferPropertyCardToRow(
-                sender, receiver, card, receiverRow, Optional.empty());
+        OperationResult<Void> result = PropertyTransferService.transferPropertyCardToRow(
+                sender, receiver, card, receiverRow);
 
         assertFalse(result.isSuccess());
         assertEquals(OperationError.CARD_NOT_ON_PROPERTY_BOARD, result.errorCode().orElseThrow());
@@ -92,11 +91,11 @@ class PlayerPropertyTransfersTest {
         Player receiver = new Player("r", "Receiver");
         PropertyCard brown = new PropertyCard("p1", "Brown 1", PropertyColor.BROWN, 2);
         sender.addToHand(brown);
-        sender.tryStartNewPropertyRowFromHand(PropertyColor.BROWN, brown, Optional.empty());
+        sender.tryStartNewPropertyRowFromHand(PropertyColor.BROWN, brown);
 
         PropertySet redRow = receiver.propertyBoard().startNewRow(PropertyColor.RED);
-        OperationResult<Void> result = PlayerPropertyTransfers.transferPropertyCardToRow(
-                sender, receiver, brown, redRow, Optional.empty());
+        OperationResult<Void> result = PropertyTransferService.transferPropertyCardToRow(
+                sender, receiver, brown, redRow);
 
         assertFalse(result.isSuccess());
         assertEquals(OperationError.RECEIVER_ROW_REJECTS_CARD, result.errorCode().orElseThrow());
@@ -109,11 +108,11 @@ class PlayerPropertyTransfersTest {
         Player receiver = new Player("r", "Receiver");
         PropertyCard card = new PropertyCard("p1", "Brown 1", PropertyColor.BROWN, 2);
         sender.addToHand(card);
-        sender.tryStartNewPropertyRowFromHand(PropertyColor.BROWN, card, Optional.empty());
+        sender.tryStartNewPropertyRowFromHand(PropertyColor.BROWN, card);
 
         PropertySet orphanRow = new PropertySet(PropertyColor.BROWN);
-        OperationResult<Void> result = PlayerPropertyTransfers.transferPropertyCardToRow(
-                sender, receiver, card, orphanRow, Optional.empty());
+        OperationResult<Void> result = PropertyTransferService.transferPropertyCardToRow(
+                sender, receiver, card, orphanRow);
 
         assertFalse(result.isSuccess());
         assertEquals(OperationError.ROW_NOT_OWNED_BY_PLAYER, result.errorCode().orElseThrow());
@@ -126,11 +125,11 @@ class PlayerPropertyTransfersTest {
         PropertyWildCard wild = new PropertyWildCard("w1", "P/O",
                 EnumSet.of(PropertyColor.PINK, PropertyColor.ORANGE), 2);
         sender.addToHand(wild);
-        sender.tryStartNewPropertyRowFromHand(PropertyColor.PINK, wild, Optional.of(PropertyColor.PINK));
+        sender.tryStartNewPropertyRowFromHand(PropertyColor.PINK, wild, PropertyColor.PINK);
 
         PropertySet receiverRow = receiver.propertyBoard().startNewRow(PropertyColor.PINK);
-        OperationResult<Void> result = PlayerPropertyTransfers.transferPropertyCardToRow(
-                sender, receiver, wild, receiverRow, Optional.of(PropertyColor.PINK));
+        OperationResult<Void> result = PropertyTransferService.transferPropertyCardToRow(
+                sender, receiver, wild, receiverRow, PropertyColor.PINK);
 
         assertTrue(result.isSuccess());
         assertTrue(receiverRow.contains(wild));

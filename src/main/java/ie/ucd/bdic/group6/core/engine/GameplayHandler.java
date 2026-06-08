@@ -9,10 +9,10 @@ import ie.ucd.bdic.group6.core.card.PropertyWildCard;
 import ie.ucd.bdic.group6.core.common.OperationError;
 import ie.ucd.bdic.group6.core.common.OperationResult;
 import ie.ucd.bdic.group6.core.player.Player;
-import ie.ucd.bdic.group6.core.player.PlayerPropertyTransfers;
-import ie.ucd.bdic.group6.core.player.PlayerSnapshot;
+import ie.ucd.bdic.group6.core.player.PropertyTransferService;
+import ie.ucd.bdic.group6.core.player.PlayerRollbackSnapshot;
 import ie.ucd.bdic.group6.core.property.PropertyColor;
-import ie.ucd.bdic.group6.core.property.PropertyRentSupport;
+import ie.ucd.bdic.group6.core.rules.PropertyRentRule;
 import ie.ucd.bdic.group6.core.property.PropertySet;
 import ie.ucd.bdic.group6.core.rules.ActionRule;
 import ie.ucd.bdic.group6.exception.GameException;
@@ -99,18 +99,11 @@ public final class GameplayHandler {
         }
 
         PropertyColor anchorColor = resolvePropertyColor(command, card);
-        Optional<PropertyColor> wildChoice = card instanceof PropertyWildCard
-                ? Optional.of(anchorColor)
-                : Optional.empty();
+        PropertyColor wildChoice = card instanceof PropertyWildCard ? anchorColor : null;
 
-        Optional<Integer> rowIndex = resolvePropertyRowIndex(command);
-        if (rowIndex.isPresent()) {
-            List<PropertySet> rows = player.propertyBoard().rowsView();
-            int index = rowIndex.get();
-            if (index < 0 || index >= rows.size()) {
-                throw new GameException("PROPERTY_ROW_NOT_FOUND", "No property row exists at index " + index);
-            }
-            PropertySet row = rows.get(index);
+        Optional<PropertySet> selectedRow = resolveOwnedPropertyRow(command, player);
+        if (selectedRow.isPresent()) {
+            PropertySet row = selectedRow.get();
             if (!row.canAdd(card, wildChoice)) {
                 throw new GameException(
                         "RECEIVER_ROW_REJECTS_CARD",
@@ -143,8 +136,9 @@ public final class GameplayHandler {
         actionRule.validatePlayableAsAction(actionCard.actionType());
         switch (actionCard.actionType()) {
             case PASS_GO -> {
-                discardActionFromHand(player, actionCard, activeGame);
+                removeActionFromHand(player, actionCard);
                 host.drawCards(player, activeGame, 2);
+                activeGame.discard(actionCard);
             }
             case DEBT_COLLECTOR -> executeDebtCollector(command, session, player, actionCard, activeGame);
             case ITS_MY_BIRTHDAY -> executeItsMyBirthday(session, player, actionCard, activeGame);
@@ -215,14 +209,14 @@ public final class GameplayHandler {
                 .filter(row -> row.canAdd(card, placement.wildChoice()))
                 .findFirst();
         if (receiverRow.isPresent()) {
-            return PlayerPropertyTransfers.transferPropertyCardToRow(
+            return PropertyTransferService.transferPropertyCardToRow(
                     sender,
                     receiver,
                     card,
                     receiverRow.get(),
                     placement.wildChoice());
         }
-        OperationResult<PropertySet> moved = PlayerPropertyTransfers.transferPropertyCardToNewRow(
+        OperationResult<PropertySet> moved = PropertyTransferService.transferPropertyCardToNewRow(
                 sender,
                 receiver,
                 card,
@@ -230,7 +224,7 @@ public final class GameplayHandler {
                 placement.wildChoice());
         if (!moved.isSuccess()) {
             return OperationResult.fail(
-                    moved.errorCode().orElse(OperationError.GENERIC),
+                    moved.errorCode().orElse(OperationError.INTERNAL_ERROR),
                     moved.errorMessage().orElse(""));
         }
         return OperationResult.ok();
@@ -296,7 +290,7 @@ public final class GameplayHandler {
             ActionCard actionCard,
             ActiveGameState activeGame) {
         PropertyColor rentColor = resolveRentColor(command, player, actionCard);
-        int rentM = PropertyRentSupport.maxRentForAnchor(player.propertyBoard(), rentColor);
+        int rentM = PropertyRentRule.maxRentForAnchor(player.propertyBoard(), rentColor);
         actionRule.validateRentAmount(rentColor, rentM);
         ActionCard doubleRent = resolveDoubleRentCard(command, player);
         if (doubleRent != null) {
@@ -450,8 +444,8 @@ public final class GameplayHandler {
             throw new GameException("CANNOT_STEAL_FROM_COMPLETE_SET", "Forced Deal cannot swap cards from complete sets");
         }
 
-        PlayerSnapshot actorSnapshot = actor.snapshot();
-        PlayerSnapshot targetSnapshot = target.snapshot();
+        PlayerRollbackSnapshot actorSnapshot = actor.snapshot();
+        PlayerRollbackSnapshot targetSnapshot = target.snapshot();
         try {
             host.requireSuccess(movePropertyCardToBestRow(actor, target, offered.card(), offered.row()));
             host.requireSuccess(movePropertyCardToBestRow(target, actor, requested.card(), requested.row()));
@@ -471,7 +465,7 @@ public final class GameplayHandler {
         if (!row.isComplete()) {
             throw new GameException("NO_COMPLETE_SET", "Deal Breaker requires a complete target set");
         }
-        host.requireSuccess(PlayerPropertyTransfers.transferEntireRow(target, actor, row));
+        host.requireSuccess(PropertyTransferService.transferEntireRow(target, actor, row));
     }
 
     private ActionCard resolveDoubleRentCard(PlayCardCommand command, Player player) {
@@ -492,7 +486,7 @@ public final class GameplayHandler {
             return color;
         }
 
-        List<PropertyColor> availableColors = PropertyRentSupport.rentableAnchors(player.propertyBoard()).stream()
+        List<PropertyColor> availableColors = PropertyRentRule.rentableAnchors(player.propertyBoard()).stream()
                 .filter(color -> actionCard.actionType() == ActionType.WILD_RENT
                         || actionCard.rentColorOptions().contains(color))
                 .toList();
@@ -521,21 +515,16 @@ public final class GameplayHandler {
     }
 
     private PropertySet resolveImprovementRow(PlayCardCommand command, Player player) {
-        Optional<Integer> rowIndex = resolvePropertyRowIndex(command);
-        if (rowIndex.isPresent()) {
-            List<PropertySet> rows = player.propertyBoard().rowsView();
-            int index = rowIndex.get();
-            if (index < 0 || index >= rows.size()) {
-                throw new GameException("PROPERTY_ROW_NOT_FOUND", "No property row exists at index " + index);
-            }
-            return rows.get(index);
+        Optional<PropertySet> selectedRow = resolveOwnedPropertyRow(command, player);
+        if (selectedRow.isPresent()) {
+            return selectedRow.get();
         }
 
         String rawColor = command.getPropertyColor();
         if (rawColor == null || rawColor.isBlank()) {
             throw new InvalidCommandException(
                     "PROPERTY_ROW_REQUIRED",
-                    "propertyRowIndex or propertyColor is required");
+                    "targetPropertyRowId or propertyColor is required");
         }
         PropertyColor color = host.parsePropertyColor(rawColor);
         return player.propertyBoard().rowsView().stream()
@@ -547,10 +536,14 @@ public final class GameplayHandler {
     }
 
     private void discardActionFromHand(Player player, ActionCard actionCard, ActiveGameState activeGame) {
+        removeActionFromHand(player, actionCard);
+        activeGame.discard(actionCard);
+    }
+
+    private void removeActionFromHand(Player player, ActionCard actionCard) {
         if (!player.hand().remove(actionCard)) {
             throw new GameException("CARD_NOT_IN_HAND", "Action card is not in hand: " + actionCard.id());
         }
-        activeGame.discard(actionCard);
     }
 
     private PropertyColor resolvePropertyColor(PlayCardCommand command, Card card) {
@@ -573,8 +566,27 @@ public final class GameplayHandler {
         return color;
     }
 
+    private Optional<PropertySet> resolveOwnedPropertyRow(PlayCardCommand command, Player player) {
+        String rowId = command.getTargetPropertyRowId();
+        if (rowId != null && !rowId.isBlank()) {
+            return Optional.of(player.findPropertyRow(rowId)
+                    .orElseThrow(() -> new GameException(
+                            "PROPERTY_ROW_NOT_FOUND",
+                            "No property row exists with id " + rowId)));
+        }
+        return resolvePropertyRowIndex(command)
+                .map(index -> {
+                    List<PropertySet> rows = player.propertyBoard().rowsView();
+                    if (index < 0 || index >= rows.size()) {
+                        throw new GameException("PROPERTY_ROW_NOT_FOUND", "No property row exists at index " + index);
+                    }
+                    return rows.get(index);
+                });
+    }
+
     private Optional<Integer> resolvePropertyRowIndex(PlayCardCommand command) {
-        String rawIndex = command.getPropertyRowIndex();
+        Object legacyIndex = command.payload().get("propertyRowIndex");
+        String rawIndex = legacyIndex == null ? null : legacyIndex.toString();
         if (rawIndex == null || rawIndex.isBlank()) {
             return Optional.empty();
         }
@@ -590,16 +602,16 @@ public final class GameplayHandler {
 
     private PropertyPlacement placementForTransferredProperty(Card card, PropertySet sourceRow) {
         if (card instanceof PropertyCard propertyCard) {
-            return new PropertyPlacement(propertyCard.color(), Optional.empty());
+            return new PropertyPlacement(propertyCard.color(), null);
         }
         if (card instanceof PropertyWildCard wildCard) {
             PropertyColor choice = sourceRow.wildAssignmentFor(wildCard.id())
                     .orElse(sourceRow.anchorColor());
-            return new PropertyPlacement(choice, Optional.of(choice));
+            return new PropertyPlacement(choice, choice);
         }
         throw new GameException("PROPERTY_CANNOT_PAY_DEBT", "Only property cards can be transferred as properties");
     }
 
-    private record PropertyPlacement(PropertyColor anchorColor, Optional<PropertyColor> wildChoice) {
+    private record PropertyPlacement(PropertyColor anchorColor, PropertyColor wildChoice) {
     }
 }

@@ -2,7 +2,7 @@ package ie.ucd.bdic.group6.facade.handler;
 
 import ie.ucd.bdic.group6.command.ProcessDisconnectTimeoutsCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
-import ie.ucd.bdic.group6.facade.model.GameResult;
+import ie.ucd.bdic.group6.facade.model.CommandResult;
 
 public class ProcessDisconnectTimeoutsHandler extends AbstractCommandHandler<ProcessDisconnectTimeoutsCommand> {
     public ProcessDisconnectTimeoutsHandler(ActionExecutor actionExecutor) {
@@ -15,7 +15,7 @@ public class ProcessDisconnectTimeoutsHandler extends AbstractCommandHandler<Pro
     }
 
     @Override
-    protected GameResult execute(ProcessDisconnectTimeoutsCommand command) {
-        return GameResult.success(actionExecutor.executeProcessDisconnectTimeouts(command));
+    protected CommandResult execute(ProcessDisconnectTimeoutsCommand command) {
+        return CommandResult.success(actionExecutor.executeProcessDisconnectTimeouts(command));
     }
 }

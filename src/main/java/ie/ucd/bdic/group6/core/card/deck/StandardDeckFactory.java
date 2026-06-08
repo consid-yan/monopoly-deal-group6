@@ -1,5 +1,6 @@
-package ie.ucd.bdic.group6.core.card;
+package ie.ucd.bdic.group6.core.card.deck;
 
+import ie.ucd.bdic.group6.core.card.*;
 import ie.ucd.bdic.group6.core.property.PropertyColor;
 
 import java.util.ArrayList;

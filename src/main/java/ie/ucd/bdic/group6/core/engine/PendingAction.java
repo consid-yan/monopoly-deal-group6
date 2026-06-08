@@ -164,7 +164,7 @@ public final class PendingAction {
     }
 
     public static final class Builder {
-        private String actionId = UUID.randomUUID().toString();
+        private final String actionId = UUID.randomUUID().toString();
         private String actorPlayerId;
         private ActionType actionType;
         private String actionCardId;
@@ -233,11 +233,6 @@ public final class PendingAction {
 
         public Builder targetPlayerIds(List<String> targetPlayerIds) {
             this.targetPlayerIds = targetPlayerIds;
-            return this;
-        }
-
-        public Builder createdAt(Instant createdAt) {
-            this.createdAt = createdAt;
             return this;
         }
 

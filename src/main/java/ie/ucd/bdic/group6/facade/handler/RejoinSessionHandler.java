@@ -3,7 +3,7 @@ package ie.ucd.bdic.group6.facade.handler;
 
 import ie.ucd.bdic.group6.command.RejoinSessionCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
-import ie.ucd.bdic.group6.facade.model.GameResult;
+import ie.ucd.bdic.group6.facade.model.CommandResult;
 
 public class RejoinSessionHandler extends AbstractCommandHandler<RejoinSessionCommand> {
     public RejoinSessionHandler(ActionExecutor actionExecutor) {
@@ -16,7 +16,7 @@ public class RejoinSessionHandler extends AbstractCommandHandler<RejoinSessionCo
     }
 
     @Override
-    protected GameResult execute(RejoinSessionCommand command) {
-        return GameResult.success(actionExecutor.executeRejoinSession(command));
+    protected CommandResult execute(RejoinSessionCommand command) {
+        return CommandResult.success(actionExecutor.executeRejoinSession(command));
     }
 }

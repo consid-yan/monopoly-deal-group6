@@ -3,6 +3,7 @@ package ie.ucd.bdic.group6.core.property;
 import ie.ucd.bdic.group6.core.card.Card;
 import ie.ucd.bdic.group6.core.common.OperationError;
 import ie.ucd.bdic.group6.core.common.OperationResult;
+import ie.ucd.bdic.group6.core.rules.PropertyPaymentRule;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -11,7 +12,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * All property rows in front of one player.
@@ -19,13 +19,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public final class PropertyBoard {
 
     private final List<PropertySet> rows = new ArrayList<>();
-    private final List<Runnable> mutateListeners = new CopyOnWriteArrayList<>();
-
-    public void addMutationListener(Runnable listener) {
-        if (listener != null) {
-            mutateListeners.add(listener);
-        }
-    }
 
     public List<PropertySet> rowsView() {
         return Collections.unmodifiableList(rows);
@@ -50,19 +43,21 @@ public final class PropertyBoard {
         }
         PropertySet row = new PropertySet(anchorColor);
         rows.add(row);
-        fireChanged();
         return row;
     }
 
     public void addRow(PropertySet row) {
         rows.add(Objects.requireNonNull(row, "row"));
-        fireChanged();
     }
 
     /**
      * Adds {@code card} to an existing row owned by this board.
      */
-    public OperationResult<Void> tryAddCardToRow(PropertySet row, Card card, Optional<PropertyColor> wildChoice) {
+    public OperationResult<Void> tryAddCardToRow(PropertySet row, Card card) {
+        return tryAddCardToRow(row, card, null);
+    }
+
+    public OperationResult<Void> tryAddCardToRow(PropertySet row, Card card, PropertyColor wildChoice) {
         Objects.requireNonNull(row, "row");
         Objects.requireNonNull(card, "card");
         if (!ownsRow(row)) {
@@ -75,7 +70,6 @@ public final class PropertyBoard {
             return OperationResult.fail(
                     OperationError.PROPERTY_TYPE_MISMATCH, "card cannot join this row with given wild choice");
         }
-        fireChanged();
         return OperationResult.ok();
     }
 
@@ -95,7 +89,6 @@ public final class PropertyBoard {
     public boolean removeCardFromRows(Card card) {
         for (PropertySet row : rows) {
             if (row.remove(card)) {
-                fireChanged();
                 return true;
             }
         }
@@ -103,16 +96,12 @@ public final class PropertyBoard {
     }
 
     public boolean removeRow(PropertySet row) {
-        if (rows.remove(row)) {
-            fireChanged();
-            return true;
-        }
-        return false;
+        return rows.remove(row);
     }
 
     public boolean canPayWithPropertyCard(Card card) {
         return findRowContaining(card)
-                .filter(row -> PropertyPaymentSupport.canUseAsPropertyPayment(card, row))
+                .filter(row -> PropertyPaymentRule.canUseAsPropertyPayment(card, row))
                 .isPresent();
     }
 
@@ -125,12 +114,10 @@ public final class PropertyBoard {
 
     public void compactEmptyRows() {
         rows.removeIf(r -> r.size() == 0);
-        fireChanged();
     }
 
     public void clearAllRows() {
         rows.clear();
-        fireChanged();
     }
 
     public Set<PropertyColor> distinctCompletedAnchorColors() {
@@ -145,11 +132,5 @@ public final class PropertyBoard {
 
     public int completeDistinctColorCount() {
         return distinctCompletedAnchorColors().size();
-    }
-
-    private void fireChanged() {
-        for (Runnable r : mutateListeners) {
-            r.run();
-        }
     }
 }

@@ -5,6 +5,7 @@ import ie.ucd.bdic.group6.command.CommandType;
 
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Pos;
@@ -42,6 +43,8 @@ public class GameUI {
     private Label selectedCardSummaryLabel;
     @FXML
     private HBox opponentsRow;
+    @FXML
+    private ScrollPane handScrollPane;
     @FXML
     private HBox handCardsHBox;
     @FXML
@@ -164,11 +167,14 @@ public class GameUI {
             return;
         }
         List<UiSnapshot.CardView> paymentOptions = snapshot.currentPlayer(context.playerId())
-                .map(UiSnapshot.PlayerView::visibleCards)
+                .map(UiSnapshot.PlayerView::paymentCards)
                 .orElse(List.of());
-        List<UiSnapshot.CardView> selected = chooseCards("Select Payment Cards", paymentOptions, 1);
-        if (selected.isEmpty()) {
-            return;
+        List<UiSnapshot.CardView> selected = List.of();
+        if (!paymentOptions.isEmpty()) {
+            selected = chooseCards("Select Payment Cards ($" + debt.get().amountM() + "M due)", paymentOptions, 1);
+            if (selected.isEmpty()) {
+                return;
+            }
         }
 
         Map<String, Object> payload = basePayload();
@@ -179,23 +185,32 @@ public class GameUI {
 
     @FXML
     private void proposeTrade() {
-        List<UiSnapshot.PlayerView> targets = snapshot.opponents(context.playerId()).stream()
+        UiSnapshot.PlayerView currentPlayer = snapshot.currentPlayer(context.playerId()).orElse(null);
+        if (currentPlayer == null) {
+            showFeedback("You are not in this game.");
+            return;
+        }
+        List<UiSnapshot.PlayerView> eligibleOpponents = snapshot.opponents(context.playerId()).stream()
                 .filter(player -> !player.defeated())
+                .toList();
+        List<UiSnapshot.CardView> ownCards = currentPlayer.visibleCards().stream()
+                .filter(offered -> eligibleOpponents.stream()
+                        .anyMatch(player -> !player.supportedTradeRequestsFor(offered, currentPlayer).isEmpty()))
+                .toList();
+        Optional<UiSnapshot.CardView> offered = chooseOne("Offer Card", ownCards, this::cardChoiceLabel);
+        if (offered.isEmpty()) {
+            return;
+        }
+        List<UiSnapshot.PlayerView> targets = eligibleOpponents.stream()
+                .filter(player -> !player.supportedTradeRequestsFor(offered.get(), currentPlayer).isEmpty())
                 .toList();
         Optional<UiSnapshot.PlayerView> target = chooseOne("Trade Target", targets, UiSnapshot.PlayerView::displayName);
         if (target.isEmpty()) {
             return;
         }
-        List<UiSnapshot.CardView> ownCards = snapshot.currentPlayer(context.playerId())
-                .map(UiSnapshot.PlayerView::visibleCards)
-                .orElse(List.of());
-        Optional<UiSnapshot.CardView> offered = chooseOne("Offer Card", ownCards, this::cardChoiceLabel);
-        if (offered.isEmpty()) {
-            return;
-        }
         Optional<UiSnapshot.CardView> requested = chooseOne(
                 "Request Card",
-                target.get().visibleCards(),
+                target.get().supportedTradeRequestsFor(offered.get(), currentPlayer),
                 this::cardChoiceLabel);
         if (requested.isEmpty()) {
             return;
@@ -472,9 +487,8 @@ public class GameUI {
                 chooseDoubleRent(card).ifPresent(doubleRent -> payload.put("doubleRentCardId", doubleRent.id()));
                 yield true;
             }
-            case "HOUSE", "HOTEL" -> chooseOwnPropertyRow().map(row -> {
-                int index = snapshot.currentPlayer(context.playerId()).orElseThrow().propertyRows().indexOf(row);
-                payload.put("propertyRowIndex", Integer.toString(index));
+            case "HOUSE", "HOTEL" -> chooseOwnPropertyRow(card.actionType()).map(row -> {
+                payload.put("targetPropertyRowId", row.rowId());
                 payload.put("propertyColor", row.anchorColor());
                 return true;
             }).orElse(false);
@@ -497,13 +511,9 @@ public class GameUI {
     }
 
     private Optional<String> chooseRentColor(UiSnapshot.CardView card) {
-        List<String> colors = card.rentColorOptions().isEmpty()
-                ? snapshot.currentPlayer(context.playerId()).stream()
-                        .flatMap(player -> player.propertyRows().stream())
-                        .map(UiSnapshot.PropertyRowView::anchorColor)
-                        .distinct()
-                        .toList()
-                : card.rentColorOptions();
+        List<String> colors = snapshot.currentPlayer(context.playerId())
+                .map(player -> player.rentableColorsFor(card))
+                .orElse(List.of());
         if (colors.size() == 1) {
             return Optional.of(colors.getFirst());
         }
@@ -526,11 +536,11 @@ public class GameUI {
     }
 
     private boolean configureSlyDeal(Map<String, Object> payload) {
-        Optional<UiSnapshot.PlayerView> target = chooseTargetPlayer();
+        Optional<UiSnapshot.PlayerView> target = chooseTargetPlayer(player -> !player.stealablePropertyCards().isEmpty());
         if (target.isEmpty()) {
             return false;
         }
-        Optional<UiSnapshot.CardView> card = chooseOne("Steal Property", target.get().propertyCards(), this::cardChoiceLabel);
+        Optional<UiSnapshot.CardView> card = chooseOne("Steal Property", target.get().stealablePropertyCards(), this::cardChoiceLabel);
         if (card.isEmpty()) {
             return false;
         }
@@ -540,16 +550,22 @@ public class GameUI {
     }
 
     private boolean configureForcedDeal(Map<String, Object> payload) {
-        Optional<UiSnapshot.PlayerView> target = chooseTargetPlayer();
+        List<UiSnapshot.CardView> ownProperties = snapshot.currentPlayer(context.playerId())
+                .map(UiSnapshot.PlayerView::stealablePropertyCards)
+                .orElse(List.of());
+        Optional<UiSnapshot.CardView> offered = chooseOne("Offer Property", ownProperties, this::cardChoiceLabel);
+        if (offered.isEmpty()) {
+            return false;
+        }
+        Optional<UiSnapshot.PlayerView> target = chooseTargetPlayer(player -> !player.stealablePropertyCards().isEmpty());
         if (target.isEmpty()) {
             return false;
         }
-        List<UiSnapshot.CardView> ownProperties = snapshot.currentPlayer(context.playerId())
-                .map(UiSnapshot.PlayerView::propertyCards)
-                .orElse(List.of());
-        Optional<UiSnapshot.CardView> offered = chooseOne("Offer Property", ownProperties, this::cardChoiceLabel);
-        Optional<UiSnapshot.CardView> requested = chooseOne("Request Property", target.get().propertyCards(), this::cardChoiceLabel);
-        if (offered.isEmpty() || requested.isEmpty()) {
+        Optional<UiSnapshot.CardView> requested = chooseOne(
+                "Request Property",
+                target.get().stealablePropertyCards(),
+                this::cardChoiceLabel);
+        if (requested.isEmpty()) {
             return false;
         }
         payload.put("targetPlayerId", target.get().playerId());
@@ -559,7 +575,8 @@ public class GameUI {
     }
 
     private boolean configureDealBreaker(Map<String, Object> payload) {
-        Optional<UiSnapshot.PlayerView> target = chooseTargetPlayer();
+        Optional<UiSnapshot.PlayerView> target = chooseTargetPlayer(player -> player.propertyRows().stream()
+                .anyMatch(UiSnapshot.PropertyRowView::complete));
         if (target.isEmpty()) {
             return false;
         }
@@ -576,20 +593,29 @@ public class GameUI {
     }
 
     private Optional<UiSnapshot.PlayerView> chooseTargetPlayer() {
+        return chooseTargetPlayer(_ -> true);
+    }
+
+    private Optional<UiSnapshot.PlayerView> chooseTargetPlayer(Predicate<UiSnapshot.PlayerView> filter) {
         List<UiSnapshot.PlayerView> targets = snapshot.opponents(context.playerId()).stream()
                 .filter(player -> !player.defeated())
+                .filter(filter)
                 .toList();
         return chooseOne("Target Player", targets, UiSnapshot.PlayerView::displayName);
     }
 
-    private Optional<UiSnapshot.PropertyRowView> chooseOwnPropertyRow() {
+    private Optional<UiSnapshot.PropertyRowView> chooseOwnPropertyRow(String actionType) {
         return chooseOne("Property Set", snapshot.currentPlayer(context.playerId())
-                        .map(UiSnapshot.PlayerView::propertyRows)
+                        .map(player -> player.improvableRows(actionType))
                         .orElse(List.of()),
                 value -> value.label() + " (" + value.rowId() + ")");
     }
 
     private void respondToTrade(boolean accepted) {
+        if (!isYourTurn()) {
+            showFeedback("Trade responses are available on your turn.");
+            return;
+        }
         List<UiSnapshot.PendingTradeView> trades = snapshot.pendingTradesForTarget(context.playerId());
         Optional<UiSnapshot.PendingTradeView> trade = chooseOne("Trade Response", trades,
                 value -> snapshot.playerName(value.proposerPlayerId()));
@@ -836,8 +862,11 @@ public class GameUI {
             selectedCardSummaryLabel.setText("Select a card from your private hand, then choose Play Selected.");
             return;
         }
+        String pendingTradeHint = hasPendingTradeForCurrentPlayer()
+                ? " Trade responses are available on your turn."
+                : "";
         selectedCardSummaryLabel.setText("Waiting for " + snapshot.playerName(snapshot.activePlayerId())
-                + ". You can still answer pending trade, debt, or action prompts.");
+                + ". You can still answer pending debt or action prompts." + pendingTradeHint);
     }
 
     private String selectedCardHint(UiSnapshot.CardView card) {
@@ -873,10 +902,10 @@ public class GameUI {
         setButtonDisabled(endTurnButton, !yourTurn);
         setButtonDisabled(proposeTradeButton, !yourTurn || !canProposeTrade());
         setButtonDisabled(payDebtButton, !hasPendingDebtForCurrentPlayer());
-        setButtonDisabled(acceptTradeButton, !hasPendingTradeForCurrentPlayer());
-        setButtonDisabled(rejectTradeButton, !hasPendingTradeForCurrentPlayer());
+        setButtonDisabled(acceptTradeButton, !canRespondToTrade());
+        setButtonDisabled(rejectTradeButton, !canRespondToTrade());
         setButtonDisabled(acceptActionButton, !hasPendingActionForCurrentPlayer());
-        setButtonDisabled(rejectActionButton, !hasPendingActionForCurrentPlayer());
+        setButtonDisabled(rejectActionButton, !canRejectActionWithJustSayNo());
     }
 
     private boolean isYourTurn() {
@@ -895,8 +924,17 @@ public class GameUI {
         return !snapshot.pendingTradesForTarget(context.playerId()).isEmpty();
     }
 
+    private boolean canRespondToTrade() {
+        return snapshot != null && snapshot.canRespondToTrade(context.playerId());
+    }
+
     private boolean hasPendingActionForCurrentPlayer() {
         return !snapshot.pendingActionsAwaiting(context.playerId()).isEmpty();
+    }
+
+    private boolean canRejectActionWithJustSayNo() {
+        return hasPendingActionForCurrentPlayer()
+                && snapshot.currentPlayerHand().stream().anyMatch(card -> card.isAction("JUST_SAY_NO"));
     }
 
     private void setButtonDisabled(Button button, boolean disabled) {

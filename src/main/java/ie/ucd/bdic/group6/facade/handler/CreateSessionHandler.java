@@ -3,7 +3,7 @@ package ie.ucd.bdic.group6.facade.handler;
 
 import ie.ucd.bdic.group6.command.CreateSessionCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
-import ie.ucd.bdic.group6.facade.model.GameResult;
+import ie.ucd.bdic.group6.facade.model.CommandResult;
 
 public class CreateSessionHandler extends AbstractCommandHandler<CreateSessionCommand> {
     public CreateSessionHandler(ActionExecutor actionExecutor) {
@@ -16,7 +16,7 @@ public class CreateSessionHandler extends AbstractCommandHandler<CreateSessionCo
     }
 
     @Override
-    protected GameResult execute(CreateSessionCommand command) {
-        return GameResult.success(actionExecutor.executeCreateSession(command));
+    protected CommandResult execute(CreateSessionCommand command) {
+        return CommandResult.success(actionExecutor.executeCreateSession(command));
     }
 }

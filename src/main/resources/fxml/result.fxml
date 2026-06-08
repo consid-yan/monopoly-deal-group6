@@ -30,7 +30,7 @@
     <center>
         <VBox spacing="12.0" BorderPane.alignment="CENTER">
             <padding>
-                <Insets bottom="16.0" left="48.0" right="48.0" top="0.0"/>
+                <Insets bottom="16.0" left="48.0" right="48.0"/>
             </padding>
             <GridPane hgap="18.0" styleClass="surface-panel" vgap="12.0">
                 <columnConstraints>
@@ -44,7 +44,7 @@
                 <Label styleClass="result-field-label" text="Completed Property Sets" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
                 <TextField fx:id="completedSetsField" editable="false" promptText="Completed Property Sets" styleClass="result-value-field" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
                 <Label styleClass="result-field-label" text="Win Condition" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-                <Label maxWidth="Infinity" styleClass="result-readout" text="Complete 3 full property sets" wrapText="true" GridPane.columnIndex="1" GridPane.columnSpan="3" GridPane.rowIndex="1"/>
+                <Label maxWidth="Infinity" styleClass="result-readout" text="Complete 3 full property sets at turn end, or remain after forfeits" wrapText="true" GridPane.columnIndex="1" GridPane.columnSpan="3" GridPane.rowIndex="1"/>
             </GridPane>
             <TitledPane animated="false" collapsible="false" maxWidth="Infinity" prefHeight="240.0" text="Player Summary">
                 <ListView fx:id="playerSummaryList" focusTraversable="false" prefHeight="210.0" prefWidth="840.0" styleClass="readonly-list">

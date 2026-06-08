@@ -4,7 +4,7 @@ import ie.ucd.bdic.group6.command.CreateSessionCommand;
 import ie.ucd.bdic.group6.command.JoinSessionCommand;
 import ie.ucd.bdic.group6.command.StartGameCommand;
 import ie.ucd.bdic.group6.core.snapshot.SessionSnapshot;
-import ie.ucd.bdic.group6.facade.model.GameResult;
+import ie.ucd.bdic.group6.facade.model.CommandResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -19,7 +19,7 @@ class GameFacadeTest {
     void defaultFacadeUsesOneSharedEngineAcrossHandlers() {
         GameFacade facade = new GameFacade();
 
-        GameResult created = facade.execute(new CreateSessionCommand(Map.of(
+        CommandResult created = facade.execute(new CreateSessionCommand(Map.of(
                 "hostPlayerId", "host",
                 "maxPlayers", 5
         )));
@@ -28,13 +28,13 @@ class GameFacadeTest {
         assertEquals("host", createdSnapshot.hostPlayerId());
         assertEquals(5, createdSnapshot.maxPlayers());
 
-        GameResult joined = facade.execute(new JoinSessionCommand(Map.of(
+        CommandResult joined = facade.execute(new JoinSessionCommand(Map.of(
                 "roomCode", createdSnapshot.roomCode(),
                 "playerId", "player2"
         )));
         assertTrue(joined.isSuccess());
 
-        GameResult started = facade.execute(new StartGameCommand(Map.of(
+        CommandResult started = facade.execute(new StartGameCommand(Map.of(
                 "sessionId", createdSnapshot.sessionId(),
                 "playerId", "host"
         )));
@@ -47,7 +47,7 @@ class GameFacadeTest {
     @Test
     void nullCommandReturnsFailure() {
         GameFacade facade = new GameFacade();
-        GameResult result = facade.execute(null);
+        CommandResult result = facade.execute(null);
         assertFalse(result.isSuccess());
         assertEquals("COMMAND_REQUIRED", result.getCode());
     }
@@ -55,7 +55,7 @@ class GameFacadeTest {
     @Test
     void gameExceptionIsWrappedIntoFailureResult() {
         GameFacade facade = new GameFacade();
-        GameResult result = facade.execute(new StartGameCommand(Map.of(
+        CommandResult result = facade.execute(new StartGameCommand(Map.of(
                 "sessionId", "nonexistent-session",
                 "playerId", "host"
         )));
@@ -66,7 +66,7 @@ class GameFacadeTest {
     @Test
     void missingRequiredFieldIsWrappedIntoFailureResult() {
         GameFacade facade = new GameFacade();
-        GameResult result = facade.execute(new CreateSessionCommand(Map.of()));
+        CommandResult result = facade.execute(new CreateSessionCommand(Map.of()));
         assertFalse(result.isSuccess());
         assertEquals("MISSING_REQUIRED_FIELD", result.getCode());
     }
@@ -74,7 +74,7 @@ class GameFacadeTest {
     @Test
     void joinNonexistentSessionReturnsFailure() {
         GameFacade facade = new GameFacade();
-        GameResult result = facade.execute(new JoinSessionCommand(Map.of(
+        CommandResult result = facade.execute(new JoinSessionCommand(Map.of(
                 "roomCode", "ZZZZZZ",
                 "playerId", "player1"
         )));

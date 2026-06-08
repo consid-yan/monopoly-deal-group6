@@ -249,11 +249,11 @@ The system shall enforce the standard Monopoly Deal hand-limit rule at the corre
 
 ### 4.1.6 Win Detection and Results
 
-**FR-30 Win Condition Evaluation**
-The system shall continuously evaluate whether any player has met the win condition.
+**FR-30 End-of-Turn Win Condition Evaluation**
+The system shall evaluate the win condition only at the end of a player's turn, after all required payments, action responses, trades, and hand-limit discards for that turn have been resolved.
 
 **FR-31 Standard Win Rule**
-The system shall declare a player the winner when that player completes **3 full property sets** according to the standard Monopoly Deal rules used by the project.
+The system shall declare a player the winner when that player still has **3 full property sets** at the end-of-turn win check according to the standard Monopoly Deal rules used by the project.
 
 **FR-32 Game Termination**
 Once a winner is declared, the system shall terminate active gameplay and reject further game actions.

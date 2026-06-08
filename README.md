@@ -107,7 +107,7 @@ The application is organized around a command-driven flow:
 1. `GameController` receives a `ControllerRequest`.
 2. `RequestMapper` converts request data into command records such as `CreateSessionCommand`, `JoinSessionCommand`, `StartGameCommand`, `PlayCardCommand`, `PayDebtCommand`, `ProposeTradeCommand`, `RespondTradeCommand`, `DiscardCardsCommand`, `EndTurnCommand`, and `RejoinSessionCommand`.
 3. `GameFacade` routes each command to a matching `CommandHandler`.
-4. Handlers return a `GameResult`.
+4. Handlers return a `CommandResult`.
 
 This flow allows UI and networking layers to submit player actions through the same application boundary while keeping game execution centralized.
 

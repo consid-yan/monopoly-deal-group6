@@ -2,13 +2,17 @@ package ie.ucd.bdic.group6.core.engine;
 
 import ie.ucd.bdic.group6.command.*;
 import ie.ucd.bdic.group6.core.card.*;
+import ie.ucd.bdic.group6.core.card.deck.Deck;
+import ie.ucd.bdic.group6.core.card.deck.StandardDeckFactory;
 import ie.ucd.bdic.group6.core.common.OperationResult;
+import ie.ucd.bdic.group6.core.player.BankPaymentSolver;
 import ie.ucd.bdic.group6.core.player.Player;
-import ie.ucd.bdic.group6.core.player.PlayerSnapshot;
+import ie.ucd.bdic.group6.core.player.PlayerRollbackSnapshot;
 import ie.ucd.bdic.group6.core.property.PropertyColor;
-import ie.ucd.bdic.group6.core.property.PropertyPaymentSupport;
+import ie.ucd.bdic.group6.core.rules.PropertyPaymentRule;
 import ie.ucd.bdic.group6.core.property.PropertySet;
 import ie.ucd.bdic.group6.core.rules.ActionRule;
+import ie.ucd.bdic.group6.core.rules.CardBankingRule;
 import ie.ucd.bdic.group6.core.rules.PaymentRule;
 import ie.ucd.bdic.group6.core.rules.WinRule;
 import ie.ucd.bdic.group6.core.snapshot.*;
@@ -57,7 +61,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         this.deckSupplier = Objects.requireNonNull(deckSupplier, "deckSupplier");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.gameplayHandler = new GameplayHandler(actionRule, this);
-        this.snapshotBuilder = new SessionSnapshotBuilder(winRule);
+        this.snapshotBuilder = new SessionSnapshotBuilder();
     }
 
     @Override
@@ -140,7 +144,6 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         for (int i = 0; i < actionCost; i++) {
             turnManager.recordAction();
         }
-        checkWin(session, player, activeGame.turnManager());
         return snapshot(session, playerId);
     }
 
@@ -155,27 +158,16 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         requireNotDefeated(session, creditor.id());
         List<String> paymentCardIds = readStringList(command.getPaymentCardIds());
 
-        int paymentValueM = paymentValueBeforeTransfer(debtor, paymentCardIds);
-        if (paymentValueM < debt.amountM()) {
+        DebtPaymentSelection payment = resolveDebtPayment(debtor, paymentCardIds);
+        int availableValueM = availableDebtPaymentValueM(debtor);
+        if (payment.totalValueM() < debt.amountM() && payment.totalValueM() < availableValueM) {
             throw new GameException(
                     "INSUFFICIENT_PAYMENT",
-                    "Selected cards total " + paymentValueM + "M but debt requires " + debt.amountM() + "M");
+                    "Selected cards total " + payment.totalValueM()
+                            + "M but debtor can still pay up to " + availableValueM + "M");
         }
 
-        PlayerSnapshot debtorSnapshot = debtor.snapshot();
-        PlayerSnapshot creditorSnapshot = creditor.snapshot();
-        try {
-            applyDebtPayment(debtor, creditor, paymentCardIds);
-        } catch (RuntimeException e) {
-            debtor.restore(debtorSnapshot);
-            creditor.restore(creditorSnapshot);
-            throw e;
-        }
-
-        debt.markAsPaid();
-        activeGame.removePendingDebt(debt);
-        Player activePlayer = requirePlayer(session, activeGame.turnManager().activePlayerId());
-        checkWin(session, activePlayer, activeGame.turnManager());
+        settleDebtWithSelectedCards(activeGame, debt, debtor, creditor, paymentCardIds);
         return snapshot(session, debtor.id());
     }
 
@@ -201,6 +193,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         if (offeredCardIds.isEmpty() || requestedCardIds.isEmpty()) {
             throw new InvalidCommandException("EMPTY_TRADE", "Trade must include offered and requested cards");
         }
+        validateTradeCardCounts(offeredCardIds, requestedCardIds);
         if (activeGame.hasPendingTradeInvolving(proposerId) || activeGame.hasPendingTradeInvolving(targetId)) {
             throw new GameException("PENDING_TRADE_EXISTS", "A player in this trade already has a pending trade");
         }
@@ -239,7 +232,6 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
             Player proposer = requirePlayer(session, trade.proposerPlayerId());
             Player responder = requirePlayer(session, responderId);
             acceptTrade(trade, proposer, responder);
-            checkWin(session, responder, activeGame.turnManager());
         } else {
             trade.reject();
         }
@@ -269,10 +261,9 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
 
         if (pendingAction.isComplete()) {
             gameplayHandler.applyResolvedPendingAction(session, activeGame, pendingAction);
+            clearUnpayableDebts(session, activeGame);
             activeGame.removePendingAction(pendingAction);
         }
-        Player activePlayer = requirePlayer(session, activeGame.turnManager().activePlayerId());
-        checkWin(session, activePlayer, activeGame.turnManager());
         return snapshot(session, responderId);
     }
 
@@ -306,6 +297,9 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
             throw new GameException("HAND_LIMIT_EXCEEDED", "Discard down to 7 cards before ending the turn");
         }
 
+        if (scanWinnersInJoinOrder(session)) {
+            return snapshot(session, playerId);
+        }
         cancelTradesAwaitingTarget(activeGame, playerId);
         String nextPlayerId = advanceToNextAvailableTurn(session);
         drawForTurnStart(session, nextPlayerId);
@@ -326,6 +320,16 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         requirePlayer(session, playerId);
         if (session.isDefeated(playerId)) {
             throw new InvalidGameStateException("PLAYER_FORFEITED", "This player has already forfeited the session");
+        }
+        if (session.status() == SessionStatus.ACTIVE
+                && session.disconnectedAt(playerId)
+                .map(disconnectedAt -> Duration.between(disconnectedAt, Instant.now(clock))
+                        .compareTo(DISCONNECTED_FORFEIT_AFTER) >= 0)
+                .orElse(false)) {
+            forfeitPlayer(session, playerId);
+            throw new InvalidGameStateException(
+                    "PLAYER_FORFEITED",
+                    "This player's reconnection window has expired");
         }
         session.markConnected(playerId);
         return snapshot(session, playerId);
@@ -408,8 +412,38 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         if (session.status() == SessionStatus.FINISHED) {
             return false;
         }
+        if (session.status() != SessionStatus.ACTIVE || session.activeGame().isEmpty()) {
+            return false;
+        }
         boolean changed = false;
         Instant now = Instant.now(clock);
+
+        for (String playerId : session.playerJoinOrder()) {
+            if (session.isDefeated(playerId)) {
+                continue;
+            }
+            Optional<Instant> disconnectedAt = session.disconnectedAt(playerId);
+            if (disconnectedAt.isPresent()
+                    && Duration.between(disconnectedAt.get(), now).compareTo(DISCONNECTED_TURN_SKIP_AFTER) >= 0) {
+                changed |= autoSettleDisconnectedPlayer(session, playerId);
+            }
+        }
+        for (String playerId : session.playerJoinOrder()) {
+            if (session.isDefeated(playerId)) {
+                continue;
+            }
+            Optional<Instant> disconnectedAt = session.disconnectedAt(playerId);
+            if (disconnectedAt.isPresent()
+                    && Duration.between(disconnectedAt.get(), now).compareTo(DISCONNECTED_TURN_SKIP_AFTER) >= 0
+                    && session.activeGame().isPresent()) {
+                changed |= autoPayDebtsForDebtor(session, requireActiveGame(session), playerId);
+            }
+        }
+
+        if (session.status() == SessionStatus.FINISHED) {
+            return changed;
+        }
+
         for (String playerId : session.playerJoinOrder()) {
             if (session.isDefeated(playerId)) {
                 continue;
@@ -438,9 +472,229 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
     private void skipDisconnectedActiveTurn(GameSession session) {
         ActiveGameState activeGame = requireActiveGame(session);
         String skippedPlayerId = activeGame.turnManager().activePlayerId();
+        autoSettleActiveTimeout(session, skippedPlayerId);
         cancelTradesAwaitingTarget(activeGame, skippedPlayerId);
+        autoDiscardHandDownToSeven(requirePlayer(session, skippedPlayerId), activeGame);
+        if (scanWinnersInJoinOrder(session)) {
+            return;
+        }
         String nextPlayerId = advanceToNextAvailableTurn(session);
         drawForTurnStart(session, nextPlayerId);
+    }
+
+    private boolean autoSettleDisconnectedPlayer(GameSession session, String playerId) {
+        if (session.status() != SessionStatus.ACTIVE || session.activeGame().isEmpty()) {
+            return false;
+        }
+        ActiveGameState activeGame = requireActiveGame(session);
+        boolean changed = false;
+        for (PendingAction pendingAction : activeGame.pendingActionsView()) {
+            if (!pendingAction.awaitsResponseFrom(playerId)) {
+                continue;
+            }
+            if (isMoneyAction(pendingAction.actionType())) {
+                pendingAction.accept(playerId);
+            } else {
+                pendingAction.reject(playerId);
+            }
+            changed = true;
+            if (pendingAction.isComplete()) {
+                gameplayHandler.applyResolvedPendingAction(session, activeGame, pendingAction);
+                changed |= clearUnpayableDebts(session, activeGame);
+                activeGame.removePendingAction(pendingAction);
+            }
+        }
+        changed |= autoPayDebtsForDebtor(session, activeGame, playerId);
+        return changed;
+    }
+
+    private void autoSettleActiveTimeout(GameSession session, String playerId) {
+        if (session.status() != SessionStatus.ACTIVE || session.activeGame().isEmpty()) {
+            return;
+        }
+        ActiveGameState activeGame = requireActiveGame(session);
+        autoSettleDisconnectedPlayer(session, playerId);
+        for (PendingAction pendingAction : activeGame.pendingActionsView()) {
+            if (!pendingAction.actorPlayerId().equals(playerId)) {
+                continue;
+            }
+            for (String targetPlayerId : pendingAction.targetPlayerIds()) {
+                if (pendingAction.awaitsResponseFrom(targetPlayerId)) {
+                    pendingAction.reject(targetPlayerId);
+                }
+            }
+            if (pendingAction.isComplete()) {
+                gameplayHandler.applyResolvedPendingAction(session, activeGame, pendingAction);
+                clearUnpayableDebts(session, activeGame);
+            }
+            activeGame.removePendingAction(pendingAction);
+        }
+        autoPayDebtsForDebtor(session, activeGame, playerId);
+        autoPayDebtsForCreditor(session, activeGame, playerId);
+    }
+
+    private boolean clearUnpayableDebts(GameSession session, ActiveGameState activeGame) {
+        boolean changed = false;
+        for (PendingDebt debt : activeGame.pendingDebtsView()) {
+            if (!debt.isPending()) {
+                continue;
+            }
+            if (session.isDefeated(debt.debtorPlayerId()) || session.isDefeated(debt.creditorPlayerId())) {
+                continue;
+            }
+            Player debtor = requirePlayer(session, debt.debtorPlayerId());
+            if (availableDebtPaymentValueM(debtor) > 0) {
+                continue;
+            }
+            debt.markAsPaid();
+            activeGame.removePendingDebt(debt);
+            changed = true;
+        }
+        return changed;
+    }
+
+    private boolean autoPayDebtsForDebtor(GameSession session, ActiveGameState activeGame, String debtorPlayerId) {
+        boolean changed = false;
+        for (PendingDebt debt : activeGame.pendingDebtsForDebtor(debtorPlayerId)) {
+            changed |= autoPayDebt(session, activeGame, debt);
+        }
+        return changed;
+    }
+
+    private void autoPayDebtsForCreditor(GameSession session, ActiveGameState activeGame, String creditorPlayerId) {
+        for (PendingDebt debt : activeGame.pendingDebtsForCreditor(creditorPlayerId)) {
+            autoPayDebt(session, activeGame, debt);
+        }
+    }
+
+    private boolean autoPayDebt(GameSession session, ActiveGameState activeGame, PendingDebt debt) {
+        if (!debt.isPending() || !activeGame.pendingDebtsView().contains(debt)) {
+            return false;
+        }
+        if (session.isDefeated(debt.debtorPlayerId()) || session.isDefeated(debt.creditorPlayerId())) {
+            debt.markAsPaid();
+            activeGame.removePendingDebt(debt);
+            return true;
+        }
+
+        Player debtor = requirePlayer(session, debt.debtorPlayerId());
+        Player creditor = requirePlayer(session, debt.creditorPlayerId());
+        List<String> paymentCardIds = chooseAutoPaymentCardIds(debtor, debt.amountM());
+        if (paymentCardIds.isEmpty()) {
+            debt.markAsPaid();
+            activeGame.removePendingDebt(debt);
+            return true;
+        }
+
+        settleDebtWithSelectedCards(activeGame, debt, debtor, creditor, paymentCardIds);
+        return true;
+    }
+
+    private List<String> chooseAutoPaymentCardIds(Player debtor, int amountM) {
+        List<Card> bankCards = debtor.bankView().stream()
+                .filter(card -> card.bankValueM().isPresent())
+                .toList();
+        int bankTotalM = BankPaymentSolver.totalBankPaymentValue(bankCards);
+        if (bankTotalM >= amountM) {
+            return cardIds(requireAutoPaymentSubset(BankPaymentSolver.suggestMinimalOverpaySubset(bankCards, amountM)));
+        }
+        List<String> paymentCardIds = new ArrayList<>(cardIds(bankCards));
+
+        int remainingM = amountM - bankTotalM;
+        List<PropertyPaymentCard> incompleteProperties = propertyPaymentCandidates(debtor, false);
+        int incompleteTotalM = propertyPaymentTotalM(incompleteProperties);
+        if (incompleteTotalM >= remainingM) {
+            paymentCardIds.addAll(propertyPaymentCardIds(minimalPropertyOverpaySubset(incompleteProperties, remainingM)));
+            return List.copyOf(paymentCardIds);
+        }
+        paymentCardIds.addAll(propertyPaymentCardIds(incompleteProperties));
+
+        remainingM -= incompleteTotalM;
+        List<PropertyPaymentCard> completeProperties = propertyPaymentCandidates(debtor, true);
+        int completeTotalM = propertyPaymentTotalM(completeProperties);
+        if (completeTotalM >= remainingM) {
+            paymentCardIds.addAll(propertyPaymentCardIds(minimalPropertyOverpaySubset(completeProperties, remainingM)));
+            return List.copyOf(paymentCardIds);
+        }
+        paymentCardIds.addAll(propertyPaymentCardIds(completeProperties));
+        return List.copyOf(paymentCardIds);
+    }
+
+    private List<PropertyPaymentCard> propertyPaymentCandidates(Player debtor, boolean completeRows) {
+        List<PropertyPaymentCard> candidates = new ArrayList<>();
+        for (PropertySet row : debtor.propertyBoard().rowsView()) {
+            if (row.isComplete() != completeRows) {
+                continue;
+            }
+            for (Card card : row.cardsView()) {
+                OperationResult<Integer> value = PropertyPaymentRule.paymentValueM(row, card);
+                if (value.isSuccess() && value.value().orElseThrow() > 0) {
+                    candidates.add(new PropertyPaymentCard(card, row, value.value().orElseThrow()));
+                }
+            }
+        }
+        return List.copyOf(candidates);
+    }
+
+    private List<PropertyPaymentCard> minimalPropertyOverpaySubset(List<PropertyPaymentCard> candidates, int dueM) {
+        if (dueM <= 0) {
+            return List.of();
+        }
+        int totalM = propertyPaymentTotalM(candidates);
+        if (totalM < dueM) {
+            return List.of();
+        }
+
+        Map<Integer, List<PropertyPaymentCard>> bestByTotal = new LinkedHashMap<>();
+        bestByTotal.put(0, List.of());
+        for (PropertyPaymentCard candidate : candidates) {
+            Map<Integer, List<PropertyPaymentCard>> snapshot = new LinkedHashMap<>(bestByTotal);
+            for (Map.Entry<Integer, List<PropertyPaymentCard>> entry : snapshot.entrySet()) {
+                int total = entry.getKey() + candidate.valueM();
+                if (bestByTotal.containsKey(total)) {
+                    continue;
+                }
+                List<PropertyPaymentCard> chosen = new ArrayList<>(entry.getValue());
+                chosen.add(candidate);
+                bestByTotal.put(total, List.copyOf(chosen));
+            }
+        }
+
+        int bestTotal = bestByTotal.keySet().stream()
+                .filter(total -> total >= dueM)
+                .min(Integer::compareTo)
+                .orElseThrow();
+        return bestByTotal.get(bestTotal);
+    }
+
+    private int propertyPaymentTotalM(List<PropertyPaymentCard> cards) {
+        return cards.stream().mapToInt(PropertyPaymentCard::valueM).sum();
+    }
+
+    private List<Card> requireAutoPaymentSubset(OperationResult<List<Card>> result) {
+        requireSuccess(result);
+        return result.value().orElse(List.of());
+    }
+
+    private List<String> cardIds(List<Card> cards) {
+        return cards.stream().map(Card::id).toList();
+    }
+
+    private List<String> propertyPaymentCardIds(List<PropertyPaymentCard> cards) {
+        return cards.stream().map(card -> card.card().id()).toList();
+    }
+
+    private boolean isMoneyAction(ActionType actionType) {
+        return switch (actionType) {
+            case DEBT_COLLECTOR, ITS_MY_BIRTHDAY,
+                    RENT_BROWN_OR_LIGHT_BLUE,
+                    RENT_PINK_OR_ORANGE,
+                    RENT_RED_OR_YELLOW,
+                    RENT_DARK_BLUE_OR_GREEN,
+                    RENT_RAILROAD_OR_UTILITY,
+                    WILD_RENT -> true;
+            default -> false;
+        };
     }
 
     private void forfeitPlayer(GameSession session, String playerId) {
@@ -520,8 +774,24 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         return matches.getFirst();
     }
 
-    private int paymentValueBeforeTransfer(Player debtor, List<String> paymentCardIds) {
-        return resolveDebtPayment(debtor, paymentCardIds).totalValueM();
+    private void settleDebtWithSelectedCards(
+            ActiveGameState activeGame,
+            PendingDebt debt,
+            Player debtor,
+            Player creditor,
+            List<String> paymentCardIds) {
+        PlayerRollbackSnapshot debtorSnapshot = debtor.snapshot();
+        PlayerRollbackSnapshot creditorSnapshot = creditor.snapshot();
+        try {
+            applyDebtPayment(debtor, creditor, paymentCardIds);
+        } catch (RuntimeException e) {
+            debtor.restore(debtorSnapshot);
+            creditor.restore(creditorSnapshot);
+            throw e;
+        }
+
+        debt.markAsPaid();
+        activeGame.removePendingDebt(debt);
     }
 
     private void applyDebtPayment(Player debtor, Player creditor, List<String> paymentCardIds) {
@@ -543,7 +813,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
 
     private DebtPaymentSelection resolveDebtPayment(Player debtor, List<String> paymentCardIds) {
         if (paymentCardIds.isEmpty()) {
-            throw new InvalidCommandException("PAYMENT_REQUIRED", "At least one payment card is required");
+            return new DebtPaymentSelection(List.of(), List.of(), 0);
         }
         Set<String> seen = new HashSet<>();
         List<Card> bankCards = new ArrayList<>();
@@ -560,8 +830,12 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
                 if (card.bankValueM().isEmpty()) {
                     throw new GameException("NON_BANKABLE_CARD", "Bank card has no payment value: " + card.id());
                 }
+                int valueM = CardBankingRule.bankPaymentValueM(card);
+                if (valueM <= 0) {
+                    throw new GameException("NON_PAYABLE_CARD", "Card has no payment value: " + card.id());
+                }
                 bankCards.add(card);
-                totalValueM += CardBankSupport.bankPaymentValueM(card);
+                totalValueM += valueM;
                 continue;
             }
 
@@ -569,14 +843,29 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
                     .orElseThrow(() -> new GameException(
                             "CARD_NOT_AVAILABLE_FOR_PAYMENT",
                             "Card is not in debtor bank or property board: " + cardId));
-            OperationResult<Integer> value = PropertyPaymentSupport.paymentValueM(
+            OperationResult<Integer> value = PropertyPaymentRule.paymentValueM(
                     propertyCard.row(),
                     propertyCard.card());
             requireSuccess(value);
-            propertyCards.add(new PropertyPaymentCard(propertyCard.card(), propertyCard.row()));
-            totalValueM += value.value().orElseThrow();
+            int valueM = value.value().orElseThrow();
+            if (valueM <= 0) {
+                throw new GameException("NON_PAYABLE_CARD", "Card has no payment value: " + propertyCard.card().id());
+            }
+            propertyCards.add(new PropertyPaymentCard(propertyCard.card(), propertyCard.row(), valueM));
+            totalValueM += valueM;
         }
         return new DebtPaymentSelection(List.copyOf(bankCards), List.copyOf(propertyCards), totalValueM);
+    }
+
+    private int availableDebtPaymentValueM(Player debtor) {
+        int bankTotalM = debtor.bankView().stream()
+                .filter(card -> card.bankValueM().isPresent())
+                .mapToInt(CardBankingRule::bankPaymentValueM)
+                .filter(value -> value > 0)
+                .sum();
+        int propertyTotalM = propertyPaymentTotalM(propertyPaymentCandidates(debtor, false))
+                + propertyPaymentTotalM(propertyPaymentCandidates(debtor, true));
+        return bankTotalM + propertyTotalM;
     }
 
     private void acceptTrade(PendingTrade trade, Player proposer, Player responder) {
@@ -584,8 +873,8 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         List<TradeCardSelection> requestedCards = resolveTradeCards(responder, trade.requestedCardIds());
         validateSupportedTrade(offeredCards, requestedCards);
 
-        PlayerSnapshot proposerSnapshot = proposer.snapshot();
-        PlayerSnapshot responderSnapshot = responder.snapshot();
+        PlayerRollbackSnapshot proposerSnapshot = proposer.snapshot();
+        PlayerRollbackSnapshot responderSnapshot = responder.snapshot();
         try {
             transferTradeCards(proposer, responder, offeredCards);
             transferTradeCards(responder, proposer, requestedCards);
@@ -624,7 +913,13 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
             }
             Optional<Card> bankCard = findBankCard(player, cardId);
             if (bankCard.isPresent()) {
-                selections.add(new TradeCardSelection(bankCard.get(), TradeCardKind.MONEY, null));
+                Card card = bankCard.get();
+                if (!(card instanceof MoneyCard)) {
+                    throw new GameException(
+                            "CARD_NOT_TRADEABLE",
+                            "Simplified trades can only use actual money cards from the bank: " + cardId);
+                }
+                selections.add(new TradeCardSelection(card, TradeCardKind.MONEY, null));
                 continue;
             }
             GameplayHandler.PropertyCardLocation propertyCard = gameplayHandler.findPropertyCardLocation(player, cardId)
@@ -642,6 +937,11 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
     private void validateSupportedTrade(
             List<TradeCardSelection> offeredCards,
             List<TradeCardSelection> requestedCards) {
+        if (offeredCards.size() != 1 || requestedCards.size() != 1) {
+            throw new GameException(
+                    "UNSUPPORTED_TRADE_CARD_COUNT",
+                    "Simplified trades must exchange exactly one card from each player");
+        }
         Set<TradeCardKind> offeredKinds = tradeKinds(offeredCards);
         Set<TradeCardKind> requestedKinds = tradeKinds(requestedCards);
         if (offeredKinds.size() != 1 || requestedKinds.size() != 1) {
@@ -662,6 +962,14 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
             kinds.add(selection.kind());
         }
         return kinds;
+    }
+
+    private void validateTradeCardCounts(List<String> offeredCardIds, List<String> requestedCardIds) {
+        if (offeredCardIds.size() != 1 || requestedCardIds.size() != 1) {
+            throw new InvalidCommandException(
+                    "UNSUPPORTED_TRADE_CARD_COUNT",
+                    "Simplified trades must exchange exactly one card from each player");
+        }
     }
 
     private Optional<Card> findBankCard(Player player, String cardId) {
@@ -742,6 +1050,17 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         }
     }
 
+    private void autoDiscardHandDownToSeven(Player player, ActiveGameState activeGame) {
+        while (player.hand().size() > 7) {
+            List<Card> cards = player.hand().copyCards();
+            Card card = cards.getLast();
+            if (!player.hand().remove(card)) {
+                throw new GameException("CARD_NOT_IN_HAND", "Card is not in hand: " + card.id());
+            }
+            activeGame.discard(card);
+        }
+    }
+
     private void drawForTurnStart(GameSession session, String playerId) {
         ActiveGameState activeGame = requireActiveGame(session);
         Player player = requirePlayer(session, playerId);
@@ -758,24 +1077,33 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
     @Override
     public void drawCards(Player player, ActiveGameState activeGame, int count) {
         Deck deck = activeGame.drawPile();
-        int before = player.hand().size();
         for (int i = 0; i < count; i++) {
             if (deck.isEmpty()) {
                 activeGame.reshuffleDiscardIntoDraw();
             }
-            deck.tryDraw().ifPresent(player::addToHand);
-        }
-        int drawn = player.hand().size() - before;
-        if (drawn < count) {
-            throw new GameException("DRAW_PILE_EXHAUSTED",
-                    "Expected " + count + " cards but only drew " + drawn + " — both piles exhausted");
+            Optional<Card> drawn = deck.tryDraw();
+            if (drawn.isEmpty()) {
+                return;
+            }
+            player.addToHand(drawn.orElseThrow());
         }
     }
 
-    private void checkWin(GameSession session, Player player, TurnManager turnManager) {
-        if (winRule.hasWon(player, turnManager.isActivePlayer(player.id()))) {
-            session.finish(player.id());
+    private boolean scanWinnersInJoinOrder(GameSession session) {
+        if (session.status() != SessionStatus.ACTIVE) {
+            return false;
         }
+        for (String playerId : session.playerJoinOrder()) {
+            if (session.isDefeated(playerId)) {
+                continue;
+            }
+            Player player = requirePlayer(session, playerId);
+            if (winRule.hasWon(player)) {
+                session.finish(playerId);
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -874,7 +1202,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         return null;
     }
 
-    private record PropertyPaymentCard(Card card, PropertySet sourceRow) {
+    private record PropertyPaymentCard(Card card, PropertySet sourceRow, int valueM) {
     }
 
     private record DebtPaymentSelection(

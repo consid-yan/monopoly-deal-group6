@@ -7,7 +7,6 @@ import ie.ucd.bdic.group6.core.card.PropertyCard;
 import ie.ucd.bdic.group6.core.card.PropertyWildCard;
 import ie.ucd.bdic.group6.core.player.Player;
 import ie.ucd.bdic.group6.core.property.PropertySet;
-import ie.ucd.bdic.group6.core.rules.WinRule;
 import ie.ucd.bdic.group6.core.snapshot.CardSnapshot;
 import ie.ucd.bdic.group6.core.snapshot.PendingActionSnapshot;
 import ie.ucd.bdic.group6.core.snapshot.PendingDebtSnapshot;
@@ -19,7 +18,6 @@ import ie.ucd.bdic.group6.core.snapshot.SessionSnapshot;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -27,24 +25,10 @@ import java.util.Optional;
  */
 public final class SessionSnapshotBuilder {
 
-    private final WinRule winRule;
-
-    public SessionSnapshotBuilder(WinRule winRule) {
-        this.winRule = Objects.requireNonNull(winRule, "winRule");
+    public SessionSnapshotBuilder() {
     }
 
     public SessionSnapshot build(GameSession session, String requesterPlayerId) {
-        // Centralized win check: every command path that produces a snapshot evaluates win conditions.
-        session.activeGame().ifPresent(ag -> {
-            if (session.status() == SessionStatus.ACTIVE) {
-                session.findPlayer(ag.turnManager().activePlayerId()).ifPresent(activePlayer -> {
-                    if (winRule.hasWon(activePlayer, ag.turnManager().isActivePlayer(activePlayer.id()))) {
-                        session.finish(activePlayer.id());
-                    }
-                });
-            }
-        });
-
         Optional<ActiveGameState> activeGame = session.activeGame();
 
         List<CardSnapshot> currentPlayerHand = session.findPlayer(blankToEmpty(requesterPlayerId))
@@ -152,7 +136,7 @@ public final class SessionSnapshotBuilder {
     }
 
     private CardSnapshot cardSummary(Card card) {
-        int valueM = 0;
+        int valueM = card.faceValueM();
         String propertyColor = "";
         int requiredToComplete = 0;
         List<String> allowedColors = List.of();

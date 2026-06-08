@@ -123,7 +123,7 @@
 
 **Dongrui Gu**
 - Complete `GameFacade` dispatch and command handlers.
-- Ensure valid and invalid commands produce structured `GameResult` responses.
+- Ensure valid and invalid commands produce structured `CommandResult` responses.
 - Add facade/controller tests for accepted and rejected commands.
 
 **Yiming Liu**
@@ -134,7 +134,7 @@
 **Tian Gao**
 - Connect UI shell to facade-backed or mocked game state.
 - Display active player, own hand, own bank, own properties, and public opponent summaries.
-- Start user-facing error display from `GameResult`.
+- Start user-facing error display from `CommandResult`.
 
 **Exit criteria**
 - A local non-network game flow can be exercised through controller/facade.

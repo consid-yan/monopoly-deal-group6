@@ -1,6 +1,8 @@
 package ie.ucd.bdic.group6.core.card;
 
-import ie.ucd.bdic.group6.core.card.DeckDefinition;
+import ie.ucd.bdic.group6.core.card.deck.Deck;
+import ie.ucd.bdic.group6.core.card.deck.DeckDefinition;
+import ie.ucd.bdic.group6.core.card.deck.StandardDeckFactory;
 import ie.ucd.bdic.group6.core.property.PropertyColor;
 import org.junit.jupiter.api.Test;
 
@@ -10,8 +12,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class StandardDeckFactoryTest {
 
@@ -43,7 +44,7 @@ class StandardDeckFactoryTest {
         assertEquals(57L, moneySum);
 
         Map<PropertyColor, Long> props = deck.stream()
-                .filter(c -> c instanceof PropertyCard pc)
+                .filter(c -> c instanceof PropertyCard)
                 .map(c -> ((PropertyCard) c).color())
                 .collect(Collectors.groupingBy(c -> c, Collectors.counting()));
         assertEquals(2L, props.get(PropertyColor.BROWN));
@@ -60,7 +61,7 @@ class StandardDeckFactoryTest {
         Map<String, Card> byId = new HashMap<>();
         for (int i = 0; i < DeckDefinition.TOTAL_PLAY_CARDS; i++) {
             Card c = shuffled.draw();
-            assertTrue(byId.put(c.id(), c) == null);
+            assertNull(byId.put(c.id(), c));
         }
         assertEquals(DeckDefinition.TOTAL_PLAY_CARDS, byId.size());
         for (Card c : original) {

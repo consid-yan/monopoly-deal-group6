@@ -2,7 +2,7 @@ package ie.ucd.bdic.group6.facade.handler;
 
 import ie.ucd.bdic.group6.command.PlayerDisconnectedCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
-import ie.ucd.bdic.group6.facade.model.GameResult;
+import ie.ucd.bdic.group6.facade.model.CommandResult;
 
 public class PlayerDisconnectedHandler extends AbstractCommandHandler<PlayerDisconnectedCommand> {
     public PlayerDisconnectedHandler(ActionExecutor actionExecutor) {
@@ -15,7 +15,7 @@ public class PlayerDisconnectedHandler extends AbstractCommandHandler<PlayerDisc
     }
 
     @Override
-    protected GameResult execute(PlayerDisconnectedCommand command) {
-        return GameResult.success(actionExecutor.executePlayerDisconnected(command));
+    protected CommandResult execute(PlayerDisconnectedCommand command) {
+        return CommandResult.success(actionExecutor.executePlayerDisconnected(command));
     }
 }

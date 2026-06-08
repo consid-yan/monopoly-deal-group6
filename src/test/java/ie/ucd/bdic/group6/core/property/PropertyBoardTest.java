@@ -3,8 +3,6 @@ package ie.ucd.bdic.group6.core.property;
 import ie.ucd.bdic.group6.core.card.PropertyCard;
 import org.junit.jupiter.api.Test;
 
-import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -18,9 +16,9 @@ class PropertyBoardTest {
         PropertyCard brown2 = new PropertyCard("b2", "B2", PropertyColor.BROWN, 2);
 
         PropertySet row = board.startNewRow(PropertyColor.BROWN);
-        row.tryAdd(brown1, Optional.empty());
+        row.tryAdd(brown1);
 
-        var result = board.tryAddCardToRow(row, brown2, Optional.empty());
+        var result = board.tryAddCardToRow(row, brown2);
         assertTrue(result.isSuccess());
         assertEquals(1, board.rowsView().size());
         assertEquals(2, row.size());
@@ -34,12 +32,12 @@ class PropertyBoardTest {
         PropertyCard brown3 = new PropertyCard("b3", "B3", PropertyColor.BROWN, 2);
 
         PropertySet first = board.startNewRow(PropertyColor.BROWN);
-        first.tryAdd(brown1, Optional.empty());
-        first.tryAdd(brown2, Optional.empty());
+        first.tryAdd(brown1);
+        first.tryAdd(brown2);
         assertTrue(first.isComplete());
 
         PropertySet second = board.startNewRow(PropertyColor.BROWN);
-        second.tryAdd(brown3, Optional.empty());
+        second.tryAdd(brown3);
         assertEquals(2, board.rowsView().size());
     }
 
@@ -49,7 +47,7 @@ class PropertyBoardTest {
         PropertyCard brown1 = new PropertyCard("b1", "B1", PropertyColor.BROWN, 2);
 
         PropertySet first = board.startNewRow(PropertyColor.BROWN);
-        first.tryAdd(brown1, Optional.empty());
+        first.tryAdd(brown1);
 
         PropertySet second = board.startNewRow(PropertyColor.BROWN);
         assertSame(first, second, "should return the existing incomplete row");

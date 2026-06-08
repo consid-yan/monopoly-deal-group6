@@ -1,5 +1,8 @@
-package ie.ucd.bdic.group6.core.card;
+package ie.ucd.bdic.group6.core.rules;
 
+import ie.ucd.bdic.group6.core.card.Card;
+import ie.ucd.bdic.group6.core.card.MoneyCard;
+import ie.ucd.bdic.group6.core.card.deck.Deck;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -9,7 +12,7 @@ import java.util.Random;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class DrawPileRulesTest {
+class DrawPileRuleTest {
 
     @Test
     void reshuffleMovesDiscardIntoEmptyDrawPile() {
@@ -17,7 +20,7 @@ class DrawPileRulesTest {
         List<Card> discard = new ArrayList<>();
         discard.add(new MoneyCard("m1", "1M", 1));
         discard.add(new MoneyCard("m2", "2M", 2));
-        var result = DrawPileRules.reshuffleDiscardIntoDrawPile(draw, discard, new Random(42));
+        var result = DrawPileRule.reshuffleDiscardIntoDrawPile(draw, discard, new Random(42));
         assertTrue(result.isSuccess());
         assertEquals(2, result.value().orElseThrow());
         assertTrue(discard.isEmpty());

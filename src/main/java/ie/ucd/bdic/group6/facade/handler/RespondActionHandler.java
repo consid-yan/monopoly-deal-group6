@@ -2,7 +2,7 @@ package ie.ucd.bdic.group6.facade.handler;
 
 import ie.ucd.bdic.group6.command.RespondActionCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
-import ie.ucd.bdic.group6.facade.model.GameResult;
+import ie.ucd.bdic.group6.facade.model.CommandResult;
 
 public class RespondActionHandler extends AbstractCommandHandler<RespondActionCommand> {
     public RespondActionHandler(ActionExecutor actionExecutor) {
@@ -15,7 +15,7 @@ public class RespondActionHandler extends AbstractCommandHandler<RespondActionCo
     }
 
     @Override
-    protected GameResult execute(RespondActionCommand command) {
-        return GameResult.success(actionExecutor.executeRespondAction(command));
+    protected CommandResult execute(RespondActionCommand command) {
+        return CommandResult.success(actionExecutor.executeRespondAction(command));
     }
 }
