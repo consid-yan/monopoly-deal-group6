@@ -50,9 +50,9 @@ public class GameUI {
     @FXML
     private HBox handCardsHBox;
     @FXML
-    private HBox bankZone;
+    private ScrollPane bankScrollPane;
     @FXML
-    private FlowPane tableActivityZone;
+    private HBox bankZone;
     @FXML
     private ScrollPane propertyRowsScroll;
     @FXML
@@ -79,6 +79,7 @@ public class GameUI {
     @FXML
     private void initialize() {
         configurePropertyRowsScrolling();
+        configureBankScrolling();
         context.setSnapshotListener(this::render);
         context.setMessageListener(this::showServerMessage);
         render(context.latestSnapshot());
@@ -96,6 +97,13 @@ public class GameUI {
         };
         propertyRowsScroll.viewportBoundsProperty().addListener((obs, oldBounds, newBounds) -> updateWrapLength.run());
         Platform.runLater(updateWrapLength);
+    }
+
+    private void configureBankScrolling() {
+        if (bankScrollPane == null || bankZone == null) {
+            return;
+        }
+        bankScrollPane.setFitToWidth(false);
     }
 
     @FXML
@@ -242,7 +250,6 @@ public class GameUI {
 
         renderOwnZones();
         renderOpponents();
-        renderPendingZones();
         renderLog();
         preserveSelection();
         layoutHand(null);
@@ -375,15 +382,6 @@ public class GameUI {
         rowBox.getChildren().addAll(label, summary, cards);
         Tooltip.install(rowBox, new Tooltip("Row ID: " + row.rowId()));
         return rowBox;
-    }
-
-    private void renderPendingZones() {
-        if (tableActivityZone == null) {
-            return;
-        }
-        snapshot.tableActivityLines().stream()
-                .map(this::activityChip)
-                .forEach(tableActivityZone.getChildren()::add);
     }
 
     private void renderLog() {
@@ -1040,18 +1038,8 @@ public class GameUI {
         return label;
     }
 
-    private Node activityChip(String text) {
-        Label label = new Label(text);
-        label.setWrapText(true);
-        label.setMaxWidth(210);
-        label.getStyleClass().addAll("zone-caption", "activity-chip");
-        Tooltip.install(label, new Tooltip(text));
-        return label;
-    }
-
     private void clearTable() {
         clearZone(bankZone);
-        clearZone(tableActivityZone);
         clearZone(propertyRowsZone);
         if (handCardsHBox != null) {
             handCardsHBox.getChildren().clear();
