@@ -8,6 +8,8 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.event.ActionEvent;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.fxml.FXML;
@@ -588,7 +590,7 @@ public class GameUI {
             return;
         }
         for (UiSnapshot.PendingDebtView debt : snapshot.pendingDebtsForDebtor(context.playerId())) {
-            showDebtPrompt(debt);
+            promptDebtPayment(debt);
             return;
         }
         if (snapshot.canRespondToTrade(context.playerId())) {
@@ -633,24 +635,153 @@ public class GameUI {
         submitActionResponse(action, false);
     }
 
-    private void showDebtPrompt(UiSnapshot.PendingDebtView debt) {
+    private void promptDebtPayment(UiSnapshot.PendingDebtView debt) {
         pendingPromptShowing = true;
-        Alert dialog = new Alert(Alert.AlertType.CONFIRMATION);
+        try {
+            String debtId = debt.debtId();
+            while (debtStillPending(debtId)) {
+                UiSnapshot.PendingDebtView currentDebt = findPendingDebt(debtId).orElse(debt);
+                if (!showDebtConfirmation(currentDebt)) {
+                    continue;
+                }
+                List<UiSnapshot.CardView> paymentOptions = snapshot.currentPlayer(context.playerId())
+                        .map(UiSnapshot.PlayerView::paymentCards)
+                        .orElse(List.of());
+                if (paymentOptions.isEmpty()) {
+                    showFeedback("No bank or property cards are available to pay this debt.");
+                    continue;
+                }
+                Optional<List<UiSnapshot.CardView>> selected = choosePaymentCards(
+                        paymentOptions,
+                        currentDebt.amountM());
+                if (selected.isEmpty()) {
+                    continue;
+                }
+                Map<String, Object> payload = basePayload();
+                payload.put("debtId", currentDebt.debtId());
+                payload.put("paymentCardIds", selected.get().stream().map(UiSnapshot.CardView::id).toList());
+                submit(CommandType.PAY_DEBT, payload, "Submitted payment.");
+                break;
+            }
+        } finally {
+            pendingPromptShowing = false;
+        }
+        maybeShowPendingPrompts();
+    }
+
+    private boolean debtStillPending(String debtId) {
+        return findPendingDebt(debtId).isPresent();
+    }
+
+    private Optional<UiSnapshot.PendingDebtView> findPendingDebt(String debtId) {
+        return snapshot.pendingDebtsForDebtor(context.playerId()).stream()
+                .filter(debt -> debt.debtId().equals(debtId))
+                .findFirst();
+    }
+
+    private boolean showDebtConfirmation(UiSnapshot.PendingDebtView debt) {
+        Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Payment Required");
         dialog.setHeaderText("You owe " + snapshot.playerName(debt.creditorPlayerId())
                 + " $" + debt.amountM() + "M");
         dialog.setContentText(buildDebtPromptDetails(debt));
-        dialog.getButtonTypes().setAll(ButtonType.OK);
+        ButtonType payNow = new ButtonType("Pay Now", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().setAll(payNow);
+        dialog.setOnCloseRequest(event -> event.consume());
+        return dialog.showAndWait().filter(payNow::equals).isPresent();
+    }
+
+    private Optional<List<UiSnapshot.CardView>> choosePaymentCards(
+            List<UiSnapshot.CardView> options,
+            int dueAmountM) {
+        if (options == null || options.isEmpty()) {
+            return Optional.empty();
+        }
+        int maxPayableM = options.stream().mapToInt(this::paymentValueM).sum();
+
+        Dialog<List<UiSnapshot.CardView>> dialog = new Dialog<>();
+        dialog.setTitle("Select Payment Cards ($" + dueAmountM + "M due)");
+        dialog.setHeaderText("Tick one or more cards to pay. No Ctrl key needed.");
+        ButtonType okButtonType = englishOkButton();
+        ButtonType cancelButtonType = englishCancelButton();
+        dialog.getDialogPane().getButtonTypes().setAll(okButtonType, cancelButtonType);
+
+        VBox content = new VBox(8);
+        content.setPadding(new Insets(4, 0, 0, 0));
+        Label summaryLabel = new Label(formatPaymentSelectionSummary(0, dueAmountM));
+        summaryLabel.setWrapText(true);
+        content.getChildren().add(summaryLabel);
+
+        VBox cardRows = new VBox(4);
+        List<CheckBox> checkBoxes = new ArrayList<>();
+        for (UiSnapshot.CardView card : options) {
+            CheckBox checkBox = new CheckBox(paymentChoiceLabel(card));
+            checkBox.setUserData(card);
+            checkBox.selectedProperty().addListener((obs, wasSelected, isSelected) ->
+                    summaryLabel.setText(formatPaymentSelectionSummary(
+                            selectedPaymentValueM(checkBoxes),
+                            dueAmountM)));
+            checkBoxes.add(checkBox);
+            cardRows.getChildren().add(checkBox);
+        }
+
+        ScrollPane scrollPane = new ScrollPane(cardRows);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setPrefViewportHeight(Math.min(280, options.size() * 32.0 + 8));
+        content.getChildren().add(scrollPane);
+        dialog.getDialogPane().setContent(content);
         dialog.setOnCloseRequest(event -> event.consume());
 
-        Optional<ButtonType> result = dialog.showAndWait();
-        pendingPromptShowing = false;
+        Button okButton = (Button) dialog.getDialogPane().lookupButton(okButtonType);
+        okButton.addEventFilter(ActionEvent.ACTION, event -> {
+            List<UiSnapshot.CardView> selected = selectedPaymentCards(checkBoxes);
+            int totalSelectedM = selected.stream().mapToInt(this::paymentValueM).sum();
+            if (totalSelectedM < dueAmountM && totalSelectedM < maxPayableM) {
+                event.consume();
+                showFeedback("Selected cards total $" + totalSelectedM
+                        + "M. Pay at least $" + dueAmountM + "M or use all available cards.");
+                summaryLabel.setText(formatPaymentSelectionSummary(totalSelectedM, dueAmountM));
+            }
+        });
 
-        if (result.isEmpty() || result.get() != ButtonType.OK) {
-            maybeShowPendingPrompts();
-            return;
+        dialog.setResultConverter(button -> {
+            if (button == cancelButtonType) {
+                return List.<UiSnapshot.CardView>of();
+            }
+            if (button != okButtonType) {
+                return null;
+            }
+            return selectedPaymentCards(checkBoxes);
+        });
+
+        return dialog.showAndWait()
+                .filter(selected -> !selected.isEmpty());
+    }
+
+    private List<UiSnapshot.CardView> selectedPaymentCards(List<CheckBox> checkBoxes) {
+        return checkBoxes.stream()
+                .filter(CheckBox::isSelected)
+                .map(checkBox -> (UiSnapshot.CardView) checkBox.getUserData())
+                .toList();
+    }
+
+    private int selectedPaymentValueM(List<CheckBox> checkBoxes) {
+        return selectedPaymentCards(checkBoxes).stream().mapToInt(this::paymentValueM).sum();
+    }
+
+    private int paymentValueM(UiSnapshot.CardView card) {
+        if (card.bankValueM() > 0) {
+            return card.bankValueM();
         }
-        payDebtFor(debt);
+        return Math.max(0, card.valueM());
+    }
+
+    private String paymentChoiceLabel(UiSnapshot.CardView card) {
+        return "$" + paymentValueM(card) + "M — " + cardChoiceLabel(card);
+    }
+
+    private String formatPaymentSelectionSummary(int selectedM, int dueM) {
+        return "Selected: $" + selectedM + "M / $" + dueM + "M due";
     }
 
     private void showTradePrompt(UiSnapshot.PendingTradeView trade) {
@@ -673,32 +804,6 @@ public class GameUI {
             return;
         }
         submitTradeResponse(trade, result.get() == accept);
-    }
-
-    private void payDebtFor(UiSnapshot.PendingDebtView debt) {
-        List<UiSnapshot.CardView> paymentOptions = snapshot.currentPlayer(context.playerId())
-                .map(UiSnapshot.PlayerView::paymentCards)
-                .orElse(List.of());
-        List<UiSnapshot.CardView> selected = List.of();
-        if (!paymentOptions.isEmpty()) {
-            selected = chooseCards(
-                    "Select Payment Cards ($" + debt.amountM() + "M due)",
-                    paymentOptions,
-                    1);
-            if (selected.isEmpty()) {
-                maybeShowPendingPrompts();
-                return;
-            }
-        } else {
-            showFeedback("No bank or property cards are available to pay this debt.");
-            maybeShowPendingPrompts();
-            return;
-        }
-
-        Map<String, Object> payload = basePayload();
-        payload.put("debtId", debt.debtId());
-        payload.put("paymentCardIds", selected.stream().map(UiSnapshot.CardView::id).toList());
-        submit(CommandType.PAY_DEBT, payload, "Submitted payment.");
     }
 
     private void submitActionResponse(UiSnapshot.PendingActionView action, boolean accepted) {
@@ -832,7 +937,9 @@ public class GameUI {
         Dialog<List<UiSnapshot.CardView>> dialog = new Dialog<>();
         dialog.setTitle(title);
         dialog.setHeaderText("Select at least " + minimum + " card(s).");
-        dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+        ButtonType okButtonType = englishOkButton();
+        ButtonType cancelButtonType = englishCancelButton();
+        dialog.getDialogPane().getButtonTypes().setAll(okButtonType, cancelButtonType);
         ListView<Choice<UiSnapshot.CardView>> listView = new ListView<>();
         listView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         listView.setItems(FXCollections.observableArrayList(options.stream()
@@ -840,7 +947,7 @@ public class GameUI {
                 .toList()));
         dialog.getDialogPane().setContent(listView);
         dialog.setResultConverter(button -> {
-            if (button != ButtonType.OK) {
+            if (button != okButtonType) {
                 return List.of();
             }
             return listView.getSelectionModel().getSelectedItems().stream()
@@ -853,6 +960,14 @@ public class GameUI {
             return List.of();
         }
         return selected;
+    }
+
+    private static ButtonType englishOkButton() {
+        return new ButtonType("OK", ButtonBar.ButtonData.OK_DONE);
+    }
+
+    private static ButtonType englishCancelButton() {
+        return new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
     }
 
     private Node createCardNode(UiSnapshot.CardView card, boolean compact, boolean selectable) {

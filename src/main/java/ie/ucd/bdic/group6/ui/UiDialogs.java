@@ -5,6 +5,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
@@ -21,6 +22,10 @@ import javafx.stage.StageStyle;
 import org.kordamp.ikonli.javafx.FontIcon;
 
 final class UiDialogs {
+    private static final ButtonType CONFIRM_BUTTON = new ButtonType("Confirm", ButtonBar.ButtonData.OK_DONE);
+    private static final ButtonType CANCEL_BUTTON = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+    private static final ButtonType ERROR_OK_BUTTON = new ButtonType("OK", ButtonBar.ButtonData.OK_DONE);
+
     private static final double FORM_DIALOG_WIDTH = 390;
     private static final String DIALOG_ICON = "/images/icon.png";
     private static final String ERROR_GRAPHIC = "/images/error.png";
@@ -32,7 +37,7 @@ final class UiDialogs {
         Optional<ButtonType> result = showForm("New Game", "Host a new multiplayer game",
                 row("Player Name", playerNameField),
                 row("Maximum Players", maxPlayersField, "Choose between 2 and 5 players"));
-        if (result.isEmpty() || result.get() != ButtonType.OK) {
+        if (result.isEmpty() || result.get() != CONFIRM_BUTTON) {
             return Optional.empty();
         }
         try {
@@ -52,7 +57,7 @@ final class UiDialogs {
                 row("Room Code", roomCodeField),
                 row("Host IP", hostField),
                 row("Player Name", playerNameField));
-        if (result.isEmpty() || result.get() != ButtonType.OK) {
+        if (result.isEmpty() || result.get() != CONFIRM_BUTTON) {
             return Optional.empty();
         }
         try {
@@ -70,7 +75,7 @@ final class UiDialogs {
         TextField roomCodeField = field("Room code");
         Optional<ButtonType> result = showForm("Rejoin Session", "Reconnect with the same player id",
                 row("Room Code", roomCodeField));
-        if (result.isEmpty() || result.get() != ButtonType.OK) {
+        if (result.isEmpty() || result.get() != CONFIRM_BUTTON) {
             return Optional.empty();
         }
         try {
@@ -91,6 +96,7 @@ final class UiDialogs {
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message == null || message.isBlank() ? "The operation failed." : message);
+        alert.getButtonTypes().setAll(ERROR_OK_BUTTON);
         ImageView errorGraphic = errorGraphic();
         if (errorGraphic != null) {
             alert.setGraphic(errorGraphic);
@@ -119,7 +125,7 @@ final class UiDialogs {
         applyDialogIcon(dialog);
         dialog.setTitle(title);
         dialog.setHeaderText(null);
-        dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.getDialogPane().getButtonTypes().setAll(CONFIRM_BUTTON, CANCEL_BUTTON);
         dialog.getDialogPane().setMinWidth(FORM_DIALOG_WIDTH);
         dialog.getDialogPane().setPrefWidth(FORM_DIALOG_WIDTH);
         dialog.getDialogPane().setMaxWidth(FORM_DIALOG_WIDTH);
@@ -157,14 +163,12 @@ final class UiDialogs {
     }
 
     private static void styleDialogButtons(Dialog<?> dialog) {
-        Node okNode = dialog.getDialogPane().lookupButton(ButtonType.OK);
+        Node okNode = dialog.getDialogPane().lookupButton(CONFIRM_BUTTON);
         if (okNode instanceof Button okButton) {
-            okButton.setText("Confirm");
             okButton.getStyleClass().add("app-dialog-confirm-button");
         }
-        Node cancelNode = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
+        Node cancelNode = dialog.getDialogPane().lookupButton(CANCEL_BUTTON);
         if (cancelNode instanceof Button cancelButton) {
-            cancelButton.setText("Cancel");
             cancelButton.getStyleClass().add("app-dialog-cancel-button");
         }
     }
