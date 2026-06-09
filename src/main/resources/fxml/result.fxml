@@ -4,86 +4,96 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
-<?import javafx.scene.control.TextArea?>
-<?import javafx.scene.control.TextField?>
-<?import javafx.scene.control.TitledPane?>
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.layout.ColumnConstraints?>
-<?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane prefHeight="640.0" prefWidth="960.0"
-            styleClass="menu-root root-screen result-screen"
-            xmlns="http://javafx.com/javafx/25.0.2"
-            xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="ie.ucd.bdic.group6.ui.ResultUI">
-    <top>
-        <VBox alignment="CENTER_LEFT" spacing="8.0" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets bottom="10.0" left="48.0" right="48.0" top="24.0"/>
-            </padding>
-            <Label styleClass="menu-title title-banner" text="Game Over"/>
+<StackPane prefHeight="640.0" prefWidth="960.0"
+           styleClass="result-screen-root"
+           xmlns="http://javafx.com/javafx/25.0.2"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="ie.ucd.bdic.group6.ui.ResultUI">
+    <StackPane mouseTransparent="true" styleClass="menu-bg-pattern"/>
+
+    <Label mouseTransparent="true" styleClass="menu-card-suit" text="&#9670;" StackPane.alignment="TOP_LEFT">
+        <StackPane.margin>
+            <Insets left="-10.0" top="-24.0"/>
+        </StackPane.margin>
+    </Label>
+    <Label mouseTransparent="true" rotate="180.0" styleClass="menu-card-suit" text="&#9670;" StackPane.alignment="BOTTOM_RIGHT">
+        <StackPane.margin>
+            <Insets bottom="-24.0" right="-10.0"/>
+        </StackPane.margin>
+    </Label>
+
+    <VBox alignment="CENTER" maxWidth="760.0" spacing="12.0" styleClass="result-content">
+        <padding>
+            <Insets bottom="24.0" left="30.0" right="30.0" top="20.0"/>
+        </padding>
+
+        <Label styleClass="result-brand-title" text="Monopoly Deal">
+            <font>
+                <Font name="Georgia Bold" size="28.0"/>
+            </font>
+        </Label>
+
+        <StackPane maxHeight="68.0" maxWidth="68.0" styleClass="result-crown-medal">
+            <FontIcon iconLiteral="bxs-crown" styleClass="result-crown-icon"/>
+        </StackPane>
+
+        <Label styleClass="result-eyebrow" text="MATCH COMPLETE"/>
+        <Label fx:id="winnerNameLabel" maxWidth="Infinity" styleClass="result-winner-name" text="Winner"/>
+        <Label fx:id="victoryReasonLabel" alignment="CENTER" maxWidth="620.0" styleClass="result-victory-reason"
+               text="Completed 3 full property sets." textAlignment="CENTER" wrapText="true"/>
+
+        <HBox alignment="CENTER" maxWidth="620.0" spacing="10.0" styleClass="result-stats-row">
+            <VBox alignment="CENTER" maxWidth="Infinity" spacing="2.0" styleClass="result-stat-card" HBox.hgrow="ALWAYS">
+                <Label fx:id="completedSetsLabel" styleClass="result-stat-value" text="3"/>
+                <Label styleClass="result-stat-caption" text="FULL SETS"/>
+            </VBox>
+            <VBox alignment="CENTER" maxWidth="Infinity" spacing="2.0" styleClass="result-stat-card" HBox.hgrow="ALWAYS">
+                <Label fx:id="bankValueLabel" styleClass="result-stat-value" text="25M"/>
+                <Label styleClass="result-stat-caption" text="BANK VALUE"/>
+            </VBox>
+            <VBox alignment="CENTER" maxWidth="Infinity" spacing="2.0" styleClass="result-stat-card" HBox.hgrow="ALWAYS">
+                <Label fx:id="finalRankLabel" styleClass="result-stat-value" text="1st"/>
+                <Label styleClass="result-stat-caption" text="FINAL RANK"/>
+            </VBox>
+        </HBox>
+
+        <VBox maxWidth="620.0" spacing="7.0" styleClass="result-standings-panel">
+            <HBox alignment="CENTER_LEFT">
+                <Label styleClass="result-section-title" text="Final Standings"/>
+            </HBox>
+            <ListView fx:id="standingsList" focusTraversable="false" maxHeight="210.0" minHeight="104.0"
+                      prefHeight="190.0" styleClass="result-standings-list">
+                <placeholder>
+                    <Label styleClass="result-empty-label" text="No standings available"/>
+                </placeholder>
+            </ListView>
         </VBox>
-    </top>
-    <center>
-        <VBox spacing="12.0" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets bottom="16.0" left="48.0" right="48.0"/>
-            </padding>
-            <GridPane hgap="18.0" styleClass="surface-panel" vgap="12.0">
-                <columnConstraints>
-                    <ColumnConstraints minWidth="160.0" prefWidth="190.0"/>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="260.0"/>
-                    <ColumnConstraints minWidth="160.0" prefWidth="190.0"/>
-                    <ColumnConstraints hgrow="ALWAYS" minWidth="260.0"/>
-                </columnConstraints>
-                <Label styleClass="result-field-label" text="Winner" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-                <TextField fx:id="winnerField" editable="false" promptText="Winner" styleClass="winner-field" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
-                <Label styleClass="result-field-label" text="Completed Property Sets" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
-                <TextField fx:id="completedSetsField" editable="false" promptText="Completed Property Sets" styleClass="result-value-field" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
-                <Label styleClass="result-field-label" text="Win Condition" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-                <Label maxWidth="Infinity" styleClass="result-readout" text="Complete 3 full property sets at turn end, or remain after forfeits" wrapText="true" GridPane.columnIndex="1" GridPane.columnSpan="3" GridPane.rowIndex="1"/>
-            </GridPane>
-            <TitledPane animated="false" collapsible="false" maxWidth="Infinity" prefHeight="240.0" text="Player Summary">
-                <ListView fx:id="playerSummaryList" focusTraversable="false" prefHeight="210.0" prefWidth="840.0" styleClass="readonly-list">
-                    <placeholder>
-                        <Label text="Game Summary"/>
-                    </placeholder>
-                </ListView>
-            </TitledPane>
-            <TitledPane animated="false" collapsible="false" styleClass="section-panel" text="Match Summary">
-                <TextArea fx:id="finalResultArea"
-                          editable="false"
-                          focusTraversable="false"
-                          prefHeight="92.0"
-                          promptText="Match Summary"
-                          styleClass="status-area"
-                          wrapText="true"/>
-            </TitledPane>
-        </VBox>
-    </center>
-    <bottom>
-        <HBox alignment="CENTER_RIGHT" spacing="12.0" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets bottom="16.0" left="48.0" right="48.0" top="4.0"/>
-            </padding>
-            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#backToMenu" prefHeight="40.0" prefWidth="140.0" styleClass="secondary-button" text="Main Menu">
+
+        <HBox alignment="CENTER" spacing="10.0" styleClass="result-actions">
+            <Button graphicTextGap="9.0" mnemonicParsing="false" onAction="#backToMenu"
+                    prefHeight="42.0" prefWidth="154.0" styleClass="menu-outline-button" text="Main Menu">
                 <graphic>
-                    <FontIcon iconLiteral="bx-home"/>
+                    <FontIcon iconLiteral="bx-home" styleClass="menu-icon-outline"/>
                 </graphic>
             </Button>
-            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#playAgain" prefHeight="40.0" prefWidth="140.0" styleClass="primary-button" text="Play Again">
+            <Button graphicTextGap="9.0" mnemonicParsing="false" onAction="#playAgain"
+                    prefHeight="42.0" prefWidth="154.0" styleClass="menu-primary-button" text="Play Again">
                 <graphic>
-                    <FontIcon iconLiteral="bx-reset"/>
+                    <FontIcon iconLiteral="bx-reset" styleClass="menu-icon-primary"/>
                 </graphic>
             </Button>
-            <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#exitApplication" prefHeight="40.0" prefWidth="120.0" styleClass="danger-button" text="Exit">
+            <Button graphicTextGap="9.0" mnemonicParsing="false" onAction="#exitApplication"
+                    prefHeight="42.0" prefWidth="126.0" styleClass="menu-danger-button" text="Exit">
                 <graphic>
-                    <FontIcon iconLiteral="bx-exit"/>
+                    <FontIcon iconLiteral="bx-exit" styleClass="menu-icon-danger"/>
                 </graphic>
             </Button>
         </HBox>
-    </bottom>
-</BorderPane>
+    </VBox>
+</StackPane>
