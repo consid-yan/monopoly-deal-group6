@@ -213,7 +213,7 @@
                 <ScrollPane fx:id="handScrollPane" fitToHeight="true" minHeight="150.0" prefHeight="170.0" styleClass="hand-scroll-pane" vbarPolicy="NEVER">
                     <HBox fx:id="handCardsHBox" alignment="CENTER_LEFT" minHeight="130.0" spacing="8.0" styleClass="hand-cards-box">
                         <padding>
-                            <Insets bottom="4.0" left="4.0" right="4.0" top="4.0"/>
+                            <Insets bottom="4.0" left="4.0" right="4.0" top="20.0"/>
                         </padding>
                     </HBox>
                 </ScrollPane>

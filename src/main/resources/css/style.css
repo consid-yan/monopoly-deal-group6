@@ -202,6 +202,84 @@
     -fx-text-fill: #e8f2ec;
 }
 
+.app-dialog-body {
+    -fx-font-size: 13px;
+    -fx-text-fill: #e8f2ec;
+}
+
+.app-dialog-error-text {
+    -fx-font-size: 12px;
+    -fx-text-fill: #e5c96a;
+}
+
+.app-dialog-image-fallback {
+    -fx-font-family: "Georgia";
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #e5c96a;
+}
+
+.app-dialog-choice-box,
+.app-dialog-list-view,
+.app-dialog-scroll-pane,
+.app-dialog-scroll-pane > .viewport {
+    -fx-background-color: #0d2117;
+    -fx-background-radius: 8;
+    -fx-border-color: #1f4a2e;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+
+.app-dialog-choice-box {
+    -fx-padding: 4 8 4 8;
+}
+
+.app-dialog-choice-box .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #e8f2ec;
+}
+
+.app-dialog-choice-box .arrow {
+    -fx-background-color: #c8a84b;
+}
+
+.app-dialog-list-view {
+    -fx-pref-height: 240;
+}
+
+.app-dialog-list-view .list-cell {
+    -fx-background-color: #0d2117;
+    -fx-text-fill: #e8f2ec;
+}
+
+.app-dialog-list-view .list-cell:filled:hover,
+.app-dialog-list-view .list-cell:filled:selected {
+    -fx-background-color: #c8a84b;
+    -fx-text-fill: #0d2117;
+}
+
+.app-dialog-check-box {
+    -fx-font-size: 13px;
+    -fx-text-fill: #e8f2ec;
+    -fx-padding: 5 6 5 6;
+}
+
+.app-dialog-check-box .box {
+    -fx-background-color: #0d2117;
+    -fx-border-color: #1f4a2e;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+}
+
+.app-dialog-check-box:selected .mark {
+    -fx-background-color: #0d2117;
+}
+
+.app-dialog-check-box:selected .box {
+    -fx-background-color: #c8a84b;
+    -fx-border-color: #c8a84b;
+}
+
 .app-dialog .button-bar {
     -fx-background-color: #112b1d;
     -fx-background-insets: 0;
@@ -1029,9 +1107,12 @@
     -fx-effect: dropshadow(gaussian, rgba(200, 168, 78, 0.48), 14, 0.26, 0, 3);
 }
 
-.deal-card-selected {
+.deal-card.deal-card-selected,
+.deal-card.deal-card-selected:hover {
+    -fx-translate-y: -15;
     -fx-border-color: #c8a84e;
     -fx-border-width: 2;
+    -fx-effect: dropshadow(gaussian, rgba(200, 168, 78, 0.62), 18, 0.3, 0, 5);
 }
 
 .compact-deal-card {

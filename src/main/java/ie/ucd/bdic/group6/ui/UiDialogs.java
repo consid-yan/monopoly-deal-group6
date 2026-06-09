@@ -3,11 +3,11 @@ package ie.ucd.bdic.group6.ui;
 import java.util.Optional;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
+import javafx.scene.control.DialogEvent;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
@@ -27,6 +27,7 @@ final class UiDialogs {
     private static final ButtonType ERROR_OK_BUTTON = new ButtonType("OK", ButtonBar.ButtonData.OK_DONE);
 
     private static final double FORM_DIALOG_WIDTH = 390;
+    private static final double DEFAULT_DIALOG_WIDTH = 430;
     private static final String DIALOG_ICON = "/images/icon.png";
     private static final String ERROR_GRAPHIC = "/images/error.png";
 
@@ -88,37 +89,96 @@ final class UiDialogs {
     }
 
     static void showError(String title, String message) {
-        var alert = new Alert(Alert.AlertType.ERROR);
-        makeUndecorated(alert);
-        decorateDialog(alert, title);
-        applyTransparentScene(alert);
-        applyDialogIcon(alert);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message == null || message.isBlank() ? "The operation failed." : message);
-        alert.getButtonTypes().setAll(ERROR_OK_BUTTON);
-        ImageView errorGraphic = errorGraphic();
-        if (errorGraphic != null) {
-            alert.setGraphic(errorGraphic);
-        }
-        styleErrorDialogButton(alert);
-        alert.showAndWait();
+        Dialog<ButtonType> dialog = messageDialog(title, message);
+        dialog.showAndWait();
     }
 
-    private static void styleErrorDialogButton(Dialog<?> dialog) {
-        Node okNode = dialog.getDialogPane().lookupButton(ButtonType.OK);
-        if (okNode instanceof Button okButton) {
-            okButton.setText("Ok");
-            okButton.getStyleClass().add("app-dialog-confirm-button");
+    static void showWarning(String title, String message) {
+        Dialog<ButtonType> dialog = messageDialog(title, message);
+        dialog.show();
+    }
+
+    static <R> Dialog<R> createDialog(String title) {
+        Dialog<R> dialog = new Dialog<>();
+        prepareDialog(dialog, title);
+        setDialogWidth(dialog, DEFAULT_DIALOG_WIDTH);
+        return dialog;
+    }
+
+    static ButtonType confirmButton(String text) {
+        return new ButtonType(text, ButtonBar.ButtonData.OK_DONE);
+    }
+
+    static ButtonType cancelButton(String text) {
+        return new ButtonType(text, ButtonBar.ButtonData.CANCEL_CLOSE);
+    }
+
+    static ButtonType secondaryButton(String text) {
+        return new ButtonType(text, ButtonBar.ButtonData.NO);
+    }
+
+    static void setDialogWidth(Dialog<?> dialog, double width) {
+        dialog.getDialogPane().setMinWidth(width);
+        dialog.getDialogPane().setPrefWidth(width);
+        dialog.getDialogPane().setMaxWidth(width);
+    }
+
+    static void styleButtons(Dialog<?> dialog, ButtonType... buttonTypes) {
+        for (ButtonType buttonType : buttonTypes) {
+            Node buttonNode = dialog.getDialogPane().lookupButton(buttonType);
+            if (buttonNode instanceof Button button) {
+                button.getStyleClass().removeAll("app-dialog-confirm-button", "app-dialog-cancel-button");
+                button.getStyleClass().add(isPrimaryButton(buttonType)
+                        ? "app-dialog-confirm-button"
+                        : "app-dialog-cancel-button");
+            }
         }
     }
 
-    private static ImageView errorGraphic() {
+    static VBox messageContent(String heading, String message) {
+        VBox content = new VBox(14);
+        if (heading != null && !heading.isBlank()) {
+            content.getChildren().add(headingLabel(heading));
+        }
+        content.getChildren().add(bodyLabel(message));
+        return content;
+    }
+
+    static Label headingLabel(String text) {
+        Label label = new Label(text == null ? "" : text);
+        label.setWrapText(true);
+        label.getStyleClass().add("app-dialog-heading");
+        return label;
+    }
+
+    static Label bodyLabel(String text) {
+        Label label = new Label(text == null || text.isBlank() ? "No details available." : text);
+        label.setWrapText(true);
+        label.getStyleClass().add("app-dialog-body");
+        return label;
+    }
+
+    private static Dialog<ButtonType> messageDialog(String title, String message) {
+        Dialog<ButtonType> dialog = createDialog(title);
+        setDialogWidth(dialog, 520);
+        dialog.getDialogPane().getButtonTypes().setAll(ERROR_OK_BUTTON);
+        styleButtons(dialog, ERROR_OK_BUTTON);
+
+        Label body = bodyLabel(message == null || message.isBlank() ? "The operation failed." : message);
+        HBox content = new HBox(18, errorGraphic(), body);
+        content.setAlignment(Pos.CENTER_LEFT);
+        dialog.getDialogPane().setContent(content);
+        return dialog;
+    }
+
+    private static Node errorGraphic() {
         Image image = loadImage(ERROR_GRAPHIC);
         if (image == null) {
-            return null;
+            Label fallback = new Label("!");
+            fallback.getStyleClass().add("app-dialog-image-fallback");
+            return fallback;
         }
-        var imageView = new ImageView(image);
+        ImageView imageView = new ImageView(image);
         imageView.setFitWidth(64);
         imageView.setFitHeight(64);
         imageView.setPreserveRatio(true);
@@ -126,19 +186,22 @@ final class UiDialogs {
         return imageView;
     }
 
+    private static boolean isPrimaryButton(ButtonType buttonType) {
+        ButtonBar.ButtonData data = buttonType.getButtonData();
+        return data == ButtonBar.ButtonData.OK_DONE
+                || data == ButtonBar.ButtonData.YES
+                || data == ButtonBar.ButtonData.APPLY
+                || data == ButtonBar.ButtonData.FINISH
+                || data == ButtonBar.ButtonData.NEXT_FORWARD;
+    }
+
     private static Optional<ButtonType> showForm(String title, String header, FormRow... rows) {
-        Dialog<ButtonType> dialog = new Dialog<>();
-        makeUndecorated(dialog);
-        decorateDialog(dialog, title);
-        applyTransparentScene(dialog);
-        applyDialogIcon(dialog);
+        Dialog<ButtonType> dialog = createDialog(title);
         dialog.setTitle(title);
         dialog.setHeaderText(null);
         dialog.getDialogPane().getButtonTypes().setAll(CONFIRM_BUTTON, CANCEL_BUTTON);
-        dialog.getDialogPane().setMinWidth(FORM_DIALOG_WIDTH);
-        dialog.getDialogPane().setPrefWidth(FORM_DIALOG_WIDTH);
-        dialog.getDialogPane().setMaxWidth(FORM_DIALOG_WIDTH);
-        styleDialogButtons(dialog);
+        setDialogWidth(dialog, FORM_DIALOG_WIDTH);
+        styleButtons(dialog, CONFIRM_BUTTON, CANCEL_BUTTON);
 
         var heading = new Label(header);
         heading.getStyleClass().add("app-dialog-heading");
@@ -171,19 +234,15 @@ final class UiDialogs {
         return block;
     }
 
-    private static void styleDialogButtons(Dialog<?> dialog) {
-        Node okNode = dialog.getDialogPane().lookupButton(CONFIRM_BUTTON);
-        if (okNode instanceof Button okButton) {
-            okButton.getStyleClass().add("app-dialog-confirm-button");
-        }
-        Node cancelNode = dialog.getDialogPane().lookupButton(CANCEL_BUTTON);
-        if (cancelNode instanceof Button cancelButton) {
-            cancelButton.getStyleClass().add("app-dialog-cancel-button");
-        }
-    }
-
     private static void makeUndecorated(Dialog<?> dialog) {
         dialog.initStyle(StageStyle.TRANSPARENT);
+    }
+
+    private static void prepareDialog(Dialog<?> dialog, String title) {
+        makeUndecorated(dialog);
+        decorateDialog(dialog, title);
+        applyTransparentScene(dialog);
+        applyDialogIcon(dialog);
     }
 
     private static void decorateDialog(Dialog<?> dialog, String title) {
@@ -233,7 +292,7 @@ final class UiDialogs {
     }
 
     private static void applyTransparentScene(Dialog<?> dialog) {
-        dialog.setOnShowing(_ -> {
+        dialog.addEventHandler(DialogEvent.DIALOG_SHOWING, _ -> {
             var scene = dialog.getDialogPane().getScene();
             if (scene != null) {
                 scene.setFill(Color.TRANSPARENT);
@@ -246,7 +305,7 @@ final class UiDialogs {
         if (icon == null) {
             return;
         }
-        dialog.setOnShown(_ -> {
+        dialog.addEventHandler(DialogEvent.DIALOG_SHOWN, _ -> {
             var scene = dialog.getDialogPane().getScene();
             if (scene != null && scene.getWindow() instanceof Stage stage) {
                 stage.getIcons().setAll(icon);

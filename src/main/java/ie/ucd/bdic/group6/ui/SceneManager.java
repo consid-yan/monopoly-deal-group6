@@ -35,6 +35,7 @@ public final class SceneManager {
     public static void initialize(Stage primaryStage, AppConfig appConfig) {
         stage = primaryStage;
         sessionContext = new GameSessionCoordinator(appConfig);
+        sessionContext.setDisconnectListener(SceneManager::handleServerDisconnect);
         UiTheme.applyDefaultTheme();
         stage.setTitle("Monopoly Deal");
         stage.getIcons().setAll(new Image(Objects.requireNonNull(SceneManager.class.getResource(APP_ICON))
@@ -91,6 +92,16 @@ public final class SceneManager {
             return;
         }
         stage.close();
+    }
+
+    private static void handleServerDisconnect(String message) {
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(() -> handleServerDisconnect(message));
+            return;
+        }
+
+        showMenu();
+        UiDialogs.showError("Connection Lost", message);
     }
 
     private static void show(String fxmlName) {
