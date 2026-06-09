@@ -646,8 +646,10 @@ class ActionExecutorTest {
         )));
         String tradeId = pendingTrades(proposed).getFirst().tradeId();
         assertEquals(2, proposed.actionsUsed());
+        assertEquals("host", proposed.activePlayerId());
+        assertEquals("RESPONDING", playerSummary(proposed, "player2").playerPhase());
+        assertEquals("ACTING", playerSummary(proposed, "host").playerPhase());
 
-        endTurn(engine, sessionId, "host");
         SessionSnapshot accepted = engine.executeRespondTrade(new RespondTradeCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "player2",
@@ -656,7 +658,8 @@ class ActionExecutorTest {
         )));
 
         assertTrue(pendingTrades(accepted).isEmpty());
-        assertEquals(0, accepted.actionsUsed());
+        assertEquals("host", accepted.activePlayerId());
+        assertEquals(2, accepted.actionsUsed());
         assertEquals(4, playerSummary(accepted, "host").bankTotalValueM());
         assertTrue(propertyRows(playerSummary(accepted, "host")).isEmpty());
         assertEquals(List.of(red.id()), cardIds(rowCards(propertyRows(playerSummary(accepted, "player2")).getFirst())));
