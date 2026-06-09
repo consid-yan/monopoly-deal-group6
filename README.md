@@ -79,7 +79,7 @@ mvn javafx:run
 ```text
 src/main/java/ie/ucd/bdic/group6/
 +-- app/          Application entry point and dependency wiring
-+-- command/      Session, gameplay, payment, trade, discard, and rejoin commands
++-- command/      Session, card, debt, trade, action, game, and connection command records
 +-- controller/   Request intake, DTOs, and request-to-command mapping
 +-- core/         Cards, common results, engine, players, properties, and rules
 +-- exception/    Project-specific exception types
@@ -105,7 +105,7 @@ Project documents live under `docs/`:
 The application is organized around a command-driven flow:
 
 1. `GameController` receives a `ControllerRequest`.
-2. `RequestMapper` converts request data into command records such as `CreateSessionCommand`, `JoinSessionCommand`, `StartGameCommand`, `PlayCardCommand`, `PayDebtCommand`, `ProposeTradeCommand`, `RespondTradeCommand`, `DiscardCardsCommand`, `EndTurnCommand`, and `RejoinSessionCommand`.
+2. `RequestMapper` converts request data into command records such as `CreateSessionCommand`, `JoinSessionCommand`, `StartGameCommand`, `PlayCardCommand`, `PayDebtCommand`, `ProposeTradeCommand`, `RespondTradeCommand`, `RespondActionCommand`, `DiscardCardsCommand`, `EndTurnCommand`, and `RejoinSessionCommand`.
 3. `GameFacade` routes each command to a matching `CommandHandler`.
 4. Handlers return a `CommandResult`.
 
