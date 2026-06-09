@@ -15,18 +15,15 @@ public final class PlayerPhaseResolver {
         }
 
         ActiveGameState activeGame = session.activeGame().orElseThrow();
-        boolean mustAnswerActionOrDebt = activeGame.pendingActionsView().stream()
+        boolean mustRespond = activeGame.pendingActionsView().stream()
                 .anyMatch(action -> action.awaitsResponseFrom(playerId))
-                || !activeGame.pendingDebtsForDebtor(playerId).isEmpty();
-        if (mustAnswerActionOrDebt) {
+                || !activeGame.pendingDebtsForDebtor(playerId).isEmpty()
+                || !activeGame.pendingTradesForTarget(playerId).isEmpty();
+        if (mustRespond) {
             return PlayerPhase.RESPONDING;
         }
         if (activeGame.hasPendingActions() || !activeGame.pendingDebtsView().isEmpty()) {
             return PlayerPhase.WAITING;
-        }
-        if (activeGame.turnManager().isActivePlayer(playerId)
-                && !activeGame.pendingTradesForTarget(playerId).isEmpty()) {
-            return PlayerPhase.RESPONDING;
         }
         if (!activeGame.turnManager().isActivePlayer(playerId)) {
             return PlayerPhase.WAITING;

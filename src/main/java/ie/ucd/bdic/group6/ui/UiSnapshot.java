@@ -191,7 +191,7 @@ public final class UiSnapshot {
     }
 
     public boolean canRespondToTrade(String playerId) {
-        return isTurnFor(playerId) && !pendingTradesForTarget(playerId).isEmpty();
+        return !pendingTradesForTarget(playerId).isEmpty();
     }
 
     public List<PendingActionView> pendingActionsAwaiting(String playerId) {

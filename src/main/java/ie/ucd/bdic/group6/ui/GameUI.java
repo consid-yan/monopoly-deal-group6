@@ -1287,9 +1287,7 @@ public class GameUI {
             hints.add("debt payment");
         }
         if (hasPendingTradeForCurrentPlayer()) {
-            hints.add(snapshot.canRespondToTrade(context.playerId())
-                    ? "trade response"
-                    : "trade response on your turn");
+            hints.add("trade response");
         }
         if (hints.isEmpty()) {
             return "";
