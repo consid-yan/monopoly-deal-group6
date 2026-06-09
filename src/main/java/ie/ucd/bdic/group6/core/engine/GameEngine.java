@@ -1,10 +1,25 @@
 package ie.ucd.bdic.group6.core.engine;
 
-import ie.ucd.bdic.group6.command.*;
+import ie.ucd.bdic.group6.command.card.DiscardCardCommand;
+import ie.ucd.bdic.group6.command.connection.PlayerDisconnectedCommand;
+import ie.ucd.bdic.group6.command.connection.ProcessDisconnectTimeoutsCommand;
+import ie.ucd.bdic.group6.command.game.EndTurnCommand;
+import ie.ucd.bdic.group6.command.debt.PayDebtCommand;
+import ie.ucd.bdic.group6.command.card.PlayCardCommand;
+import ie.ucd.bdic.group6.command.trade.ProposeTradeCommand;
+import ie.ucd.bdic.group6.command.action.RespondActionCommand;
+import ie.ucd.bdic.group6.command.trade.RespondTradeCommand;
+import ie.ucd.bdic.group6.command.session.CreateSessionCommand;
+import ie.ucd.bdic.group6.command.session.JoinSessionCommand;
+import ie.ucd.bdic.group6.command.session.RejoinSessionCommand;
+import ie.ucd.bdic.group6.command.game.StartGameCommand;
 import ie.ucd.bdic.group6.core.card.*;
 import ie.ucd.bdic.group6.core.card.deck.Deck;
 import ie.ucd.bdic.group6.core.card.deck.StandardDeckFactory;
 import ie.ucd.bdic.group6.core.common.OperationResult;
+import ie.ucd.bdic.group6.core.engine.pending.PendingAction;
+import ie.ucd.bdic.group6.core.engine.pending.PendingDebt;
+import ie.ucd.bdic.group6.core.engine.pending.PendingTrade;
 import ie.ucd.bdic.group6.core.player.BankPaymentSolver;
 import ie.ucd.bdic.group6.core.player.Player;
 import ie.ucd.bdic.group6.core.player.PlayerRollbackSnapshot;
@@ -128,6 +143,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         requireNoPendingActionResponses(activeGame);
         requireNoPendingDebts(activeGame);
         actionRule.requireActivePlayer(turnManager, playerId);
+        requireNoPendingTradeResponseFor(activeGame, playerId);
 
         Player player = requirePlayer(session, playerId);
         requireNotDefeated(session, playerId);
@@ -142,8 +158,9 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         }
 
         for (int i = 0; i < actionCost; i++) {
-        turnManager.recordAction();
+            turnManager.recordAction();
         }
+        progressTurn(session);
         return snapshot(session, playerId);
     }
 
@@ -168,6 +185,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         }
 
         settleDebtWithSelectedCards(activeGame, debt, debtor, creditor, paymentCardIds);
+        progressTurn(session);
         return snapshot(session, debtor.id());
     }
 
@@ -180,6 +198,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         requireNoPendingActionResponses(activeGame);
         requireNoPendingDebts(activeGame);
         actionRule.requireActivePlayer(activeGame.turnManager(), proposerId);
+        requireNoPendingTradeResponseFor(activeGame, proposerId);
         requireNotDefeated(session, proposerId);
         if (proposerId.equals(targetId)) {
             throw new GameException("TRADE_WITH_SELF", "Cannot propose a trade with yourself");
@@ -236,6 +255,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
             trade.reject();
         }
         activeGame.removePendingTrade(trade);
+        progressTurn(session);
         return snapshot(session, responderId);
     }
 
@@ -264,20 +284,26 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
             clearUnpayableDebts(session, activeGame);
             activeGame.removePendingAction(pendingAction);
         }
+        progressTurn(session);
         return snapshot(session, responderId);
     }
 
     @Override
-    public synchronized SessionSnapshot executeDiscardCards(DiscardCardsCommand command) {
+    public synchronized SessionSnapshot executeDiscardCards(DiscardCardCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
         String playerId = requireText(command.getPlayerId(), "playerId");
         ActiveGameState activeGame = requireActiveGame(session);
+        requireNoPendingActionResponses(activeGame);
+        requireNoPendingDebts(activeGame);
         actionRule.requireActivePlayer(activeGame.turnManager(), playerId);
+        requireNoPendingTradeResponseFor(activeGame, playerId);
         requireNotDefeated(session, playerId);
+        requirePlayerPhase(session, playerId, PlayerPhase.DISCARDING);
 
         Player player = requirePlayer(session, playerId);
         List<String> cardIds = readStringList(command.getDiscardedCardIds());
         discardHandDownToSeven(player, cardIds, activeGame);
+        progressTurn(session);
         return snapshot(session, playerId);
     }
 
@@ -290,19 +316,12 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         requireNoPendingActionResponses(activeGame);
         requireNoPendingDebts(activeGame);
         actionRule.requireActivePlayer(turnManager, playerId);
+        requireNoPendingTradeResponseFor(activeGame, playerId);
         requireNotDefeated(session, playerId);
+        requirePlayerPhase(session, playerId, PlayerPhase.ACTING);
 
-        Player player = requirePlayer(session, playerId);
-        if (player.hand().size() > 7) {
-            throw new GameException("HAND_LIMIT_EXCEEDED", "Discard down to 7 cards before ending the turn");
-        }
-
-        if (scanWinnersInJoinOrder(session)) {
-            return snapshot(session, playerId);
-        }
-        cancelTradesAwaitingTarget(activeGame, playerId);
-        String nextPlayerId = advanceToNextAvailableTurn(session);
-        drawForTurnStart(session, nextPlayerId);
+        activeGame.requestEndTurn();
+        progressTurn(session);
         return snapshot(session, playerId);
     }
 
@@ -379,6 +398,48 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         }
     }
 
+    private void requireNoPendingTradeResponseFor(ActiveGameState activeGame, String playerId) {
+        if (!activeGame.pendingTradesForTarget(playerId).isEmpty()) {
+            throw new InvalidGameStateException(
+                    "TRADE_RESPONSE_REQUIRED",
+                    "Respond to the pending trade before continuing the turn");
+        }
+    }
+
+    private void requirePlayerPhase(GameSession session, String playerId, PlayerPhase expected) {
+        PlayerPhase actual = PlayerPhaseResolver.resolve(session, playerId);
+        if (actual != expected) {
+            throw new InvalidGameStateException(
+                    "PLAYER_PHASE_REQUIRED",
+                    "Player phase must be " + expected + " but was " + actual);
+        }
+    }
+
+    private void progressTurn(GameSession session) {
+        if (session.status() != SessionStatus.ACTIVE || session.activeGame().isEmpty()) {
+            return;
+        }
+        ActiveGameState activeGame = requireActiveGame(session);
+        String activePlayerId = activeGame.turnManager().activePlayerId();
+        if (activeGame.hasPendingActions()
+                || !activeGame.pendingDebtsView().isEmpty()
+                || !activeGame.pendingTradesForTarget(activePlayerId).isEmpty()) {
+            return;
+        }
+
+        boolean turnEnding = activeGame.endTurnRequested()
+                || activeGame.turnManager().actionsRemaining() == 0;
+        if (!turnEnding || requirePlayer(session, activePlayerId).hand().size() > 7) {
+            return;
+        }
+        if (scanWinnersInJoinOrder(session)) {
+            return;
+        }
+        activeGame.clearEndTurnRequest();
+        String nextPlayerId = advanceToNextAvailableTurn(session);
+        drawForTurnStart(session, nextPlayerId);
+    }
+
     @Override
     public void requireNotDefeated(GameSession session, String playerId) {
         if (session.isDefeated(playerId)) {
@@ -395,6 +456,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
 
     private String advanceToNextAvailableTurn(GameSession session) {
         ActiveGameState activeGame = requireActiveGame(session);
+        activeGame.clearEndTurnRequest();
         TurnManager turnManager = activeGame.turnManager();
         int guard = turnManager.turnOrder().size();
         String nextPlayerId;
@@ -442,6 +504,11 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
 
         if (session.status() == SessionStatus.FINISHED) {
             return changed;
+        }
+
+        progressTurn(session);
+        if (session.status() == SessionStatus.FINISHED) {
+            return true;
         }
 
         for (String playerId : session.playerJoinOrder()) {
@@ -1025,19 +1092,21 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         }
         List<Card> selected = new ArrayList<>();
         for (String cardId : cardIds) {
-            if (selected.size() >= cardsToDiscard) {
-                break;
-            }
             Card card = requireCardInHand(player, cardId);
             boolean alreadySelected = selected.stream().anyMatch(existing -> existing.id().equals(card.id()));
             if (!alreadySelected) {
                 selected.add(card);
             }
         }
-        if (selected.size() < cardsToDiscard) {
+        if (selected.isEmpty()) {
             throw new GameException(
-                    "HAND_LIMIT_EXCEEDED",
-                    "Need to discard " + cardsToDiscard + " cards but received " + selected.size());
+                    "DISCARD_SELECTION_REQUIRED",
+                    "Select at least one card to discard");
+        }
+        if (selected.size() > cardsToDiscard) {
+            throw new GameException(
+                    "TOO_MANY_DISCARDS",
+                    "Discard at most " + cardsToDiscard + " card" + (cardsToDiscard == 1 ? "" : "s"));
         }
         for (Card card : selected) {
             if (!player.hand().remove(card)) {

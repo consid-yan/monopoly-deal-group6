@@ -1,7 +1,7 @@
 // RejoinSessionHandler.java
 package ie.ucd.bdic.group6.facade.handler;
 
-import ie.ucd.bdic.group6.command.RejoinSessionCommand;
+import ie.ucd.bdic.group6.command.session.RejoinSessionCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.CommandResult;
 

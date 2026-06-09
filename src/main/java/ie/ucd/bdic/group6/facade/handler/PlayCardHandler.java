@@ -1,7 +1,7 @@
 // PlayCardHandler.java
 package ie.ucd.bdic.group6.facade.handler;
 
-import ie.ucd.bdic.group6.command.PlayCardCommand;
+import ie.ucd.bdic.group6.command.card.PlayCardCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.CommandResult;
 

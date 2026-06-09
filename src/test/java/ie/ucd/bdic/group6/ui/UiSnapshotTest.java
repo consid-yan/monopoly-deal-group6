@@ -1,5 +1,6 @@
 package ie.ucd.bdic.group6.ui;
 
+import ie.ucd.bdic.group6.core.engine.PlayerPhase;
 import ie.ucd.bdic.group6.core.snapshot.CardSnapshot;
 import ie.ucd.bdic.group6.core.snapshot.PendingActionSnapshot;
 import ie.ucd.bdic.group6.core.snapshot.PendingDebtSnapshot;
@@ -17,6 +18,28 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UiSnapshotTest {
+
+    @Test
+    void exposesEngineOwnedPlayerPhase() {
+        PlayerStateSnapshot player = new PlayerStateSnapshot(
+                "host",
+                "Host",
+                "CONNECTED",
+                "DISCARDING",
+                true,
+                "",
+                false,
+                8,
+                0,
+                List.of(),
+                List.of());
+        UiSnapshot snapshot = UiSnapshot.from(new SessionSnapshot(
+                "s1", "ABC123", "host", 2, "ACTIVE", "host", 3, 0, "", 20, 0,
+                List.of(), List.of(), List.of(), List.of(), List.of(player), List.of()));
+
+        assertEquals(PlayerPhase.DISCARDING, snapshot.playerPhase("host"));
+        assertEquals(PlayerPhase.WAITING, snapshot.playerPhase("missing"));
+    }
 
     @Test
     void parsesLobbyFieldsNeededByJavaFxScreens() {

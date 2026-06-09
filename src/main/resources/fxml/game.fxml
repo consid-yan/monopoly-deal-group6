@@ -116,21 +116,24 @@
                         <Label styleClass="game-helper-text" text="End your turn with 3 complete property sets to win"/>
                     </HBox>
 
-                    <VBox spacing="5.0" styleClass="game-board-row clean-game-board-row game-zone-panel clean-zone-panel">
+                    <VBox spacing="5.0" styleClass="game-board-row clean-game-board-row game-zone-panel clean-zone-panel"
+                          minHeight="160.0" prefHeight="160.0" maxHeight="160.0">
                         <Label styleClass="zone-heading" text="Bank"/>
-                        <ScrollPane fx:id="bankScrollPane" fitToHeight="true" hbarPolicy="AS_NEEDED" prefHeight="130.0"
-                                    styleClass="game-bank-scroll" vbarPolicy="NEVER">
-                            <HBox fx:id="bankZone" alignment="TOP_LEFT" minHeight="118.0" prefHeight="118.0"
+                        <ScrollPane fx:id="bankScrollPane" fitToHeight="true"
+                                    minHeight="130.0" prefHeight="130.0" maxHeight="130.0" styleClass="game-bank-scroll"
+                                    vbarPolicy="NEVER">
+                            <HBox fx:id="bankZone" minHeight="118.0" prefHeight="118.0"
                                   spacing="7.0"
                                   styleClass="drop-zone symbolic-drop-zone bank-drop-zone game-drop-zone clean-drop-zone"/>
                         </ScrollPane>
                     </VBox>
 
-                    <VBox spacing="6.0" styleClass="game-zone-panel clean-property-panel" VBox.vgrow="ALWAYS">
+                    <VBox spacing="6.0" styleClass="game-zone-panel clean-property-panel" minHeight="0.0" VBox.vgrow="ALWAYS">
                         <HBox alignment="CENTER_LEFT" spacing="10.0">
                             <Label styleClass="zone-heading" text="Properties"/>
                         </HBox>
-                        <ScrollPane fx:id="propertyRowsScroll" fitToHeight="false" fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="game-property-scroll" VBox.vgrow="ALWAYS">
+                        <ScrollPane fx:id="propertyRowsScroll" fitToWidth="true" hbarPolicy="NEVER"
+                                    minHeight="0.0" styleClass="game-property-scroll" VBox.vgrow="ALWAYS">
                             <FlowPane fx:id="propertyRowsZone" hgap="10.0" minHeight="150.0" styleClass="property-board clean-property-rows" vgap="10.0">
                                 <padding>
                                     <Insets bottom="2.0" left="2.0" right="2.0" top="2.0"/>
@@ -143,7 +146,7 @@
         </center>
 
         <right>
-            <VBox maxHeight="380.0" prefWidth="270.0" spacing="10.0" styleClass="game-action-rail" BorderPane.alignment="CENTER">
+            <VBox maxHeight="365.0" prefWidth="270.0" spacing="10.0" styleClass="game-action-rail" BorderPane.alignment="CENTER">
                 <BorderPane.margin>
                     <Insets top="35.0"/>
                 </BorderPane.margin>
@@ -153,15 +156,6 @@
                 </padding>
 
                 <Label styleClass="game-section-title" text="Turn Actions"/>
-
-                <Button fx:id="discardSelectedButton" graphicTextGap="8.0" mnemonicParsing="false" onAction="#discardSelectedCard"
-                        prefHeight="38.0" prefWidth="238.0"
-                        styleClass="menu-danger-button game-command-button"
-                        text="Discard Required">
-                    <graphic>
-                        <FontIcon iconLiteral="bx-trash" styleClass="menu-icon-danger"/>
-                    </graphic>
-                </Button>
 
                 <Button fx:id="endTurnButton" graphicTextGap="8.0" mnemonicParsing="false" onAction="#endTurn"
                         prefHeight="38.0" prefWidth="238.0"

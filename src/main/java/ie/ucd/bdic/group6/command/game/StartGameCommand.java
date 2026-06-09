@@ -1,4 +1,7 @@
-package ie.ucd.bdic.group6.command;
+package ie.ucd.bdic.group6.command.game;
+
+import ie.ucd.bdic.group6.command.AbstractCommand;
+import ie.ucd.bdic.group6.command.CommandType;
 
 import java.util.Map;
 

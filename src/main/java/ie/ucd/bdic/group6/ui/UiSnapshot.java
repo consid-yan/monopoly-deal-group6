@@ -1,5 +1,6 @@
 package ie.ucd.bdic.group6.ui;
 
+import ie.ucd.bdic.group6.core.engine.PlayerPhase;
 import ie.ucd.bdic.group6.core.snapshot.CardSnapshot;
 import ie.ucd.bdic.group6.core.snapshot.PendingActionSnapshot;
 import ie.ucd.bdic.group6.core.snapshot.PendingDebtSnapshot;
@@ -17,23 +18,9 @@ import java.util.Optional;
 public final class UiSnapshot {
 
     private static final SessionSnapshot EMPTY_SNAPSHOT = new SessionSnapshot(
-            "",
-            "",
-            "",
-            0,
-            "",
-            "",
-            0,
-            0,
-            "",
-            0,
-            0,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of()
+            "", "", "", 0, "", "", 0,
+            0, "", 0, 0,
+            List.of(), List.of(), List.of(), List.of(), List.of(), List.of()
     );
     private static final UiSnapshot EMPTY = new UiSnapshot(EMPTY_SNAPSHOT);
 
@@ -149,6 +136,13 @@ public final class UiSnapshot {
         return player(playerId);
     }
 
+    public PlayerPhase playerPhase(String playerId) {
+        return player(playerId)
+                .map(PlayerView::playerPhase)
+                .map(UiSnapshot::parsePlayerPhase)
+                .orElse(PlayerPhase.WAITING);
+    }
+
     public String playerName(String playerId) {
         return player(playerId)
                 .map(PlayerView::displayName)
@@ -238,6 +232,7 @@ public final class UiSnapshot {
             String playerId,
             String name,
             String playerStatus,
+            String playerPhase,
             boolean connected,
             String disconnectedAt,
             boolean defeated,
@@ -251,6 +246,7 @@ public final class UiSnapshot {
                     snapshot.playerId(),
                     snapshot.name(),
                     snapshot.playerStatus(),
+                    snapshot.playerPhase(),
                     snapshot.connected(),
                     snapshot.disconnectedAt(),
                     snapshot.defeated(),
@@ -569,5 +565,16 @@ public final class UiSnapshot {
             builder.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
         }
         return builder.toString();
+    }
+
+    private static PlayerPhase parsePlayerPhase(String value) {
+        if (value == null || value.isBlank()) {
+            return PlayerPhase.WAITING;
+        }
+        try {
+            return PlayerPhase.valueOf(value);
+        } catch (IllegalArgumentException ignored) {
+            return PlayerPhase.WAITING;
+        }
     }
 }

@@ -5,6 +5,9 @@ import ie.ucd.bdic.group6.core.card.Card;
 import ie.ucd.bdic.group6.core.card.MoneyCard;
 import ie.ucd.bdic.group6.core.card.PropertyCard;
 import ie.ucd.bdic.group6.core.card.PropertyWildCard;
+import ie.ucd.bdic.group6.core.engine.pending.PendingAction;
+import ie.ucd.bdic.group6.core.engine.pending.PendingDebt;
+import ie.ucd.bdic.group6.core.engine.pending.PendingTrade;
 import ie.ucd.bdic.group6.core.player.Player;
 import ie.ucd.bdic.group6.core.property.PropertySet;
 import ie.ucd.bdic.group6.core.snapshot.CardSnapshot;
@@ -113,6 +116,7 @@ public final class SessionSnapshotBuilder {
                 player.id(),
                 player.name(),
                 session.playerStatus(player.id()),
+                PlayerPhaseResolver.resolve(session, player.id()).name(),
                 session.isConnected(player.id()),
                 session.disconnectedAt(player.id()).map(Instant::toString).orElse(""),
                 session.isDefeated(player.id()),

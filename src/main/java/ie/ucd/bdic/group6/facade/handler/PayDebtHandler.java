@@ -1,7 +1,7 @@
 // PayDebtHandler.java
 package ie.ucd.bdic.group6.facade.handler;
 
-import ie.ucd.bdic.group6.command.PayDebtCommand;
+import ie.ucd.bdic.group6.command.debt.PayDebtCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.CommandResult;
 

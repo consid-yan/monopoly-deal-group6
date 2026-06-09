@@ -1,4 +1,7 @@
-package ie.ucd.bdic.group6.command;
+package ie.ucd.bdic.group6.command.session;
+
+import ie.ucd.bdic.group6.command.AbstractCommand;
+import ie.ucd.bdic.group6.command.CommandType;
 
 import java.util.Map;
 
@@ -24,10 +27,6 @@ public class CreateSessionCommand extends AbstractCommand {
         if (raw instanceof Number n) {
             return n.intValue();
         }
-        try {
-            return Integer.parseInt(raw.toString());
-        } catch (NumberFormatException e) {
-            return null;
-        }
+        return Integer.parseInt(raw.toString());
     }
 }

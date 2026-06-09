@@ -1,6 +1,6 @@
 package ie.ucd.bdic.group6.facade.handler;
 
-import ie.ucd.bdic.group6.command.ProcessDisconnectTimeoutsCommand;
+import ie.ucd.bdic.group6.command.connection.ProcessDisconnectTimeoutsCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.CommandResult;
 

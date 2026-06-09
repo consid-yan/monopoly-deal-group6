@@ -1,6 +1,6 @@
 package ie.ucd.bdic.group6.facade.handler;
 
-import ie.ucd.bdic.group6.command.PlayerDisconnectedCommand;
+import ie.ucd.bdic.group6.command.connection.PlayerDisconnectedCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.CommandResult;
 
