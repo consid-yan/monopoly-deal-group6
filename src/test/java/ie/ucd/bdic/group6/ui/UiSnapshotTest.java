@@ -352,12 +352,12 @@ class UiSnapshotTest {
     }
 
     @Test
-    void tradeResponseRequiresTargetPlayersTurn() {
+    void tradeResponseAvailableWhenTargetHasPendingTrade() {
         UiSnapshot targetOffTurn = UiSnapshot.from(snapshotWithPendingTrade("host", "guest", "host"));
         UiSnapshot targetTurn = UiSnapshot.from(snapshotWithPendingTrade("guest", "guest", "host"));
         UiSnapshot activeNonTarget = UiSnapshot.from(snapshotWithPendingTrade("host", "guest", "host"));
 
-        assertFalse(targetOffTurn.canRespondToTrade("guest"));
+        assertTrue(targetOffTurn.canRespondToTrade("guest"));
         assertTrue(targetTurn.canRespondToTrade("guest"));
         assertFalse(activeNonTarget.canRespondToTrade("host"));
     }
