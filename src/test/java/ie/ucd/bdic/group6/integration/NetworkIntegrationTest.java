@@ -22,10 +22,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
@@ -334,7 +331,7 @@ class NetworkIntegrationTest {
         assertTrue(host.isConnected());
         server.stop();
 
-        Throwable disconnect = await(disconnects, value -> value != null);
+        Throwable disconnect = await(disconnects, Objects::nonNull);
         assertNotNull(disconnect);
         assertFalse(host.isConnected());
     }

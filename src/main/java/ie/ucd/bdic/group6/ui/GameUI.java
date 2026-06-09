@@ -2,8 +2,11 @@ package ie.ucd.bdic.group6.ui;
 
 import ie.ucd.bdic.group6.app.GameSessionCoordinator;
 import ie.ucd.bdic.group6.command.CommandType;
+import ie.ucd.bdic.group6.network.message.ServerResponse;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import javafx.application.Platform;
@@ -25,6 +28,7 @@ public class GameUI {
     private final GameSessionCoordinator context;
     private final Map<String, Node> cardNodes = new LinkedHashMap<>();
     private final List<String> handCardIds = new ArrayList<>();
+    private final Set<String> submittedDebtIds = ConcurrentHashMap.newKeySet();
     private UiSnapshot snapshot = UiSnapshot.empty();
     private String selectedCardId;
 
@@ -55,11 +59,7 @@ public class GameUI {
     @FXML
     private FlowPane propertyRowsZone;
     @FXML
-    private TextArea gameLogArea;
-    @FXML
-    private Label statusMessageLabel;
-    @FXML
-    private Button playSelectedButton;
+    private TextArea gameActivityArea;
     @FXML
     private Button discardSelectedButton;
     @FXML
@@ -71,6 +71,61 @@ public class GameUI {
 
     public GameUI(GameSessionCoordinator context) {
         this.context = context;
+    }
+
+    enum HandCardClickAction {
+        SELECT,
+        PLAY_SELECTED
+    }
+
+    static HandCardClickAction resolveHandCardClick(String clickedCardId, String selectedCardId, boolean yourTurn) {
+        if (yourTurn && clickedCardId != null && clickedCardId.equals(selectedCardId)) {
+            return HandCardClickAction.PLAY_SELECTED;
+        }
+        return HandCardClickAction.SELECT;
+    }
+
+    static boolean shouldPromptDebt(String debtId, Set<String> submittedDebtIds) {
+        return debtId == null || submittedDebtIds == null || !submittedDebtIds.contains(debtId);
+    }
+
+    static List<String> buildActivityLines(UiSnapshot snapshot, String viewerPlayerId) {
+        if (snapshot == null || snapshot.isEmpty()) {
+            return List.of("Connect to a session to view status.");
+        }
+
+        List<String> lines = new ArrayList<>();
+        for (UiSnapshot.PendingDebtView debt : snapshot.pendingDebts()) {
+            lines.add(snapshot.playerName(debt.debtorPlayerId()) + " needs to pay $" + debt.amountM() + "M.");
+        }
+        for (UiSnapshot.PendingTradeView trade : snapshot.pendingTrades()) {
+            if (trade.pending()) {
+                lines.add("Waiting for " + snapshot.playerName(trade.targetPlayerId())
+                        + " to respond to a trade.");
+            }
+        }
+        for (UiSnapshot.PendingActionView action : snapshot.pendingActions()) {
+            List<String> waitingPlayers = action.targetPlayerIds().stream()
+                    .filter(action::awaits)
+                    .map(snapshot::playerName)
+                    .toList();
+            if (waitingPlayers.isEmpty()) {
+                lines.add("Some actions are waiting for response.");
+            } else {
+                lines.add("Waiting for " + String.join(", ", waitingPlayers)
+                        + " to respond to " + UiSnapshot.humanize(action.actionType()) + ".");
+            }
+        }
+
+        if (!lines.isEmpty()) {
+            return List.copyOf(lines);
+        }
+        if (snapshot.activePlayerId() != null
+                && !snapshot.activePlayerId().isBlank()
+                && !snapshot.isTurnFor(viewerPlayerId)) {
+            return List.of("Waiting for " + snapshot.playerName(snapshot.activePlayerId()) + " to finish their turn.");
+        }
+        return List.of("No pending actions.");
     }
 
     @FXML
@@ -107,7 +162,6 @@ public class GameUI {
     private void playSelectedCard() {
         UiSnapshot.CardView card = selectedHandCard().orElse(null);
         if (card == null) {
-            showFeedback("Select a card from your hand first.");
             return;
         }
 
@@ -116,7 +170,7 @@ public class GameUI {
 
         if ("MONEY".equals(card.type())) {
             payload.put("playMode", "BANK");
-            submit(CommandType.PLAY_CARD, payload, "Played " + card.title() + " to your bank.");
+            submit(CommandType.PLAY_CARD, payload);
             return;
         }
 
@@ -129,7 +183,7 @@ public class GameUI {
                 }
                 payload.put("propertyColor", color.get());
             }
-            submit(CommandType.PLAY_CARD, payload, "Played " + card.title() + ".");
+            submit(CommandType.PLAY_CARD, payload);
             return;
         }
 
@@ -142,7 +196,6 @@ public class GameUI {
     private void discardSelectedCard() {
         int cardsToDiscard = snapshot.cardsToDiscard();
         if (cardsToDiscard <= 0) {
-            showFeedback("Discarding is only required when your hand has more than 7 cards.");
             return;
         }
 
@@ -162,19 +215,18 @@ public class GameUI {
 
         Map<String, Object> payload = basePayload();
         payload.put("discardedCardIds", cardIds);
-        submit(CommandType.DISCARD_CARDS, payload, "Discarded selected cards.");
+        submit(CommandType.DISCARD_CARDS, payload);
     }
 
     @FXML
     private void endTurn() {
-        submit(CommandType.END_TURN, basePayload(), "Ended your turn.");
+        submit(CommandType.END_TURN, basePayload());
     }
 
     @FXML
     private void proposeTrade() {
         UiSnapshot.PlayerView currentPlayer = snapshot.currentPlayer(context.playerId()).orElse(null);
         if (currentPlayer == null) {
-            showFeedback("You are not in this game.");
             return;
         }
         List<UiSnapshot.PlayerView> eligibleOpponents = snapshot.opponents(context.playerId()).stream()
@@ -207,7 +259,7 @@ public class GameUI {
         payload.put("targetPlayerId", target.get().playerId());
         payload.put("offeredCardIds", List.of(offered.get().id()));
         payload.put("requestedCardIds", List.of(requested.get().id()));
-        submit(CommandType.PROPOSE_TRADE, payload, "Proposed trade to " + target.get().displayName() + ".");
+        submit(CommandType.PROPOSE_TRADE, payload);
     }
 
     @FXML
@@ -217,10 +269,10 @@ public class GameUI {
 
     private void render(UiSnapshot nextSnapshot) {
         if (nextSnapshot == null || nextSnapshot.isEmpty()) {
+            submittedDebtIds.clear();
             clearTable();
             updateSelectedCardSummary();
             updateButtonStates();
-            showFeedback("Connect to a session from the main menu.");
             return;
         }
         if ("LOBBY".equals(nextSnapshot.status())) {
@@ -233,6 +285,7 @@ public class GameUI {
         }
 
         snapshot = nextSnapshot;
+        pruneSubmittedDebtIds();
         cardNodes.clear();
         handCardIds.clear();
         clearTable();
@@ -384,17 +437,7 @@ public class GameUI {
     }
 
     private void renderLog() {
-        List<String> lines = new ArrayList<>();
-        lines.add("Status: " + snapshot.status());
-        lines.add("Active: " + snapshot.playerName(snapshot.activePlayerId()));
-        lines.add("Players: " + snapshot.players().size() + " / " + snapshot.maxPlayers());
-        lines.add("Pending debts: " + snapshot.pendingDebts().size());
-        lines.add("Pending trades: " + snapshot.pendingTrades().size());
-        lines.add("Pending actions: " + snapshot.pendingActions().size());
-        if (!snapshot.forfeitedPlayerIds().isEmpty()) {
-            lines.add("Forfeits: " + String.join(", ", snapshot.forfeitedPlayerIds()));
-        }
-        MessageUI.showLines(gameLogArea, lines);
+        MessageUI.showLines(gameActivityArea, buildActivityLines(snapshot, context.playerId()));
     }
 
     private void playActionCard(UiSnapshot.CardView card, Map<String, Object> payload) {
@@ -406,7 +449,7 @@ public class GameUI {
             }
             payload.put("playMode", mode.get());
             if ("BANK".equals(mode.get())) {
-                submit(CommandType.PLAY_CARD, payload, "Banked " + card.title() + ".");
+                submit(CommandType.PLAY_CARD, payload);
                 return;
             }
         } else {
@@ -416,7 +459,7 @@ public class GameUI {
         if (!configureActionPayload(card, payload)) {
             return;
         }
-        submit(CommandType.PLAY_CARD, payload, "Played " + card.title() + ".");
+        submit(CommandType.PLAY_CARD, payload);
     }
 
     private boolean configureActionPayload(UiSnapshot.CardView card, Map<String, Object> payload) {
@@ -587,6 +630,9 @@ public class GameUI {
             return;
         }
         for (UiSnapshot.PendingDebtView debt : snapshot.pendingDebtsForDebtor(context.playerId())) {
+            if (!shouldPromptDebt(debt.debtId(), submittedDebtIds)) {
+                continue;
+            }
             promptDebtPayment(debt);
             return;
         }
@@ -645,7 +691,6 @@ public class GameUI {
                         .map(UiSnapshot.PlayerView::paymentCards)
                         .orElse(List.of());
                 if (paymentOptions.isEmpty()) {
-                    showFeedback("No bank or property cards are available to pay this debt.");
                     continue;
                 }
                 Optional<List<UiSnapshot.CardView>> selected = choosePaymentCards(
@@ -657,7 +702,7 @@ public class GameUI {
                 Map<String, Object> payload = basePayload();
                 payload.put("debtId", currentDebt.debtId());
                 payload.put("paymentCardIds", selected.get().stream().map(UiSnapshot.CardView::id).toList());
-                submit(CommandType.PAY_DEBT, payload, "Submitted payment.");
+                submitDebtPayment(currentDebt.debtId(), payload);
                 break;
             }
         } finally {
@@ -668,6 +713,16 @@ public class GameUI {
 
     private boolean debtStillPending(String debtId) {
         return findPendingDebt(debtId).isPresent();
+    }
+
+    private void pruneSubmittedDebtIds() {
+        if (submittedDebtIds.isEmpty()) {
+            return;
+        }
+        Set<String> currentDebtIds = snapshot.pendingDebtsForDebtor(context.playerId()).stream()
+                .map(UiSnapshot.PendingDebtView::debtId)
+                .collect(java.util.stream.Collectors.toSet());
+        submittedDebtIds.retainAll(currentDebtIds);
     }
 
     private Optional<UiSnapshot.PendingDebtView> findPendingDebt(String debtId) {
@@ -752,7 +807,7 @@ public class GameUI {
 
         dialog.setResultConverter(button -> {
             if (button == cancelButtonType) {
-                return List.<UiSnapshot.CardView>of();
+                return List.of();
             }
             if (button != okButtonType) {
                 return null;
@@ -821,7 +876,6 @@ public class GameUI {
                     .filter(card -> card.isAction("JUST_SAY_NO"))
                     .toList();
             if (justSayNoCards.isEmpty()) {
-                showFeedback("You need a Just Say No card to reject this action.");
                 maybeShowPendingPrompts();
                 return;
             }
@@ -837,14 +891,14 @@ public class GameUI {
                 payload.put("justSayNoCardId", justSayNo.get().id());
             }
         }
-        submit(CommandType.RESPOND_ACTION, payload, accepted ? "Accepted action." : "Played Just Say No.");
+        submit(CommandType.RESPOND_ACTION, payload);
     }
 
     private void submitTradeResponse(UiSnapshot.PendingTradeView trade, boolean accepted) {
         Map<String, Object> payload = basePayload();
         payload.put("tradeId", trade.tradeId());
         payload.put("accepted", accepted);
-        submit(CommandType.RESPOND_TRADE, payload, accepted ? "Accepted trade." : "Rejected trade.");
+        submit(CommandType.RESPOND_TRADE, payload);
     }
 
     private String buildActionPromptDetails(UiSnapshot.PendingActionView action) {
@@ -903,13 +957,20 @@ public class GameUI {
                 .findFirst();
     }
 
-    private void submit(CommandType commandType, Map<String, Object> payload, String successMessage) {
-        context.sendCommand(commandType, payload)
-                .thenAccept(result -> {
-                    if (result.accepted()) {
-                        Platform.runLater(() -> showFeedback(successMessage));
+    private void submitDebtPayment(String debtId, Map<String, Object> payload) {
+        submittedDebtIds.add(debtId);
+        submit(CommandType.PAY_DEBT, payload)
+                .whenComplete((result, error) -> {
+                    if (error == null && result != null && result.accepted()) {
+                        return;
                     }
+                    submittedDebtIds.remove(debtId);
+                    Platform.runLater(this::maybeShowPendingPrompts);
                 });
+    }
+
+    private CompletableFuture<ServerResponse> submit(CommandType commandType, Map<String, Object> payload) {
+        return context.sendCommand(commandType, payload);
     }
 
     private Map<String, Object> basePayload() {
@@ -918,7 +979,7 @@ public class GameUI {
 
     private <T> Optional<T> chooseOne(String title, List<T> values, Function<T, String> labeler) {
         if (values == null || values.isEmpty()) {
-            showActionFailed("No choices available for " + title + ".");
+            showActionFailed("Not available");
             return Optional.empty();
         }
         return chooseChoice(title, values.stream()
@@ -1024,8 +1085,11 @@ public class GameUI {
         Tooltip.install(cardBox, new Tooltip(card.title() + "\nID: " + card.id()));
         if (selectable) {
             cardBox.setOnMouseClicked(event -> {
+                HandCardClickAction action = resolveHandCardClick(card.id(), selectedCardId, isYourTurn());
                 selectCard(card.id());
-                showFeedback("Selected " + card.title() + ".");
+                if (action == HandCardClickAction.PLAY_SELECTED) {
+                    playSelectedCard();
+                }
                 event.consume();
             });
             cardBox.setOnMouseEntered(_ -> {
@@ -1107,7 +1171,7 @@ public class GameUI {
             return;
         }
         if (isYourTurn()) {
-            selectedCardSummaryLabel.setText("Select a card from your private hand, then choose Play Selected.");
+            selectedCardSummaryLabel.setText("Select a card from your private hand, then click it again to play.");
             return;
         }
         String pendingHint = pendingResponseHint();
@@ -1134,16 +1198,13 @@ public class GameUI {
     private void updateButtonStates() {
         boolean hasSnapshot = snapshot != null && !snapshot.isEmpty();
         boolean yourTurn = hasSnapshot && isYourTurn();
-        boolean hasSelection = hasSnapshot && selectedHandCard().isPresent();
         int cardsToDiscard = hasSnapshot ? snapshot.cardsToDiscard() : 0;
 
-        setButtonText(playSelectedButton, hasSelection ? "Play Selected" : "Select a Card");
         setButtonText(discardSelectedButton, cardsToDiscard > 0
                 ? "Discard " + cardsToDiscard + " Card" + (cardsToDiscard == 1 ? "" : "s")
                 : "No Discard Needed");
         setButtonText(endTurnButton, yourTurn ? "End Turn" : "Waiting");
 
-        setButtonDisabled(playSelectedButton, !yourTurn || !hasSelection);
         setButtonDisabled(discardSelectedButton, !yourTurn || cardsToDiscard <= 0);
         setButtonDisabled(endTurnButton, !yourTurn);
         setButtonDisabled(proposeTradeButton, !yourTurn || !canProposeTrade());
@@ -1343,15 +1404,10 @@ public class GameUI {
         };
     }
 
-    private void showFeedback(String message) {
-        setLabelText(statusMessageLabel, message);
-    }
-
     private void showActionFailed(String message) {
         if (message == null || message.isBlank()) {
             return;
         }
-        showFeedback(message);
         UiDialogs.showWarning("Action Failed", message);
     }
 
@@ -1359,9 +1415,7 @@ public class GameUI {
         if (message == null || message.isBlank()) {
             return;
         }
-        Platform.runLater(() -> {
-            showActionFailed(message);
-        });
+        Platform.runLater(() -> showActionFailed(message));
     }
 
     private record Choice<T>(String label, T value) {

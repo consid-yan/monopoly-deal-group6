@@ -120,7 +120,7 @@
                         <Label styleClass="zone-heading" text="Bank"/>
                         <ScrollPane fx:id="bankScrollPane" fitToHeight="true" hbarPolicy="AS_NEEDED" prefHeight="130.0"
                                     styleClass="game-bank-scroll" vbarPolicy="NEVER">
-                            <HBox fx:id="bankZone" alignment="CENTER_LEFT" minHeight="118.0" prefHeight="118.0"
+                            <HBox fx:id="bankZone" alignment="TOP_LEFT" minHeight="118.0" prefHeight="118.0"
                                   spacing="7.0"
                                   styleClass="drop-zone symbolic-drop-zone bank-drop-zone game-drop-zone clean-drop-zone"/>
                         </ScrollPane>
@@ -143,62 +143,57 @@
         </center>
 
         <right>
-            <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="game-action-scroll"
-                        BorderPane.alignment="CENTER">
-                <VBox prefWidth="270.0" spacing="10.0" styleClass="game-action-rail">
-                    <padding>
-                        <Insets bottom="10.0" left="8.0" right="24.0"/>
-                    </padding>
-                    <Label styleClass="game-section-title" text="Turn Actions"/>
-                    <Button fx:id="playSelectedButton" graphicTextGap="8.0" mnemonicParsing="false"
-                            onAction="#playSelectedCard" prefHeight="38.0" prefWidth="238.0"
-                            styleClass="menu-primary-button game-command-button" text="Play Selected">
-                        <graphic>
-                            <FontIcon iconLiteral="bx-play" styleClass="menu-icon-primary"/>
-                        </graphic>
-                    </Button>
-                    <Button fx:id="discardSelectedButton" graphicTextGap="8.0" mnemonicParsing="false"
-                            onAction="#discardSelectedCard" prefHeight="38.0" prefWidth="238.0"
-                            styleClass="menu-danger-button game-command-button" text="Discard Required">
-                        <graphic>
-                            <FontIcon iconLiteral="bx-trash" styleClass="menu-icon-danger"/>
-                        </graphic>
-                    </Button>
-                    <Button fx:id="endTurnButton" graphicTextGap="8.0" mnemonicParsing="false" onAction="#endTurn"
-                            prefHeight="38.0" prefWidth="238.0" styleClass="menu-outline-button game-command-button"
-                            text="End Turn">
-                        <graphic>
-                            <FontIcon iconLiteral="bx-skip-next" styleClass="menu-icon-outline"/>
-                        </graphic>
-                    </Button>
+            <VBox maxHeight="380.0" prefWidth="270.0" spacing="10.0" styleClass="game-action-rail" BorderPane.alignment="CENTER">
+                <BorderPane.margin>
+                    <Insets top="35.0"/>
+                </BorderPane.margin>
 
-                    <Separator prefWidth="238.0"/>
-                    <Label styleClass="game-section-title" text="Trade"/>
-                    <Button fx:id="proposeTradeButton" graphicTextGap="6.0" mnemonicParsing="false"
-                            onAction="#proposeTrade" prefHeight="38.0" prefWidth="238.0"
-                            styleClass="menu-primary-button game-command-button" text="Propose Trade">
-                        <graphic>
-                            <FontIcon iconLiteral="bx-log-in-circle" styleClass="menu-icon-primary"/>
-                        </graphic>
-                    </Button>
+                <padding>
+                    <Insets bottom="10.0" left="8.0" right="24.0"/>
+                </padding>
 
-                    <Separator prefWidth="238.0"/>
-                    <Label styleClass="game-section-title" text="Status"/>
-                    <Label fx:id="statusMessageLabel"
-                           maxWidth="238.0"
-                           styleClass="game-status-message"
-                           text="Pending responses open automatically."
-                           wrapText="true"/>
-                    <Label styleClass="game-section-title" text="Game Log"/>
-                    <TextArea fx:id="gameLogArea"
-                              editable="false"
-                              focusTraversable="false"
-                              prefHeight="116.0"
-                              promptText="Game state summary"
-                              styleClass="lobby-status-area game-log-area"
-                              wrapText="true"/>
-                </VBox>
-            </ScrollPane>
+                <Label styleClass="game-section-title" text="Turn Actions"/>
+
+                <Button fx:id="discardSelectedButton" graphicTextGap="8.0" mnemonicParsing="false" onAction="#discardSelectedCard"
+                        prefHeight="38.0" prefWidth="238.0"
+                        styleClass="menu-danger-button game-command-button"
+                        text="Discard Required">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-trash" styleClass="menu-icon-danger"/>
+                    </graphic>
+                </Button>
+
+                <Button fx:id="endTurnButton" graphicTextGap="8.0" mnemonicParsing="false" onAction="#endTurn"
+                        prefHeight="38.0" prefWidth="238.0"
+                        styleClass="menu-outline-button game-command-button"
+                        text="End Turn">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-skip-next" styleClass="menu-icon-outline"/>
+                    </graphic>
+                </Button>
+
+                <Separator prefWidth="238.0"/>
+
+                <Label styleClass="game-section-title" text="Trade"/>
+
+                <Button fx:id="proposeTradeButton" graphicTextGap="6.0" mnemonicParsing="false" onAction="#proposeTrade"
+                        prefHeight="38.0" prefWidth="238.0"
+                        styleClass="menu-primary-button game-command-button"
+                        text="Propose Trade">
+                    <graphic>
+                        <FontIcon iconLiteral="bx-log-in-circle" styleClass="menu-icon-primary"/>
+                    </graphic>
+                </Button>
+
+                <Separator prefWidth="238.0"/>
+
+                <Label styleClass="game-section-title" text="Activity"/>
+
+                <TextArea fx:id="gameActivityArea" editable="false" focusTraversable="false" prefHeight="116.0"
+                          promptText="Current game status"
+                          styleClass="status-area game-activity-area"
+                          wrapText="true"/>
+            </VBox>
         </right>
 
         <bottom>
@@ -210,8 +205,8 @@
                     <Label styleClass="game-section-title" text="Your Hand"/>
                     <Label fx:id="selectedCardSummaryLabel" maxWidth="720.0" styleClass="game-selected-card-summary" text="Select a card to see available actions." wrapText="true" HBox.hgrow="ALWAYS"/>
                 </HBox>
-                <ScrollPane fx:id="handScrollPane" fitToHeight="true" minHeight="150.0" prefHeight="170.0" styleClass="hand-scroll-pane" vbarPolicy="NEVER">
-                    <HBox fx:id="handCardsHBox" alignment="CENTER_LEFT" minHeight="130.0" spacing="8.0" styleClass="hand-cards-box">
+                <ScrollPane fx:id="handScrollPane" fitToHeight="true" fitToWidth="true" minHeight="150.0" prefHeight="170.0" styleClass="hand-scroll-pane" vbarPolicy="NEVER">
+                    <HBox fx:id="handCardsHBox" alignment="CENTER" minHeight="130.0" spacing="8.0" styleClass="hand-cards-box">
                         <padding>
                             <Insets bottom="4.0" left="4.0" right="4.0" top="20.0"/>
                         </padding>

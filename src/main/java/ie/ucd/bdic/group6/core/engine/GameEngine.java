@@ -500,7 +500,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
             changed = true;
             if (pendingAction.isComplete()) {
                 gameplayHandler.applyResolvedPendingAction(session, activeGame, pendingAction);
-                changed |= clearUnpayableDebts(session, activeGame);
+                clearUnpayableDebts(session, activeGame);
                 activeGame.removePendingAction(pendingAction);
             }
         }
@@ -533,8 +533,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         autoPayDebtsForCreditor(session, activeGame, playerId);
     }
 
-    private boolean clearUnpayableDebts(GameSession session, ActiveGameState activeGame) {
-        boolean changed = false;
+    private void clearUnpayableDebts(GameSession session, ActiveGameState activeGame) {
         for (PendingDebt debt : activeGame.pendingDebtsView()) {
             if (!debt.isPending()) {
                 continue;
@@ -548,9 +547,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
             }
             debt.markAsPaid();
             activeGame.removePendingDebt(debt);
-            changed = true;
         }
-        return changed;
     }
 
     private boolean autoPayDebtsForDebtor(GameSession session, ActiveGameState activeGame, String debtorPlayerId) {
