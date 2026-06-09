@@ -1,4 +1,4 @@
-package ie.ucd.bdic.group6.core.engine;
+package ie.ucd.bdic.group6.core.engine.pending;
 
 import ie.ucd.bdic.group6.core.card.ActionType;
 
@@ -59,10 +59,6 @@ public final class PendingDebt {
 
     public String sourceCardId() {
         return sourceCardId;
-    }
-
-    public boolean isPaid() {
-        return paid;
     }
 
     public boolean isPending() {

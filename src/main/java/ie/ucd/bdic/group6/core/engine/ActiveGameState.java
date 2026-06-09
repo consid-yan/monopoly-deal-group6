@@ -2,6 +2,9 @@ package ie.ucd.bdic.group6.core.engine;
 
 import ie.ucd.bdic.group6.core.card.Card;
 import ie.ucd.bdic.group6.core.card.deck.Deck;
+import ie.ucd.bdic.group6.core.engine.pending.PendingAction;
+import ie.ucd.bdic.group6.core.engine.pending.PendingDebt;
+import ie.ucd.bdic.group6.core.engine.pending.PendingTrade;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +19,7 @@ public final class ActiveGameState {
     private final List<PendingTrade> pendingTrades = new ArrayList<>();
     private final List<PendingAction> pendingActions = new ArrayList<>();
     private String winnerPlayerId;
+    private boolean endTurnRequested;
 
     public ActiveGameState(Deck drawPile, TurnManager turnManager) {
         this.drawPile = Objects.requireNonNull(drawPile, "drawPile");
@@ -51,6 +55,18 @@ public final class ActiveGameState {
 
     public Optional<String> winnerPlayerId() {
         return Optional.ofNullable(winnerPlayerId);
+    }
+
+    public boolean endTurnRequested() {
+        return endTurnRequested;
+    }
+
+    public void requestEndTurn() {
+        endTurnRequested = true;
+    }
+
+    public void clearEndTurnRequest() {
+        endTurnRequested = false;
     }
 
     void setWinnerPlayerId(String winnerPlayerId) {

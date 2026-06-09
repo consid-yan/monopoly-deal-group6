@@ -1,6 +1,7 @@
 package ie.ucd.bdic.group6.app;
 
 import ie.ucd.bdic.group6.command.CommandType;
+import ie.ucd.bdic.group6.command.Command;
 import ie.ucd.bdic.group6.core.snapshot.SessionSnapshot;
 import ie.ucd.bdic.group6.network.client.GameClient;
 import ie.ucd.bdic.group6.network.message.ServerNotice;
@@ -44,8 +45,8 @@ public final class GameSessionCoordinator implements AutoCloseable {
     private final Map<String, RejoinCredentials> rejoinCredentialsByRoomCode = new ConcurrentHashMap<>();
     private volatile boolean connected;
 
-    public GameSessionCoordinator(AppConfig appConfig) {
-        this.appConfig = Objects.requireNonNull(appConfig, "appConfig");
+    public GameSessionCoordinator(AppConfig config) {
+        appConfig = Objects.requireNonNull(config, "appConfig");
     }
 
     public UiSnapshot latestSnapshot() {
@@ -92,8 +93,7 @@ public final class GameSessionCoordinator implements AutoCloseable {
     }
 
     public void setDisconnectListener(Consumer<String> listener) {
-        disconnectListener = listener == null ? _ -> {
-        } : listener;
+        disconnectListener = listener == null ? _ -> {} : listener;
     }
 
     public CompletableFuture<ServerResponse> createHostedSession(String requestedPlayerName, int maxPlayers) {
@@ -118,14 +118,10 @@ public final class GameSessionCoordinator implements AutoCloseable {
                 String serverBindAddress = "0.0.0.0";
 
                 LOGGER.info("Server started successfully.");
-                LOGGER.info(() -> "Bind address: " + serverBindAddress + " (0.0.0.0 listens on all network adapters)");
+                LOGGER.info(() -> "Bind address: " + serverBindAddress);
                 LOGGER.info(() -> "Actual listening port: " + actualPort);
 
                 String shareableHost = resolveShareableHost();
-
-                LOGGER.info(() -> "Resolved local LAN IP: " + shareableHost);
-                LOGGER.info(() -> "Connection address for other players: " + shareableHost + ":" + actualPort);
-                LOGGER.info(() -> "Local connection address: 127.0.0.1:" + actualPort);
 
                 LOGGER.info("[4/5] Creating local client and connecting to server...");
                 GameClient newClient = openClient("127.0.0.1", actualPort);
@@ -179,8 +175,7 @@ public final class GameSessionCoordinator implements AutoCloseable {
                     "maxPlayers", maxPlayers
             )).whenComplete((result, throwable) -> {
                 if (throwable != null) {
-                    LOGGER.log(
-                            Level.SEVERE,
+                    LOGGER.log(Level.SEVERE,
                             "Failed to create game session. Possible reasons: no server response, "
                                     + "serialization failure, or invalid command format.",
                             throwable);
@@ -188,7 +183,6 @@ public final class GameSessionCoordinator implements AutoCloseable {
                     LOGGER.info("Game session created successfully.");
                     LOGGER.info(() -> "Session ID: " + result.payload().get("sessionId"));
                     LOGGER.info(() -> "Room Code: " + result.payload().get("roomCode"));
-                    LOGGER.info("Ready to invite other players to join.");
                 } else {
                     LOGGER.warning(() -> "Server rejected session creation. Error Code: "
                             + result.code()
@@ -211,8 +205,7 @@ public final class GameSessionCoordinator implements AutoCloseable {
                 .thenCompose(ignored -> sendCommand(CommandType.JOIN_SESSION, Map.of(
                         "roomCode", newRoomCode,
                         "playerId", newPlayerId,
-                        "playerName", newPlayerName
-                )));
+                        "playerName", newPlayerName)));
     }
 
     public CompletableFuture<ServerResponse> rejoinSession(String requestedRoomCode) {
@@ -255,14 +248,9 @@ public final class GameSessionCoordinator implements AutoCloseable {
         return future;
     }
 
-    public Map<String, Object> sessionCommandPayload() {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("sessionId", sessionId);
-        payload.put("playerId", playerId);
-        if (!playerToken.isBlank()) {
-            payload.put("playerToken", playerToken);
-        }
-        return payload;
+    public CompletableFuture<ServerResponse> sendCommand(Command command) {
+        Objects.requireNonNull(command, "command");
+        return sendCommand(command.getCommandType(), command.payload());
     }
 
     public void leaveSession() {

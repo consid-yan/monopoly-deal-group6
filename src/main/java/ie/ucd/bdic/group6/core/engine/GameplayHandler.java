@@ -1,6 +1,6 @@
 package ie.ucd.bdic.group6.core.engine;
 
-import ie.ucd.bdic.group6.command.PlayCardCommand;
+import ie.ucd.bdic.group6.command.card.PlayCardCommand;
 import ie.ucd.bdic.group6.core.card.ActionCard;
 import ie.ucd.bdic.group6.core.card.ActionType;
 import ie.ucd.bdic.group6.core.card.Card;
@@ -8,6 +8,8 @@ import ie.ucd.bdic.group6.core.card.PropertyCard;
 import ie.ucd.bdic.group6.core.card.PropertyWildCard;
 import ie.ucd.bdic.group6.core.common.OperationError;
 import ie.ucd.bdic.group6.core.common.OperationResult;
+import ie.ucd.bdic.group6.core.engine.pending.PendingAction;
+import ie.ucd.bdic.group6.core.engine.pending.PendingDebt;
 import ie.ucd.bdic.group6.core.player.Player;
 import ie.ucd.bdic.group6.core.player.PropertyTransferService;
 import ie.ucd.bdic.group6.core.player.PlayerRollbackSnapshot;

@@ -1,18 +1,18 @@
 package ie.ucd.bdic.group6.core.engine;
 
-import ie.ucd.bdic.group6.command.CreateSessionCommand;
-import ie.ucd.bdic.group6.command.DiscardCardsCommand;
-import ie.ucd.bdic.group6.command.EndTurnCommand;
-import ie.ucd.bdic.group6.command.JoinSessionCommand;
-import ie.ucd.bdic.group6.command.PayDebtCommand;
-import ie.ucd.bdic.group6.command.PlayCardCommand;
-import ie.ucd.bdic.group6.command.PlayerDisconnectedCommand;
-import ie.ucd.bdic.group6.command.ProposeTradeCommand;
-import ie.ucd.bdic.group6.command.ProcessDisconnectTimeoutsCommand;
-import ie.ucd.bdic.group6.command.RejoinSessionCommand;
-import ie.ucd.bdic.group6.command.RespondActionCommand;
-import ie.ucd.bdic.group6.command.RespondTradeCommand;
-import ie.ucd.bdic.group6.command.StartGameCommand;
+import ie.ucd.bdic.group6.command.session.CreateSessionCommand;
+import ie.ucd.bdic.group6.command.card.DiscardCardCommand;
+import ie.ucd.bdic.group6.command.game.EndTurnCommand;
+import ie.ucd.bdic.group6.command.session.JoinSessionCommand;
+import ie.ucd.bdic.group6.command.debt.PayDebtCommand;
+import ie.ucd.bdic.group6.command.card.PlayCardCommand;
+import ie.ucd.bdic.group6.command.connection.PlayerDisconnectedCommand;
+import ie.ucd.bdic.group6.command.trade.ProposeTradeCommand;
+import ie.ucd.bdic.group6.command.connection.ProcessDisconnectTimeoutsCommand;
+import ie.ucd.bdic.group6.command.session.RejoinSessionCommand;
+import ie.ucd.bdic.group6.command.action.RespondActionCommand;
+import ie.ucd.bdic.group6.command.trade.RespondTradeCommand;
+import ie.ucd.bdic.group6.command.game.StartGameCommand;
 import ie.ucd.bdic.group6.core.card.ActionCard;
 import ie.ucd.bdic.group6.core.card.ActionType;
 import ie.ucd.bdic.group6.core.card.Card;
@@ -637,7 +637,6 @@ class ActionExecutorTest {
         endTurn(engine, sessionId, "player2");
         playAs(engine, sessionId, "host", red.id());
         playAs(engine, sessionId, "host", "host-1");
-        playAs(engine, sessionId, "host", "host-2");
         SessionSnapshot proposed = engine.executeProposeTrade(new ProposeTradeCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "host",
@@ -646,7 +645,7 @@ class ActionExecutorTest {
                 "requestedCardIds", List.of(payment.id())
         )));
         String tradeId = pendingTrades(proposed).getFirst().tradeId();
-        assertEquals(3, proposed.actionsUsed());
+        assertEquals(2, proposed.actionsUsed());
 
         endTurn(engine, sessionId, "host");
         SessionSnapshot accepted = engine.executeRespondTrade(new RespondTradeCommand(Map.of(
@@ -658,7 +657,7 @@ class ActionExecutorTest {
 
         assertTrue(pendingTrades(accepted).isEmpty());
         assertEquals(0, accepted.actionsUsed());
-        assertEquals(5, playerSummary(accepted, "host").bankTotalValueM());
+        assertEquals(4, playerSummary(accepted, "host").bankTotalValueM());
         assertTrue(propertyRows(playerSummary(accepted, "host")).isEmpty());
         assertEquals(List.of(red.id()), cardIds(rowCards(propertyRows(playerSummary(accepted, "player2")).getFirst())));
     }
@@ -768,6 +767,113 @@ class ActionExecutorTest {
     }
 
     @Test
+    void activeTradeTargetMustRespondBeforeContinuingTurn() {
+        PropertyCard offered = property("offered-property", PropertyColor.RED);
+        MoneyCard hostDiscard = money("host-discard", 1);
+        MoneyCard requested = money("requested-money", 3);
+        MoneyCard player2Play = money("player2-play", 1);
+        StartedGame game = startedGameWithHands(
+                List.of(offered, hostDiscard),
+                List.of(requested, player2Play),
+                moneyCards("fill", 30),
+                new MutableClock());
+
+        endTurn(game.engine(), game.sessionId(), "host");
+        bankAs(game.engine(), game.sessionId(), "player2", requested.id());
+        endTurn(game.engine(), game.sessionId(), "player2");
+        playAs(game.engine(), game.sessionId(), "host", offered.id());
+        SessionSnapshot proposed = game.engine().executeProposeTrade(new ProposeTradeCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "host",
+                "targetPlayerId", "player2",
+                "offeredCardIds", List.of(offered.id()),
+                "requestedCardIds", List.of(requested.id())
+        )));
+        String tradeId = pendingTrades(proposed).getFirst().tradeId();
+        endTurn(game.engine(), game.sessionId(), "host");
+        game.engine().executeDiscardCards(new DiscardCardCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "host",
+                "discardedCardIds", List.of(hostDiscard.id())
+        )));
+
+        GameException playError = assertThrows(GameException.class,
+                () -> playAs(game.engine(), game.sessionId(), "player2", player2Play.id()));
+        GameException discardError = assertThrows(GameException.class,
+                () -> game.engine().executeDiscardCards(new DiscardCardCommand(Map.of(
+                        "sessionId", game.sessionId(),
+                        "playerId", "player2",
+                        "discardedCardIds", List.of(player2Play.id())
+                ))));
+        GameException endError = assertThrows(GameException.class,
+                () -> endTurn(game.engine(), game.sessionId(), "player2"));
+
+        assertEquals("TRADE_RESPONSE_REQUIRED", playError.getErrorCode());
+        assertEquals("TRADE_RESPONSE_REQUIRED", discardError.getErrorCode());
+        assertEquals("TRADE_RESPONSE_REQUIRED", endError.getErrorCode());
+
+        game.engine().executeRespondTrade(new RespondTradeCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "player2",
+                "tradeId", tradeId,
+                "accepted", false
+        )));
+        SessionSnapshot afterPlay = playAs(game.engine(), game.sessionId(), "player2", player2Play.id());
+        assertEquals(1, afterPlay.actionsUsed());
+    }
+
+    @Test
+    void discardRejectsWhileActionResponseIsPending() {
+        ActionCard passGo1 = passGo("pass-go-1");
+        ActionCard passGo2 = passGo("pass-go-2");
+        ActionCard debtCollector = debtCollector("debt-collector");
+        MoneyCard discard = money("discard", 1);
+        StartedGame game = startedGameWithHostCards(
+                List.of(passGo1, passGo2, debtCollector, discard),
+                moneyCards("draw", 30));
+
+        play(game.engine(), game.sessionId(), passGo1.id());
+        play(game.engine(), game.sessionId(), passGo2.id());
+        game.engine().executePlayCard(new PlayCardCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "host",
+                "cardId", debtCollector.id(),
+                "targetPlayerId", "player2"
+        )));
+
+        GameException error = assertThrows(GameException.class,
+                () -> game.engine().executeDiscardCards(new DiscardCardCommand(Map.of(
+                        "sessionId", game.sessionId(),
+                        "playerId", "host",
+                        "discardedCardIds", List.of(discard.id())
+                ))));
+
+        assertEquals("ACTION_RESPONSE_REQUIRED", error.getErrorCode());
+    }
+
+    @Test
+    void discardRejectsWhileDebtPaymentIsPending() {
+        ActionCard debtCollector = debtCollector("debt-collector");
+        MoneyCard payment = money("payment", 2);
+        StartedGame game = startedGameForPlayer2Assets(new MutableClock(), debtCollector, List.of(payment));
+        acceptedDebtCollectorDebt(game, debtCollector.id());
+        SessionSnapshot hostView = game.engine().executeRejoinSession(new RejoinSessionCommand(Map.of(
+                "sessionIdentity", game.sessionId(),
+                "playerId", "host"
+        )));
+        String hostCardId = currentPlayerHand(hostView).getFirst().id();
+
+        GameException error = assertThrows(GameException.class,
+                () -> game.engine().executeDiscardCards(new DiscardCardCommand(Map.of(
+                        "sessionId", game.sessionId(),
+                        "playerId", "host",
+                        "discardedCardIds", List.of(hostCardId)
+                ))));
+
+        assertEquals("PAYMENT_REQUIRED", error.getErrorCode());
+    }
+
+    @Test
     void selectedPropertyRowRejectsIncompatibleCardWithoutAutoCreatingRow() {
         PropertyCard red = property("red", PropertyColor.RED);
         PropertyCard blue = property("blue", PropertyColor.LIGHT_BLUE);
@@ -783,7 +889,7 @@ class ActionExecutorTest {
                 ))));
 
         assertEquals("RECEIVER_ROW_REJECTS_CARD", error.getErrorCode());
-        SessionSnapshot snapshot = game.engine().executeRejoinSession(new ie.ucd.bdic.group6.command.RejoinSessionCommand(Map.of(
+        SessionSnapshot snapshot = game.engine().executeRejoinSession(new RejoinSessionCommand(Map.of(
                 "sessionIdentity", game.sessionId(),
                 "playerId", "host"
         )));
@@ -810,7 +916,6 @@ class ActionExecutorTest {
                 .findFirst()
                 .orElseThrow()
                 .rowId();
-        endTurn(game.engine(), game.sessionId(), "host");
         endTurn(game.engine(), game.sessionId(), "player2");
         play(game.engine(), game.sessionId(), darkBlue2.id());
 
@@ -834,7 +939,7 @@ class ActionExecutorTest {
     }
 
     @Test
-    void fourthPlayInTurnIsRejectedWithoutMutation() {
+    void previousPlayerCannotPlayAfterThirdActionAutomaticallyAdvancesTurn() {
         List<Card> hostCards = List.of(
                 money("m1", 1),
                 money("m2", 1),
@@ -857,8 +962,8 @@ class ActionExecutorTest {
                         "cardId", "m4"
                 ))));
 
-        assertEquals("ACTION_LIMIT_REACHED", error.getErrorCode());
-        SessionSnapshot snapshot = game.engine().executeRejoinSession(new ie.ucd.bdic.group6.command.RejoinSessionCommand(Map.of(
+        assertEquals("NOT_ACTIVE_PLAYER", error.getErrorCode());
+        SessionSnapshot snapshot = game.engine().executeRejoinSession(new RejoinSessionCommand(Map.of(
                 "sessionIdentity", game.sessionId(),
                 "playerId", "host"
         )));
@@ -867,7 +972,52 @@ class ActionExecutorTest {
     }
 
     @Test
-    void endTurnRejectsLargeHandThenSucceedsAfterDiscard() {
+    void thirdActionAutomaticallyAdvancesTurnInEngine() {
+        StartedGame game = startedGameWithHostCards(
+                List.of(money("m1", 1), money("m2", 1), money("m3", 1)),
+                moneyCards("fill", 20));
+
+        play(game.engine(), game.sessionId(), "m1");
+        play(game.engine(), game.sessionId(), "m2");
+        SessionSnapshot afterThirdAction = play(game.engine(), game.sessionId(), "m3");
+
+        assertEquals("player2", afterThirdAction.activePlayerId());
+        assertEquals("ACTING", playerSummary(afterThirdAction, "player2").playerPhase());
+        assertEquals("WAITING", playerSummary(afterThirdAction, "host").playerPhase());
+    }
+
+    @Test
+    void endTurnWithLargeHandEntersEngineOwnedDiscardPhase() {
+        ActionCard passGo = passGo("pass-go");
+        StartedGame game = startedGameWithHostCards(List.of(passGo, money("discard", 1)), moneyCards("draw", 20));
+        play(game.engine(), game.sessionId(), passGo.id());
+
+        SessionSnapshot discardPhase = endTurn(game.engine(), game.sessionId(), "host");
+
+        assertEquals("host", discardPhase.activePlayerId());
+        assertEquals("DISCARDING", playerSummary(discardPhase, "host").playerPhase());
+    }
+
+    @Test
+    void finalDiscardAutomaticallyAdvancesTurnInEngine() {
+        ActionCard passGo = passGo("pass-go");
+        MoneyCard discard = money("discard", 1);
+        StartedGame game = startedGameWithHostCards(List.of(passGo, discard), moneyCards("draw", 20));
+        play(game.engine(), game.sessionId(), passGo.id());
+        endTurn(game.engine(), game.sessionId(), "host");
+
+        SessionSnapshot afterDiscard = game.engine().executeDiscardCards(new DiscardCardCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "host",
+                "discardedCardIds", List.of(discard.id())
+        )));
+
+        assertEquals("player2", afterDiscard.activePlayerId());
+        assertEquals("ACTING", playerSummary(afterDiscard, "player2").playerPhase());
+    }
+
+    @Test
+    void endTurnWithLargeHandEntersDiscardPhaseAndFinalDiscardAdvances() {
         ActionCard passGo = passGo("pass-go");
         MoneyCard discard = money("discard-me", 1);
         StartedGame game = startedGameWithHostCards(List.of(passGo, discard), moneyCards("draw", 20));
@@ -877,18 +1027,87 @@ class ActionExecutorTest {
                 "cardId", passGo.id()
         )));
 
-        GameException handLimit = assertThrows(GameException.class,
-                () -> endTurn(game.engine(), game.sessionId(), "host"));
-        assertEquals("HAND_LIMIT_EXCEEDED", handLimit.getErrorCode());
+        SessionSnapshot discardPhase = endTurn(game.engine(), game.sessionId(), "host");
+        assertEquals("DISCARDING", playerSummary(discardPhase, "host").playerPhase());
 
-        game.engine().executeDiscardCards(new DiscardCardsCommand(Map.of(
+        SessionSnapshot afterDiscard = game.engine().executeDiscardCards(new DiscardCardCommand(Map.of(
                 "sessionId", game.sessionId(),
                 "playerId", "host",
                 "discardedCardIds", List.of(discard.id())
         )));
-        SessionSnapshot afterEnd = endTurn(game.engine(), game.sessionId(), "host");
-        assertEquals(2, afterEnd.discardSize());
+        assertEquals(2, afterDiscard.discardSize());
+        assertEquals("player2", afterDiscard.activePlayerId());
+    }
+
+    @Test
+    void discardCommandCanMakePartialProgressTowardSevenCards() {
+        ActionCard passGo1 = passGo("pass-go-1");
+        ActionCard passGo2 = passGo("pass-go-2");
+        MoneyCard discard1 = money("discard-one", 1);
+        MoneyCard discard2 = money("discard-two", 1);
+        StartedGame game = startedGameWithHostCards(
+                List.of(passGo1, passGo2, discard1, discard2, money("keep", 1)),
+                moneyCards("draw", 20));
+
+        game.engine().executePlayCard(new PlayCardCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "host",
+                "cardId", passGo1.id()
+        )));
+        game.engine().executePlayCard(new PlayCardCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "host",
+                "cardId", passGo2.id()
+        )));
+        endTurn(game.engine(), game.sessionId(), "host");
+
+        SessionSnapshot afterOneDiscard = game.engine().executeDiscardCards(new DiscardCardCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "host",
+                "discardedCardIds", List.of(discard1.id())
+        )));
+
+        assertEquals(8, currentPlayerHand(afterOneDiscard).size());
+        assertFalse(cardIds(currentPlayerHand(afterOneDiscard)).contains(discard1.id()));
+        assertEquals(3, afterOneDiscard.discardSize());
+
+        SessionSnapshot afterEnd = game.engine().executeDiscardCards(new DiscardCardCommand(Map.of(
+                "sessionId", game.sessionId(),
+                "playerId", "host",
+                "discardedCardIds", List.of(discard2.id())
+        )));
         assertEquals("player2", afterEnd.activePlayerId());
+    }
+
+    @Test
+    void discardCommandCannotDropHandBelowSevenCards() {
+        ActionCard passGo1 = passGo("pass-go-1");
+        ActionCard passGo2 = passGo("pass-go-2");
+        MoneyCard discard1 = money("discard-one", 1);
+        MoneyCard discard2 = money("discard-two", 1);
+        MoneyCard keep = money("keep", 1);
+        StartedGame game = startedGameWithHostCards(
+                List.of(passGo1, passGo2, discard1, discard2, keep),
+                moneyCards("draw", 20));
+
+        play(game.engine(), game.sessionId(), passGo1.id());
+        play(game.engine(), game.sessionId(), passGo2.id());
+        endTurn(game.engine(), game.sessionId(), "host");
+
+        GameException error = assertThrows(GameException.class,
+                () -> game.engine().executeDiscardCards(new DiscardCardCommand(Map.of(
+                        "sessionId", game.sessionId(),
+                        "playerId", "host",
+                        "discardedCardIds", List.of(discard1.id(), discard2.id(), keep.id())
+                ))));
+
+        assertEquals("TOO_MANY_DISCARDS", error.getErrorCode());
+        SessionSnapshot snapshot = game.engine().executeRejoinSession(new RejoinSessionCommand(Map.of(
+                "sessionIdentity", game.sessionId(),
+                "playerId", "host"
+        )));
+        assertEquals(9, currentPlayerHand(snapshot).size());
+        assertEquals("DISCARDING", playerSummary(snapshot, "host").playerPhase());
     }
 
     @Test
@@ -906,7 +1125,7 @@ class ActionExecutorTest {
     }
 
     @Test
-    void completingThreePropertySetsFinishesOnlyAtEndTurn() {
+    void completingThreePropertySetsOnThirdActionFinishesImmediately() {
         List<Card> hostCards = List.of(
                 property("brown-1", PropertyColor.BROWN),
                 property("dark-blue-1", PropertyColor.DARK_BLUE),
@@ -920,19 +1139,14 @@ class ActionExecutorTest {
         play(game.engine(), game.sessionId(), "brown-1");
         play(game.engine(), game.sessionId(), "dark-blue-1");
         play(game.engine(), game.sessionId(), "utility-1");
-        endTurn(game.engine(), game.sessionId(), "host");
         endTurn(game.engine(), game.sessionId(), "player2");
         play(game.engine(), game.sessionId(), "brown-2");
         play(game.engine(), game.sessionId(), "dark-blue-2");
         SessionSnapshot afterThirdSet = play(game.engine(), game.sessionId(), "utility-2");
 
-        assertEquals("ACTIVE", afterThirdSet.status());
-        assertEquals("", afterThirdSet.winnerPlayerId());
-
-        SessionSnapshot afterEnd = endTurn(game.engine(), game.sessionId(), "host");
-        assertEquals("FINISHED", afterEnd.status());
-        assertEquals("host", afterEnd.winnerPlayerId());
-        assertEquals("host", afterEnd.activePlayerId());
+        assertEquals("FINISHED", afterThirdSet.status());
+        assertEquals("host", afterThirdSet.winnerPlayerId());
+        assertEquals("host", afterThirdSet.activePlayerId());
     }
 
     @Test
@@ -950,7 +1164,6 @@ class ActionExecutorTest {
         play(game.engine(), game.sessionId(), "brown-1");
         play(game.engine(), game.sessionId(), "dark-blue-1");
         play(game.engine(), game.sessionId(), "utility-1");
-        endTurn(game.engine(), game.sessionId(), "host");
         endTurn(game.engine(), game.sessionId(), "player2");
         play(game.engine(), game.sessionId(), "brown-2");
         play(game.engine(), game.sessionId(), "dark-blue-2");
@@ -966,8 +1179,8 @@ class ActionExecutorTest {
         )));
 
         assertEquals(firstSnapshot, secondSnapshot);
-        assertEquals("ACTIVE", secondSnapshot.status());
-        assertEquals("", secondSnapshot.winnerPlayerId());
+        assertEquals("FINISHED", secondSnapshot.status());
+        assertEquals("host", secondSnapshot.winnerPlayerId());
         assertEquals(afterThirdSet.activePlayerId(), secondSnapshot.activePlayerId());
         assertEquals(afterThirdSet.actionsUsed(), secondSnapshot.actionsUsed());
         assertEquals(afterThirdSet.discardSize(), secondSnapshot.discardSize());
@@ -1072,7 +1285,7 @@ class ActionExecutorTest {
     }
 
     @Test
-    void activeTimeoutSkipScansWinnerBeforeAdvancingOrDrawing() {
+    void activeTimeoutSkipAdvancesAndDrawsWhenNoWinnerExists() {
         MutableClock clock = new MutableClock();
         List<Card> hostCards = List.of(
                 property("brown-1", PropertyColor.BROWN),
@@ -1087,12 +1300,14 @@ class ActionExecutorTest {
         play(game.engine(), game.sessionId(), "brown-1");
         play(game.engine(), game.sessionId(), "dark-blue-1");
         play(game.engine(), game.sessionId(), "utility-1");
-        endTurn(game.engine(), game.sessionId(), "host");
         endTurn(game.engine(), game.sessionId(), "player2");
         play(game.engine(), game.sessionId(), "brown-2");
         play(game.engine(), game.sessionId(), "dark-blue-2");
-        SessionSnapshot afterThirdSet = play(game.engine(), game.sessionId(), "utility-2");
-        int player2HandBeforeSkip = playerSummary(afterThirdSet, "player2").handCount();
+        SessionSnapshot beforeSkip = game.engine().executeRejoinSession(new RejoinSessionCommand(Map.of(
+                "sessionIdentity", game.sessionId(),
+                "playerId", "host"
+        )));
+        int player2HandBeforeSkip = playerSummary(beforeSkip, "player2").handCount();
 
         game.engine().executePlayerDisconnected(new PlayerDisconnectedCommand(Map.of(
                 "sessionId", game.sessionId(),
@@ -1105,14 +1320,14 @@ class ActionExecutorTest {
                 "playerId", "player2"
         )));
 
-        assertEquals("FINISHED", snapshot.status());
-        assertEquals("host", snapshot.winnerPlayerId());
-        assertEquals("host", snapshot.activePlayerId());
-        assertEquals(player2HandBeforeSkip, playerSummary(snapshot, "player2").handCount());
+        assertEquals("ACTIVE", snapshot.status());
+        assertEquals("", snapshot.winnerPlayerId());
+        assertEquals("player2", snapshot.activePlayerId());
+        assertEquals(player2HandBeforeSkip + 2, playerSummary(snapshot, "player2").handCount());
     }
 
     @Test
-    void thirtySecondAutoSettleDoesNotTriggerVictoryScan() {
+    void thirtySecondAutoSettleCompletesThirdActionAndTriggersVictoryScan() {
         MutableClock clock = new MutableClock();
         ActionCard debtCollector = debtCollector("debt-collector");
         PropertyCard hostBrown1 = property("host-brown-1", PropertyColor.BROWN);
@@ -1130,7 +1345,6 @@ class ActionExecutorTest {
         play(game.engine(), game.sessionId(), hostBrown1.id());
         play(game.engine(), game.sessionId(), hostBrown2.id());
         play(game.engine(), game.sessionId(), hostBlue1.id());
-        endTurn(game.engine(), game.sessionId(), "host");
         playAs(game.engine(), game.sessionId(), "player2", targetUtility2.id());
         endTurn(game.engine(), game.sessionId(), "player2");
         play(game.engine(), game.sessionId(), hostBlue2.id());
@@ -1144,8 +1358,8 @@ class ActionExecutorTest {
 
         SessionSnapshot snapshot = disconnectPlayer2AndProcess(game, clock);
 
-        assertEquals("ACTIVE", snapshot.status());
-        assertEquals("", snapshot.winnerPlayerId());
+        assertEquals("FINISHED", snapshot.status());
+        assertEquals("host", snapshot.winnerPlayerId());
         assertTrue(pendingDebts(snapshot).isEmpty());
         assertEquals(3, propertyRows(playerSummary(snapshot, "host")).stream()
                 .filter(PropertyRowSnapshot::complete)
@@ -1462,7 +1676,13 @@ class ActionExecutorTest {
         for (Card asset : player2Assets) {
             playAssetAsPlayer2(game.engine(), game.sessionId(), asset);
         }
-        endTurn(game.engine(), game.sessionId(), "player2");
+        SessionSnapshot afterAssets = game.engine().executeRejoinSession(new RejoinSessionCommand(Map.of(
+                "sessionIdentity", game.sessionId(),
+                "playerId", "player2"
+        )));
+        if ("player2".equals(afterAssets.activePlayerId())) {
+            endTurn(game.engine(), game.sessionId(), "player2");
+        }
         return game;
     }
 

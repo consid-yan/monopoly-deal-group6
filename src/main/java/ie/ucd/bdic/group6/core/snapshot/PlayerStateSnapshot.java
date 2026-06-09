@@ -8,6 +8,7 @@ public record PlayerStateSnapshot(
         String playerId,
         String name,
         String playerStatus,
+        String playerPhase,
         boolean connected,
         String disconnectedAt,
         boolean defeated,
@@ -23,9 +24,35 @@ public record PlayerStateSnapshot(
         playerId = text(playerId);
         name = text(name);
         playerStatus = text(playerStatus);
+        playerPhase = text(playerPhase);
         disconnectedAt = text(disconnectedAt);
         bankCards = copy(bankCards);
         propertyRows = copy(propertyRows);
+    }
+
+    public PlayerStateSnapshot(
+            String playerId,
+            String name,
+            String playerStatus,
+            boolean connected,
+            String disconnectedAt,
+            boolean defeated,
+            int handCount,
+            int bankTotalValueM,
+            List<CardSnapshot> bankCards,
+            List<PropertyRowSnapshot> propertyRows) {
+        this(
+                playerId,
+                name,
+                playerStatus,
+                "WAITING",
+                connected,
+                disconnectedAt,
+                defeated,
+                handCount,
+                bankTotalValueM,
+                bankCards,
+                propertyRows);
     }
 
     private static <T> List<T> copy(List<T> values) {

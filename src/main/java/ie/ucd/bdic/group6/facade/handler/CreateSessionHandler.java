@@ -1,7 +1,7 @@
 // CreateSessionHandler.java
 package ie.ucd.bdic.group6.facade.handler;
 
-import ie.ucd.bdic.group6.command.CreateSessionCommand;
+import ie.ucd.bdic.group6.command.session.CreateSessionCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.CommandResult;
 

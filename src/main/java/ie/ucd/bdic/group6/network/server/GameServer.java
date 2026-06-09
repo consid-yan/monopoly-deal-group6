@@ -1,15 +1,11 @@
 package ie.ucd.bdic.group6.network.server;
 
-import ie.ucd.bdic.group6.command.CommandType;
 import ie.ucd.bdic.group6.controller.GameController;
-import ie.ucd.bdic.group6.controller.dto.ControllerRequest;
-import ie.ucd.bdic.group6.core.snapshot.SessionSnapshot;
 import ie.ucd.bdic.group6.facade.model.CommandResult;
 import ie.ucd.bdic.group6.network.message.ClientRequest;
 import ie.ucd.bdic.group6.network.message.Message;
 import ie.ucd.bdic.group6.network.message.NoticeType;
 import ie.ucd.bdic.group6.network.message.ServerNotice;
-import ie.ucd.bdic.group6.network.message.ServerResponse;
 import ie.ucd.bdic.group6.network.message.ServerUpdate;
 
 import java.io.EOFException;
@@ -19,12 +15,9 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -38,20 +31,17 @@ import static ie.ucd.bdic.group6.network.NetworkConfig.requireValidPort;
 public class GameServer implements AutoCloseable {
     private static final Logger LOGGER = Logger.getLogger(GameServer.class.getName());
 
-    private final GameController gameController;
+    private final ServerRequestDispatcher dispatcher;
     private final int requestedPort;
 
     private final Set<ClientConnection> clients = ConcurrentHashMap.newKeySet();
-    private final Map<String, Map<String, String>> playerTokensBySessionId = new ConcurrentHashMap<>();
-    private final Map<String, String> sessionIdByRoomCode = new ConcurrentHashMap<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     private ServerSocket serverSocket;
-    private Thread acceptThread;
     private ScheduledExecutorService timeoutExecutor;
 
     public GameServer(GameController gameController, int port) {
-        this.gameController = Objects.requireNonNull(gameController, "gameController");
+        this.dispatcher = new ServerRequestDispatcher(gameController);
         requireValidPort(port);
         this.requestedPort = port;
     }
@@ -64,7 +54,7 @@ public class GameServer implements AutoCloseable {
         serverSocket = new ServerSocket(requestedPort);
         running.set(true);
 
-        acceptThread = new Thread(this::acceptLoop, "monopoly-server-accept");
+        Thread acceptThread = new Thread(this::acceptLoop, "monopoly-server-accept");
         acceptThread.setDaemon(true);
         acceptThread.start();
 
@@ -141,191 +131,23 @@ public class GameServer implements AutoCloseable {
     }
 
     private void handleRequest(ClientConnection connection, ClientRequest request) {
-        ServerResponse authFailure = authenticate(request);
+        ServerRequestDispatcher.DispatchResult result = dispatcher.dispatch(request);
+        connection.send(result.response());
 
-        if (authFailure != null) {
-            connection.send(authFailure);
-            return;
+        if (result.bindConnection()) {
+            bind(connection, result.sessionId(), result.playerId());
         }
 
-        CommandResult result = execute(request);
-
-        SessionSnapshot snapshot = result.getSnapshot().orElse(null);
-        String authenticatedSessionId = authenticatedSessionId(request);
-        String sessionId = snapshot == null
-                ? firstNonBlank(text(result.getData().get("sessionId")), authenticatedSessionId)
-                : text(snapshot.sessionId());
-        String playerId = resolvePlayerId(request);
-        Map<String, Object> resultData = result.getData();
-
-        if (result.isSuccess()) {
-            if (snapshot != null) {
-                rememberRoomCode(snapshot);
-                resultData = responsePayload(snapshot);
-            }
-            resultData = withIssuedPlayerToken(request, sessionId, playerId, resultData);
+        if (result.broadcastSessionState()) {
+            broadcastSessionState(result.sessionId());
         }
-
-        connection.send(new ServerResponse(
-                request.requestId(),
-                result.isSuccess(),
-                result.getCode(),
-                result.getMessage(),
-                resultData,
-                snapshot
-        ));
-
-        if (!result.isSuccess()) {
-            if (request.commandType() == CommandType.REJOIN_SESSION && sessionId != null) {
-                broadcastSessionState(sessionId);
-            }
-            return;
-        }
-
-        if (sessionId != null && playerId != null) {
-            bind(connection, sessionId, playerId);
-            broadcastSessionState(sessionId);
-        }
-    }
-
-    private ServerResponse authenticate(ClientRequest request) {
-        CommandType commandType = request.commandType();
-
-        if (commandType == CommandType.CREATE_SESSION || commandType == CommandType.JOIN_SESSION) {
-            return null;
-        }
-
-        String sessionId = authenticatedSessionId(request);
-        String playerId = text(request.payload().get("playerId"));
-        String playerToken = text(request.payload().get("playerToken"));
-
-        if (sessionId == null || playerId == null || playerToken == null) {
-            return new ServerResponse(
-                    request.requestId(),
-                    false,
-                    "AUTH_REQUIRED",
-                    "A valid player token is required for " + commandType,
-                    Map.of(), null
-            );
-        }
-
-        String expectedToken = playerTokensBySessionId
-                .getOrDefault(sessionId, Map.of())
-                .get(playerId);
-
-        if (!playerToken.equals(expectedToken)) {
-            return new ServerResponse(
-                    request.requestId(),
-                    false,
-                    "UNAUTHORIZED_PLAYER",
-                    "Player identity could not be verified",
-                    Map.of(), null
-            );
-        }
-
-        return null;
-    }
-
-    private String authenticatedSessionId(ClientRequest request) {
-        if (request.commandType() == CommandType.REJOIN_SESSION) {
-            String sessionIdentity = text(request.payload().get("sessionIdentity"));
-
-            if (sessionIdentity == null) {
-                return null;
-            }
-
-            return sessionIdByRoomCode.getOrDefault(sessionIdentity, sessionIdentity);
-        }
-
-        return text(request.payload().get("sessionId"));
-    }
-
-    private CommandResult execute(ClientRequest request) {
-        try {
-            ControllerRequest controllerRequest = new ControllerRequest(request.payload());
-
-            return switch (request.commandType()) {
-                case CREATE_SESSION -> gameController.createSession(controllerRequest);
-                case JOIN_SESSION -> gameController.joinSession(controllerRequest);
-                case START_GAME -> gameController.startGame(controllerRequest);
-                case PLAY_CARD -> gameController.playCard(controllerRequest);
-                case PAY_DEBT -> gameController.payDebt(controllerRequest);
-                case PROPOSE_TRADE -> gameController.proposeTrade(controllerRequest);
-                case RESPOND_TRADE -> gameController.respondTrade(controllerRequest);
-                case RESPOND_ACTION -> gameController.respondAction(controllerRequest);
-                case DISCARD_CARDS -> gameController.discardCards(controllerRequest);
-                case END_TURN -> gameController.endTurn(controllerRequest);
-                case REJOIN_SESSION -> gameController.rejoinSession(controllerRequest);
-                case PLAYER_DISCONNECTED -> gameController.playerDisconnected(controllerRequest);
-                case PROCESS_DISCONNECT_TIMEOUTS -> gameController.processDisconnectTimeouts(controllerRequest);
-            };
-        } catch (RuntimeException e) {
-            LOGGER.log(Level.WARNING, "Failed to execute command " + request.commandType(), e);
-
-            return CommandResult.failure(
-                    "NETWORK_COMMAND_FAILED",
-                    "Failed to execute " + request.commandType() + ": " + e.getMessage()
-            );
-        }
-    }
-
-    private void rememberRoomCode(SessionSnapshot snapshot) {
-        String sessionId = text(snapshot.sessionId());
-        String roomCode = text(snapshot.roomCode());
-
-        if (sessionId != null && roomCode != null) {
-            sessionIdByRoomCode.put(roomCode, sessionId);
-        }
-    }
-
-    private Map<String, Object> responsePayload(SessionSnapshot snapshot) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("sessionId", snapshot.sessionId());
-        payload.put("roomCode", snapshot.roomCode());
-        return payload;
-    }
-
-    private Map<String, Object> withIssuedPlayerToken(
-            ClientRequest request,
-            String sessionId,
-            String playerId,
-            Map<String, Object> data
-    ) {
-        if (sessionId == null || playerId == null) {
-            return data;
-        }
-
-        String playerToken = switch (request.commandType()) {
-            case CREATE_SESSION, JOIN_SESSION -> issuePlayerToken(sessionId, playerId);
-            case REJOIN_SESSION -> playerTokensBySessionId
-                    .getOrDefault(sessionId, Map.of())
-                    .get(playerId);
-            default -> null;
-        };
-
-        if (playerToken == null) {
-            return data;
-        }
-
-        Map<String, Object> enriched = new LinkedHashMap<>(data);
-        enriched.put("playerToken", playerToken);
-        return enriched;
-    }
-
-    private String issuePlayerToken(String sessionId, String playerId) {
-        Map<String, String> tokens = playerTokensBySessionId.computeIfAbsent(
-                sessionId,
-                ignored -> new ConcurrentHashMap<>()
-        );
-
-        return tokens.computeIfAbsent(playerId, ignored -> UUID.randomUUID().toString());
     }
 
     private void bind(ClientConnection connection, String sessionId, String playerId) {
         connection.bind(sessionId, playerId);
 
         for (ClientConnection other : clients) {
-            if (other != connection && other.isBoundTo(sessionId, playerId)) {
+            if (other != connection && other.isBoundToPlayer(sessionId, playerId)) {
                 other.send(new ServerNotice(
                         NoticeType.SESSION_REPLACED,
                         Map.of(
@@ -335,21 +157,18 @@ public class GameServer implements AutoCloseable {
                         )
                 ));
 
-                other.replaceAndClose();
+                other.markReplacedAndClose();
             }
         }
     }
 
     private void broadcastSessionState(String sessionId) {
         for (ClientConnection connection : clients) {
-            if (!connection.isBoundTo(sessionId)) {
+            if (!connection.isBoundToSession(sessionId)) {
                 continue;
             }
 
-            CommandResult stateResult = gameController.rejoinSession(new ControllerRequest(Map.of(
-                    "sessionIdentity", sessionId,
-                    "playerId", connection.playerId()
-            )));
+            CommandResult stateResult = dispatcher.rejoinSession(sessionId, connection.playerId());
 
             if (stateResult.isSuccess() && stateResult.getSnapshot().isPresent()) {
                 connection.send(new ServerUpdate(stateResult.getSnapshot().orElseThrow()));
@@ -372,66 +191,19 @@ public class GameServer implements AutoCloseable {
             return;
         }
 
-        CommandResult result = gameController.processDisconnectTimeouts(new ControllerRequest(Map.of()));
-
-        if (!result.isSuccess()) {
-            return;
+        for (String sessionId : dispatcher.processDisconnectTimeouts()) {
+            broadcastSessionState(sessionId);
         }
-
-        Object rawSessionIds = result.getData().get("sessionIds");
-
-        if (!(rawSessionIds instanceof List<?> sessionIds)) {
-            return;
-        }
-
-        for (Object sessionId : sessionIds) {
-            if (sessionId != null) {
-                broadcastSessionState(sessionId.toString());
-            }
-        }
-    }
-
-    private String resolvePlayerId(ClientRequest request) {
-        String playerId = text(request.payload().get("playerId"));
-
-        if (playerId != null) {
-            return playerId;
-        }
-
-        if (request.commandType() == CommandType.CREATE_SESSION) {
-            return text(request.payload().get("hostPlayerId"));
-        }
-
-        return null;
     }
 
     private boolean hasBoundConnection(String sessionId, String playerId) {
         for (ClientConnection connection : clients) {
-            if (connection.isBoundTo(sessionId, playerId)) {
+            if (connection.isBoundToPlayer(sessionId, playerId)) {
                 return true;
             }
         }
 
         return false;
-    }
-
-    private static String text(Object value) {
-        if (value == null) {
-            return null;
-        }
-
-        String text = value.toString().trim();
-        return text.isEmpty() ? null : text;
-    }
-
-    private static String firstNonBlank(String first, String second) {
-        if (first != null && !first.isBlank()) {
-            return first;
-        }
-        if (second != null && !second.isBlank()) {
-            return second;
-        }
-        return null;
     }
 
     private synchronized void closeServerSocket() {
@@ -457,6 +229,16 @@ public class GameServer implements AutoCloseable {
         try {
             socket.close();
         } catch (IOException ignored) {}
+    }
+
+    private void handlePlayerDisconnected(String sessionId, String playerId) {
+        CommandResult result = dispatcher.playerDisconnected(sessionId, playerId);
+
+        if (result.isSuccess()) {
+            broadcastSessionState(sessionId);
+        } else {
+            LOGGER.warning("Failed to mark player disconnected: " + result.getMessage());
+        }
     }
 
     private final class ClientConnection implements Runnable, AutoCloseable {
@@ -537,10 +319,7 @@ public class GameServer implements AutoCloseable {
             String closedPlayerId = playerId;
 
             boolean shouldMarkDisconnected =
-                    running.get()
-                            && !replaced
-                            && closedSessionId != null
-                            && closedPlayerId != null;
+                    running.get() && !replaced && closedSessionId != null && closedPlayerId != null;
 
             close();
             clients.remove(this);
@@ -550,23 +329,10 @@ public class GameServer implements AutoCloseable {
             }
 
             if (shouldMarkDisconnected) {
-                markPlayerDisconnected(closedSessionId, closedPlayerId);
+                handlePlayerDisconnected(closedSessionId, closedPlayerId);
             }
 
             LOGGER.fine("Connection cleanup finished for " + clientAddress());
-        }
-
-        private void markPlayerDisconnected(String sessionId, String playerId) {
-            CommandResult result = gameController.playerDisconnected(new ControllerRequest(Map.of(
-                    "sessionId", sessionId,
-                    "playerId", playerId
-            )));
-
-            if (result.isSuccess()) {
-                broadcastSessionState(sessionId);
-            } else {
-                LOGGER.warning("Failed to mark player disconnected: " + result.getMessage());
-            }
         }
 
         private synchronized void send(Message message) {
@@ -591,18 +357,18 @@ public class GameServer implements AutoCloseable {
             this.playerId = playerId;
         }
 
-        private void replaceAndClose() {
+        private void markReplacedAndClose() {
             replaced = true;
             close();
         }
 
-        private boolean isBoundTo(String sessionId) {
+        private boolean isBoundToSession(String sessionId) {
             return open.get()
                     && Objects.equals(this.sessionId, sessionId)
                     && playerId != null;
         }
 
-        private boolean isBoundTo(String sessionId, String playerId) {
+        private boolean isBoundToPlayer(String sessionId, String playerId) {
             return open.get()
                     && Objects.equals(this.sessionId, sessionId)
                     && Objects.equals(this.playerId, playerId);

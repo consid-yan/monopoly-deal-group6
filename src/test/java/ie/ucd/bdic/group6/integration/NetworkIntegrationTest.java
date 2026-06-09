@@ -139,6 +139,75 @@ class NetworkIntegrationTest {
     }
 
     @Test
+    void rejoinReplacesOldPlayerConnectionWithoutStoppingServer() throws Exception {
+        server = new AppConfig().gameServer(DEFAULT_PORT);
+        server.startAsync();
+
+        GameClient host = client();
+        List<ServerUpdate> hostUpdates = updates(host);
+        connect(host);
+
+        GameClient player2 = client();
+        List<ServerNotice> player2Notices = notices(player2);
+        connect(player2);
+
+        ServerResponse created = host.sendCommand(CommandType.CREATE_SESSION, Map.of(
+                "hostPlayerId", "host",
+                "playerName", "Host",
+                "maxPlayers", 2
+        )).get(3, TimeUnit.SECONDS);
+        assertTrue(created.accepted());
+        String sessionId = text(created.payload(), "sessionId");
+        String roomCode = text(created.payload(), "roomCode");
+        String hostToken = text(created.payload(), "playerToken");
+
+        assertNotNull(roomCode);
+        ServerResponse joined = player2.sendCommand(CommandType.JOIN_SESSION, Map.of(
+                "roomCode", roomCode,
+                "playerId", "player2",
+                "playerName", "Player 2"
+        )).get(3, TimeUnit.SECONDS);
+        assertTrue(joined.accepted());
+        String player2Token = text(joined.payload(), "playerToken");
+
+        assertNotNull(sessionId);
+        assertNotNull(hostToken);
+        assertTrue(host.sendCommand(CommandType.START_GAME, Map.of(
+                "sessionId", sessionId,
+                "playerId", "host",
+                "playerToken", hostToken
+        )).get(3, TimeUnit.SECONDS).accepted());
+        await(hostUpdates, activeUpdate(sessionId));
+
+        GameClient replacementPlayer2 = client();
+        List<ServerUpdate> replacementUpdates = updates(replacementPlayer2);
+        connect(replacementPlayer2);
+        assertNotNull(player2Token);
+        ServerResponse rejoined = replacementPlayer2.sendCommand(CommandType.REJOIN_SESSION, Map.of(
+                "sessionIdentity", sessionId,
+                "playerId", "player2",
+                "playerToken", player2Token
+        )).get(3, TimeUnit.SECONDS);
+
+        assertTrue(rejoined.accepted());
+        assertNotNull(await(player2Notices, notice -> notice.type() == NoticeType.SESSION_REPLACED));
+        assertTrue(server.isRunning(), "Replacing one player connection must not stop the server");
+
+        ServerUpdate replacementActive = await(replacementUpdates, activeUpdate(sessionId));
+        assertNotNull(replacementActive);
+        assertEquals(5, currentPlayerHand(replacementActive).size());
+
+        ServerResponse ended = host.sendCommand(CommandType.END_TURN, Map.of(
+                "sessionId", sessionId,
+                "playerId", "host",
+                "playerToken", hostToken
+        )).get(3, TimeUnit.SECONDS);
+        assertTrue(ended.accepted());
+        assertNotNull(await(replacementUpdates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
+                && "player2".equals(update.snapshot().activePlayerId())));
+    }
+
+    @Test
     void serverMarksDisconnectedPlayerForfeitAndBroadcastsResultAfterTimeout() throws Exception {
         MutableClock clock = new MutableClock();
         GameEngine engine = new GameEngine(clock);

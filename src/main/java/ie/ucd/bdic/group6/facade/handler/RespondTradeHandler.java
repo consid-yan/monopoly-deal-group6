@@ -1,7 +1,7 @@
 // RespondTradeHandler.java
 package ie.ucd.bdic.group6.facade.handler;
 
-import ie.ucd.bdic.group6.command.RespondTradeCommand;
+import ie.ucd.bdic.group6.command.trade.RespondTradeCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.facade.model.CommandResult;
 

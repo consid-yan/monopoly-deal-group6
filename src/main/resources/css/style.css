@@ -74,9 +74,6 @@
 
 .status-label {
     -fx-padding: 8 12 8 12;
-}
-
-.status-label {
     -fx-background-color: #1a7a4a;
     -fx-text-fill: #fafaf2;
     -fx-font-weight: bold;
@@ -267,6 +264,10 @@
     -fx-border-color: #1f4a2e;
     -fx-border-radius: 4;
     -fx-background-radius: 4;
+}
+
+.app-dialog-check-box .mark {
+    -fx-background-color: transparent;
 }
 
 .app-dialog-check-box:selected .mark {
@@ -1567,6 +1568,15 @@
 .clean-game-board-row {
     -fx-min-height: 146;
     -fx-pref-height: 146;
+    -fx-max-height: 146;
+}
+
+.clean-property-panel {
+    -fx-min-height: 0;
+}
+
+.game-property-scroll {
+    -fx-min-height: 0;
 }
 
 .clean-zone-panel,

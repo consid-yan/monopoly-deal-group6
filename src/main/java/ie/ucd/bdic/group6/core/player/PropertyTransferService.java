@@ -15,9 +15,6 @@ import java.util.Optional;
  */
 public final class PropertyTransferService {
 
-    private PropertyTransferService() {
-    }
-
     public static OperationResult<Void> transferPropertyCardToRow(
             Player sender,
             Player receiver,

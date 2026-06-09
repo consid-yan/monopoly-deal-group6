@@ -1,6 +1,18 @@
 package ie.ucd.bdic.group6.controller.mapper;
 
-import ie.ucd.bdic.group6.command.*;
+import ie.ucd.bdic.group6.command.card.DiscardCardCommand;
+import ie.ucd.bdic.group6.command.connection.PlayerDisconnectedCommand;
+import ie.ucd.bdic.group6.command.connection.ProcessDisconnectTimeoutsCommand;
+import ie.ucd.bdic.group6.command.game.EndTurnCommand;
+import ie.ucd.bdic.group6.command.debt.PayDebtCommand;
+import ie.ucd.bdic.group6.command.card.PlayCardCommand;
+import ie.ucd.bdic.group6.command.trade.ProposeTradeCommand;
+import ie.ucd.bdic.group6.command.action.RespondActionCommand;
+import ie.ucd.bdic.group6.command.trade.RespondTradeCommand;
+import ie.ucd.bdic.group6.command.session.CreateSessionCommand;
+import ie.ucd.bdic.group6.command.session.JoinSessionCommand;
+import ie.ucd.bdic.group6.command.session.RejoinSessionCommand;
+import ie.ucd.bdic.group6.command.game.StartGameCommand;
 import ie.ucd.bdic.group6.controller.dto.ControllerRequest;
 
 import java.util.Map;
@@ -38,8 +50,8 @@ public class RequestMapper {
         return new RespondActionCommand(safeData(request));
     }
 
-    public DiscardCardsCommand toDiscardCardsCommand(ControllerRequest request) {
-        return new DiscardCardsCommand(safeData(request));
+    public DiscardCardCommand toDiscardCardsCommand(ControllerRequest request) {
+        return new DiscardCardCommand(safeData(request));
     }
 
     public EndTurnCommand toEndTurnCommand(ControllerRequest request) {

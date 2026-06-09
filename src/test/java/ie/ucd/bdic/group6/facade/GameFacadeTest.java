@@ -1,8 +1,8 @@
 package ie.ucd.bdic.group6.facade;
 
-import ie.ucd.bdic.group6.command.CreateSessionCommand;
-import ie.ucd.bdic.group6.command.JoinSessionCommand;
-import ie.ucd.bdic.group6.command.StartGameCommand;
+import ie.ucd.bdic.group6.command.session.CreateSessionCommand;
+import ie.ucd.bdic.group6.command.session.JoinSessionCommand;
+import ie.ucd.bdic.group6.command.game.StartGameCommand;
 import ie.ucd.bdic.group6.core.snapshot.SessionSnapshot;
 import ie.ucd.bdic.group6.facade.model.CommandResult;
 import org.junit.jupiter.api.Test;
