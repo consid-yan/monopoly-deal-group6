@@ -3,11 +3,15 @@ package ie.ucd.bdic.group6.ui;
 import ie.ucd.bdic.group6.app.GameSessionCoordinator;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
+import javafx.geometry.Pos;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import org.kordamp.ikonli.javafx.FontIcon;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -16,16 +20,22 @@ public class ResultUI {
     private final GameSessionCoordinator context;
 
     @FXML
-    private TextField winnerField;
+    private Label winnerNameLabel;
 
     @FXML
-    private TextField completedSetsField;
+    private Label victoryReasonLabel;
 
     @FXML
-    private ListView<String> playerSummaryList;
+    private Label completedSetsLabel;
 
     @FXML
-    private TextArea finalResultArea;
+    private Label bankValueLabel;
+
+    @FXML
+    private Label finalRankLabel;
+
+    @FXML
+    private ListView<StandingRow> standingsList;
 
     public ResultUI(GameSessionCoordinator context) {
         this.context = context;
@@ -33,12 +43,10 @@ public class ResultUI {
 
     @FXML
     private void initialize() {
-        winnerField.clear();
-        completedSetsField.clear();
-        playerSummaryList.setItems(FXCollections.observableArrayList());
-        MessageUI.clear(finalResultArea);
+        standingsList.setCellFactory(ignored -> standingCell());
+        showUnavailableResult("");
         context.setSnapshotListener(this::render);
-        context.setMessageListener(message -> MessageUI.show(finalResultArea, message));
+        context.setMessageListener(message -> victoryReasonLabel.setText(message == null ? "" : message));
         render(context.latestSnapshot());
     }
 
@@ -61,53 +69,112 @@ public class ResultUI {
 
     private void render(UiSnapshot snapshot) {
         if (snapshot == null || snapshot.isEmpty()) {
-            MessageUI.show(finalResultArea, "No completed game result is available.");
+            showUnavailableResult("No completed game result is available.");
             return;
         }
         if (!"FINISHED".equals(snapshot.status())) {
-            MessageUI.show(finalResultArea, "The game is not finished yet.");
+            showUnavailableResult("The game is not finished yet.");
             return;
         }
 
         UiSnapshot.PlayerView winner = snapshot.player(snapshot.winnerPlayerId()).orElse(null);
-        winnerField.setText(winner == null ? snapshot.winnerPlayerId() : winner.displayName());
-        completedSetsField.setText((winner == null ? 0 : winner.completedSetCount()) + " full sets");
-        playerSummaryList.setItems(FXCollections.observableArrayList(playerSummaries(snapshot)));
-        MessageUI.showLines(finalResultArea, matchSummaryLines(snapshot, winner));
+        if (winner == null) {
+            showUnavailableResult("The winner is not available.");
+            return;
+        }
+
+        winnerNameLabel.setText(winner.displayName() + " Wins!");
+        victoryReasonLabel.setText(victoryReason(snapshot, winner));
+        completedSetsLabel.setText(Integer.toString(winner.completedSetCount()));
+        bankValueLabel.setText("$" + winner.bankTotalValueM() + "M");
+        finalRankLabel.setText("1st");
+        standingsList.setItems(FXCollections.observableArrayList(standingRows(snapshot)));
     }
 
-    private List<String> matchSummaryLines(UiSnapshot snapshot, UiSnapshot.PlayerView winner) {
-        int completedSets = winner == null ? 0 : winner.completedSetCount();
-        int bankTotalValueM = winner == null ? 0 : winner.bankTotalValueM();
-        String winnerName = winner == null ? snapshot.winnerPlayerId() : winner.displayName();
-
-        List<String> lines = new ArrayList<>();
-        if (completedSets >= 3) {
-            lines.add(winnerName + " wins by completing " + completedSets + " full property sets.");
-        } else if (!snapshot.forfeitedPlayerIds().isEmpty()) {
-            lines.add(winnerName + " wins as the last active player after forfeits.");
-        } else {
-            lines.add(winnerName + " wins as the last active player.");
-        }
-        lines.add("Final score: " + completedSets + " full sets, Bank $" + bankTotalValueM + "M.");
-        if (snapshot.forfeitedPlayerIds().isEmpty()) {
-            lines.add("No players forfeited.");
-        } else {
-            lines.add("Forfeits: " + String.join(", ", snapshot.forfeitedPlayerIds().stream()
-                    .map(snapshot::playerName)
-                    .toList()));
-        }
-        return lines;
+    private void showUnavailableResult(String message) {
+        winnerNameLabel.setText("No Result");
+        victoryReasonLabel.setText(message);
+        completedSetsLabel.setText("--");
+        bankValueLabel.setText("--");
+        finalRankLabel.setText("--");
+        standingsList.setItems(FXCollections.observableArrayList());
     }
 
-    private List<String> playerSummaries(UiSnapshot snapshot) {
-        return snapshot.players().stream()
-                .sorted(Comparator.comparingInt(UiSnapshot.PlayerView::completedSetCount).reversed()
-                        .thenComparing(UiSnapshot.PlayerView::displayName))
-                .map(player -> player.displayName()
-                        + " - " + player.completedSetCount() + " full sets"
-                        + " - Bank $" + player.bankTotalValueM() + "M"
-                        + " - " + player.playerStatus())
+    private ListCell<StandingRow> standingCell() {
+        return new ListCell<>() {
+            @Override
+            protected void updateItem(StandingRow row, boolean empty) {
+                super.updateItem(row, empty);
+                getStyleClass().remove("result-standing-winner");
+                if (empty || row == null) {
+                    setGraphic(null);
+                    return;
+                }
+
+                Label rank = new Label(row.winner() ? "" : Integer.toString(row.rank()));
+                if (row.winner()) {
+                    rank.setGraphic(new FontIcon("bxs-crown"));
+                }
+                rank.getStyleClass().add("result-standing-rank");
+                rank.setMinWidth(26);
+
+                Label name = new Label(row.displayName());
+                name.getStyleClass().add("result-standing-name");
+                VBox identity = new VBox(1, name);
+
+                Label summary = new Label(row.summary());
+                summary.getStyleClass().add("result-standing-summary");
+
+                HBox content = new HBox(8, rank, identity, summary);
+                content.setAlignment(Pos.CENTER_LEFT);
+                HBox.setHgrow(identity, Priority.ALWAYS);
+                if (row.winner()) {
+                    getStyleClass().add("result-standing-winner");
+                }
+                setGraphic(content);
+            }
+        };
+    }
+
+    static String victoryReason(UiSnapshot snapshot, UiSnapshot.PlayerView winner) {
+        if (winner.completedSetCount() >= 3) {
+            return "Completed " + winner.completedSetCount() + " full property sets.";
+        }
+        if (!snapshot.forfeitedPlayerIds().isEmpty()) {
+            return "Last active player after forfeits.";
+        }
+        return "Last active player.";
+    }
+
+    static List<StandingRow> standingRows(UiSnapshot snapshot) {
+        Comparator<UiSnapshot.PlayerView> scoreOrder =
+                Comparator.comparingInt(UiSnapshot.PlayerView::completedSetCount).reversed()
+                        .thenComparing(Comparator.comparingInt(UiSnapshot.PlayerView::bankTotalValueM).reversed())
+                        .thenComparing(UiSnapshot.PlayerView::displayName);
+
+        List<UiSnapshot.PlayerView> orderedPlayers = snapshot.players().stream()
+                .sorted(Comparator.comparing((UiSnapshot.PlayerView player) ->
+                                !player.playerId().equals(snapshot.winnerPlayerId()))
+                        .thenComparing(scoreOrder))
                 .toList();
+
+        return java.util.stream.IntStream.range(0, orderedPlayers.size())
+                .mapToObj(index -> {
+                    UiSnapshot.PlayerView player = orderedPlayers.get(index);
+                    return new StandingRow(
+                            index + 1,
+                            player.playerId().equals(snapshot.winnerPlayerId()),
+                            player.displayName(),
+                            player.completedSetCount(),
+                            player.bankTotalValueM());
+                })
+                .toList();
+    }
+
+    record StandingRow(int rank, boolean winner, String displayName, int completedSets, int bankValueM) {
+        String summary() {
+            String setLabel = completedSets == 1 ? " full set" : " full sets";
+            return completedSets + setLabel + "  |  Bank $" + bankValueM + "M";
+        }
     }
 }

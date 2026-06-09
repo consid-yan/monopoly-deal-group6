@@ -67,6 +67,7 @@ class ActionExecutorTest {
         assertEquals(3, started.actionsRemaining());
         assertEquals(7, currentPlayerHand(started).size());
         assertEquals(7, playerSummary(started, "host").handCount());
+        assertEquals("ACTING", playerSummary(started, "host").playerPhase());
         assertEquals(5, playerSummary(started, "player2").handCount());
     }
 
@@ -183,8 +184,10 @@ class ActionExecutorTest {
         )));
 
         assertEquals(1, afterPlay.actionsUsed());
+        assertEquals(2, afterPlay.actionsRemaining());
         assertEquals(1, afterPlay.discardSize());
         assertEquals(8, playerSummary(afterPlay, "host").handCount());
+        assertEquals("ACTING", playerSummary(afterPlay, "host").playerPhase());
         assertFalse(cardIds(currentPlayerHand(afterPlay)).contains(passGo.id()));
         assertTrue(cardIds(currentPlayerHand(afterPlay)).containsAll(List.of(drawnOne.id(), drawnTwo.id())));
     }
@@ -984,6 +987,31 @@ class ActionExecutorTest {
         assertEquals("player2", afterThirdAction.activePlayerId());
         assertEquals("ACTING", playerSummary(afterThirdAction, "player2").playerPhase());
         assertEquals("WAITING", playerSummary(afterThirdAction, "host").playerPhase());
+    }
+
+    @Test
+    void largeHandEntersDiscardPhaseOnlyAfterThirdAction() {
+        ActionCard passGo1 = passGo("pass-go-1");
+        ActionCard passGo2 = passGo("pass-go-2");
+        ActionCard passGo3 = passGo("pass-go-3");
+        StartedGame game = startedGameWithHostCards(
+                List.of(passGo1, passGo2, passGo3),
+                moneyCards("draw", 20));
+
+        SessionSnapshot afterFirstAction = play(game.engine(), game.sessionId(), passGo1.id());
+        assertEquals(8, playerSummary(afterFirstAction, "host").handCount());
+        assertEquals(2, afterFirstAction.actionsRemaining());
+        assertEquals("ACTING", playerSummary(afterFirstAction, "host").playerPhase());
+
+        SessionSnapshot afterSecondAction = play(game.engine(), game.sessionId(), passGo2.id());
+        assertEquals(9, playerSummary(afterSecondAction, "host").handCount());
+        assertEquals(1, afterSecondAction.actionsRemaining());
+        assertEquals("ACTING", playerSummary(afterSecondAction, "host").playerPhase());
+
+        SessionSnapshot afterThirdAction = play(game.engine(), game.sessionId(), passGo3.id());
+        assertEquals(10, playerSummary(afterThirdAction, "host").handCount());
+        assertEquals(0, afterThirdAction.actionsRemaining());
+        assertEquals("DISCARDING", playerSummary(afterThirdAction, "host").playerPhase());
     }
 
     @Test

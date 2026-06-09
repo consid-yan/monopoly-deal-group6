@@ -922,6 +922,187 @@
     -fx-text-fill: #d4b86a;
 }
 
+/*
+ * Result screen - focused victory stage with compact final standings.
+ */
+.result-screen-root {
+    -fx-background-color: radial-gradient(center 50% 34%, radius 74%, #1a6840 0%, #0b2b1b 100%);
+}
+
+.result-content {
+    -fx-padding: 20 30 24 30;
+}
+
+.result-brand-title {
+    -fx-effect: dropshadow(gaussian, rgba(200, 168, 78, 0.42), 24, 0, 0, 3);
+    -fx-font-family: "Georgia";
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #c8a84e;
+}
+
+.result-crown-medal {
+    -fx-background-color: rgba(200, 168, 78, 0.12);
+    -fx-background-radius: 38;
+    -fx-border-color: #d4b86a;
+    -fx-border-radius: 38;
+    -fx-border-width: 2;
+    -fx-effect: dropshadow(gaussian, rgba(200, 168, 78, 0.34), 22, 0.12, 0, 4);
+    -fx-min-height: 68;
+    -fx-min-width: 68;
+    -fx-pref-height: 68;
+    -fx-pref-width: 68;
+}
+
+.result-crown-icon {
+    -fx-icon-color: #e5c96a;
+    -fx-icon-size: 34;
+}
+
+.result-eyebrow {
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-text-fill: rgba(250, 250, 242, 0.46);
+}
+
+.result-winner-name {
+    -fx-alignment: center;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.62), 22, 0, 0, 5);
+    -fx-font-family: "Georgia";
+    -fx-font-size: 34px;
+    -fx-font-weight: bold;
+    -fx-text-alignment: center;
+    -fx-text-fill: #e5c96a;
+}
+
+.result-victory-reason {
+    -fx-font-size: 12px;
+    -fx-text-alignment: center;
+    -fx-text-fill: rgba(250, 250, 242, 0.54);
+}
+
+.result-stats-row {
+    -fx-padding: 4 0 2 0;
+}
+
+.result-stat-card {
+    -fx-background-color:
+        linear-gradient(from 0% 0% to 0% 100%, rgba(200, 168, 78, 0.08) 0%, transparent 32%),
+        rgba(7, 32, 19, 0.68);
+    -fx-background-radius: 5;
+    -fx-border-color: rgba(200, 168, 78, 0.38);
+    -fx-border-radius: 5;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.34), 16, 0, 0, 5);
+    -fx-padding: 10 14 10 14;
+}
+
+.result-stat-value {
+    -fx-font-family: "Georgia";
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #e5c96a;
+}
+
+.result-stat-caption {
+    -fx-font-size: 9px;
+    -fx-font-weight: bold;
+    -fx-text-fill: rgba(250, 250, 242, 0.38);
+}
+
+.result-standings-panel {
+    -fx-background-color: rgba(7, 32, 19, 0.56);
+    -fx-background-radius: 5;
+    -fx-border-color: rgba(200, 168, 78, 0.32);
+    -fx-border-radius: 5;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.42), 22, 0, 0, 7);
+    -fx-padding: 10;
+}
+
+.result-section-title {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #c8a84e;
+}
+
+.result-standings-list {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.result-standings-list .virtual-flow,
+.result-standings-list .corner {
+    -fx-background-color: transparent;
+}
+
+.result-standings-list .list-cell {
+    -fx-background-color: rgba(250, 250, 242, 0.035);
+    -fx-background-radius: 4;
+    -fx-border-color: transparent transparent rgba(200, 168, 78, 0.12) transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 7 10 7 10;
+}
+
+.result-standings-list .list-cell:empty {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+}
+
+.result-standings-list .list-cell:filled:selected,
+.result-standings-list .list-cell:filled:hover {
+    -fx-background-color: rgba(250, 250, 242, 0.035);
+}
+
+.result-standings-list .list-cell.result-standing-winner,
+.result-standings-list .list-cell.result-standing-winner:filled:selected,
+.result-standings-list .list-cell.result-standing-winner:filled:hover {
+    -fx-background-color: rgba(200, 168, 78, 0.13);
+    -fx-border-color: rgba(200, 168, 78, 0.58);
+    -fx-border-radius: 4;
+    -fx-border-width: 1;
+}
+
+.result-standing-rank {
+    -fx-font-family: "Georgia";
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #c8a84e;
+}
+
+.result-standing-rank .ikonli-font-icon {
+    -fx-icon-color: #c8a84e;
+    -fx-icon-size: 15;
+}
+
+.result-standing-name {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: rgba(250, 250, 242, 0.88);
+}
+
+.result-standing-summary {
+    -fx-font-size: 11px;
+    -fx-text-fill: rgba(250, 250, 242, 0.48);
+}
+
+.result-empty-label {
+    -fx-font-size: 11px;
+    -fx-font-style: italic;
+    -fx-text-fill: rgba(250, 250, 242, 0.34);
+}
+
+.result-actions {
+    -fx-padding: 4 0 0 0;
+}
+
+.result-actions .button {
+    -fx-alignment: center;
+    -fx-font-size: 12px;
+    -fx-padding: 10 16 10 16;
+}
+
 .help-scroll-pane,
 .help-scroll-pane > .viewport,
 .help-screen .scroll-pane,
