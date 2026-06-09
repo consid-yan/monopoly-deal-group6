@@ -216,7 +216,12 @@ public final class GameSessionCoordinator implements AutoCloseable {
     }
 
     public CompletableFuture<ServerResponse> rejoinSession(String requestedRoomCode) {
-        RejoinCredentials credentials = requireSavedRejoinCredentials(requestedRoomCode);
+        RejoinCredentials credentials;
+        try {
+            credentials = requireSavedRejoinCredentials(requestedRoomCode);
+        } catch (RuntimeException exception) {
+            return CompletableFuture.failedFuture(exception);
+        }
         return connectAs(
                 credentials.host(),
                 credentials.playerId(),
@@ -305,16 +310,7 @@ public final class GameSessionCoordinator implements AutoCloseable {
     private synchronized void resetNetwork() {
         connected = false;
         playerToken = "";
-        GameClient currentClient = client;
-        client = null;
-        if (currentClient != null) {
-            currentClient.close();
-        }
-        GameServer currentServer = hostedServer;
-        hostedServer = null;
-        if (currentServer != null) {
-            currentServer.stop();
-        }
+        closeAndClearNetworkResources();
     }
 
     private void handleStateUpdate(ServerUpdate update) {
@@ -372,7 +368,13 @@ public final class GameSessionCoordinator implements AutoCloseable {
         playerToken = "";
         sessionId = "";
         roomCode = "";
+        closeAndClearNetworkResources();
 
+        notifySnapshot(latestSnapshot);
+        return true;
+    }
+
+    private void closeAndClearNetworkResources() {
         GameClient currentClient = client;
         client = null;
         if (currentClient != null) {
@@ -384,9 +386,6 @@ public final class GameSessionCoordinator implements AutoCloseable {
         if (currentServer != null) {
             currentServer.stop();
         }
-
-        notifySnapshot(latestSnapshot);
-        return true;
     }
 
     private void updateSnapshot(SessionSnapshot sessionSnapshot) {

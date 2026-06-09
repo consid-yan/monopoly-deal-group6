@@ -47,10 +47,7 @@ public class ActionRule {
             throw new IllegalArgumentException("requiredActions must be non-negative");
         }
         if (turnManager.actionsRemaining() < requiredActions) {
-            throw new InvalidGameStateException(
-                    "ACTION_LIMIT_REACHED",
-                    "This play requires " + requiredActions + " action(s) but only "
-                            + turnManager.actionsRemaining() + " remain");
+            throw new InvalidGameStateException("ACTION_LIMIT_REACHED", "No actions left");
         }
     }
 
