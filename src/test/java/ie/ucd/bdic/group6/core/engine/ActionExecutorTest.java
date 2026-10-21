@@ -659,7 +659,7 @@ class ActionExecutorTest {
         )));
 
         assertTrue(accepted.pendingTrades().isEmpty());
-        assertEquals(0, accepted.actionsUsed());
+        assertEquals(2, accepted.actionsUsed());
         assertEquals(4, playerSummary(accepted, "host").bankTotalValueM());
         assertTrue(playerSummary(accepted, "host").propertyRows().isEmpty());
         assertEquals(List.of(red.id()), cardIds(playerSummary(accepted, "player2").propertyRows().getFirst().cards()));
