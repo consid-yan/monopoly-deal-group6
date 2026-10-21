@@ -19,11 +19,6 @@ public final class PropertyPaymentRule {
         return card instanceof PropertyCard || card instanceof PropertyWildCard;
     }
 
-    public static boolean canUseAsPropertyPayment(Card card, PropertySet row) {
-        Objects.requireNonNull(row, "row");
-        return canUseAsPropertyPayment(card) && row.contains(card);
-    }
-
     public static OperationResult<Integer> paymentValueM(PropertySet row, Card card) {
         Objects.requireNonNull(row, "row");
         Objects.requireNonNull(card, "card");

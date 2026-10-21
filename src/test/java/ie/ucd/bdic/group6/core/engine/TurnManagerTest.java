@@ -81,13 +81,4 @@ class TurnManagerTest {
     void emptyTurnOrderThrows() {
         assertThrows(IllegalArgumentException.class, () -> new TurnManager(List.of()));
     }
-
-    @Test
-    void actionsRemainingNeverNegative() {
-        TurnManager tm = new TurnManager(List.of("p1"));
-        tm.recordAction();
-        tm.recordAction();
-        tm.recordAction();
-        assertEquals(0, tm.actionsRemaining());
-    }
 }

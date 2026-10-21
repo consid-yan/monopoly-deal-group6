@@ -17,6 +17,15 @@ import ie.ucd.bdic.group6.controller.dto.ControllerRequest;
 
 import java.util.Map;
 
+/**
+ * [Deep Dive: Translation Layer — How do raw network payloads become typed Command objects?]
+ * RequestMapper is a pure data-mapping layer. Each toXxxCommand() method takes a ControllerRequest
+ * (which wraps a Map<String, Object> from the network) and constructs the corresponding Command.
+ * This is the boundary where untyped data becomes typed: the network only knows about
+ * string-keyed maps, but the engine expects strongly-typed Command objects.
+ * Each method is a one-liner because the Command constructors accept Map payloads directly
+ * and extract the fields they need internally.
+ */
 public class RequestMapper {
     public CreateSessionCommand toCreateSessionCommand(ControllerRequest request) {
         return new CreateSessionCommand(safeData(request));

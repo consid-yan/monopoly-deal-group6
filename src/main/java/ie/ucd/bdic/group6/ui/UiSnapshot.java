@@ -1,6 +1,7 @@
 package ie.ucd.bdic.group6.ui;
 
 import ie.ucd.bdic.group6.core.engine.PlayerPhase;
+import ie.ucd.bdic.group6.core.property.PropertyColor;
 import ie.ucd.bdic.group6.core.snapshot.CardSnapshot;
 import ie.ucd.bdic.group6.core.snapshot.PendingActionSnapshot;
 import ie.ucd.bdic.group6.core.snapshot.PendingDebtSnapshot;
@@ -30,16 +31,14 @@ public final class UiSnapshot {
     private final List<PendingDebtView> pendingDebts;
     private final List<PendingTradeView> pendingTrades;
     private final List<PendingActionView> pendingActions;
-    private final List<String> forfeitedPlayerIds;
 
     private UiSnapshot(SessionSnapshot snapshot) {
-        this.snapshot = snapshot == null ? EMPTY_SNAPSHOT : snapshot;
+        this.snapshot = snapshot;
         this.players = this.snapshot.players().stream().map(PlayerView::from).toList();
         this.currentPlayerHand = this.snapshot.currentPlayerHand().stream().map(CardView::from).toList();
         this.pendingDebts = this.snapshot.pendingDebts().stream().map(PendingDebtView::from).toList();
         this.pendingTrades = this.snapshot.pendingTrades().stream().map(PendingTradeView::from).toList();
         this.pendingActions = this.snapshot.pendingActions().stream().map(PendingActionView::from).toList();
-        this.forfeitedPlayerIds = this.snapshot.forfeitedPlayerIds();
     }
 
     public static UiSnapshot empty() {
@@ -125,15 +124,11 @@ public final class UiSnapshot {
     }
 
     public List<String> forfeitedPlayerIds() {
-        return forfeitedPlayerIds;
+        return snapshot.forfeitedPlayerIds();
     }
 
     public Optional<PlayerView> player(String playerId) {
         return players.stream().filter(player -> player.playerId().equals(playerId)).findFirst();
-    }
-
-    public Optional<PlayerView> currentPlayer(String playerId) {
-        return player(playerId);
     }
 
     public PlayerPhase playerPhase(String playerId) {
@@ -201,31 +196,11 @@ public final class UiSnapshot {
     }
 
     public boolean canProposeTrade(String playerId) {
-        return currentPlayer(playerId)
+        return player(playerId)
                 .map(player -> opponents(playerId).stream()
                         .filter(opponent -> !opponent.defeated())
                         .anyMatch(player::canTradeWith))
                 .orElse(false);
-    }
-
-    public List<String> tableActivityLines() {
-        List<String> lines = new ArrayList<>();
-        lines.add("Draw pile: " + deckSize() + " cards");
-        lines.add("Discard pile: " + discardSize() + " cards");
-        pendingActions.forEach(action -> lines.add("Action: "
-                + humanize(action.actionType())
-                + " from " + playerName(action.actorPlayerId())));
-        pendingDebts.forEach(debt -> lines.add("Debt: "
-                + playerName(debt.debtorPlayerId())
-                + " owes "
-                + playerName(debt.creditorPlayerId())
-                + " $" + debt.amountM() + "M"));
-        pendingTrades.forEach(trade -> lines.add("Trade: "
-                + playerName(trade.proposerPlayerId())
-                + " -> "
-                + playerName(trade.targetPlayerId())
-                + " (" + humanize(trade.status()) + ")"));
-        return List.copyOf(lines);
     }
 
     public record PlayerView(
@@ -373,14 +348,10 @@ public final class UiSnapshot {
         }
 
         public int requiredToComplete() {
-            int colorRequirement = switch (anchorColor) {
-                case "BROWN", "DARK_BLUE", "UTILITY" -> 2;
-                case "RAILROAD" -> 4;
-                case "LIGHT_BLUE", "PINK", "ORANGE", "RED", "YELLOW", "GREEN" -> 3;
-                default -> 0;
-            };
-            if (colorRequirement > 0) {
-                return colorRequirement;
+            try {
+                return PropertyColor.fullSetSize(PropertyColor.valueOf(anchorColor));
+            } catch (IllegalArgumentException ignored) {
+                // Fall back to the card metadata for an unknown color.
             }
             return cards.stream()
                     .mapToInt(CardView::requiredToComplete)

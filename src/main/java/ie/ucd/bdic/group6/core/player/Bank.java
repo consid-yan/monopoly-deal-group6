@@ -22,10 +22,6 @@ public final class Bank {
         return Collections.unmodifiableList(cards);
     }
 
-    public List<Card> copyCards() {
-        return new ArrayList<>(cards);
-    }
-
     public int size() {
         return cards.size();
     }
@@ -35,7 +31,7 @@ public final class Bank {
     }
 
     public int totalValueM() {
-        return cards.stream().mapToInt(CardBankingRule::bankPaymentValueM).sum();
+        return BankPaymentSolver.totalBankPaymentValue(cards);
     }
 
     /**

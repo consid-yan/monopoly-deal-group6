@@ -45,11 +45,6 @@ public class LobbyUI {
 
     @FXML
     private void initialize() {
-        setReadout(roomCodeLabel, "", "Waiting for room code");
-        setReadout(hostLabel, "", "Waiting for host");
-        setReadout(playerCountLabel, "", "0 / 5");
-        setReadout(joinHostLabel, "", "Waiting for host address");
-        playersList.setItems(FXCollections.observableArrayList());
         context.setSnapshotListener(this::render);
         context.setMessageListener(this::showStatus);
         render(context.latestSnapshot());
@@ -66,12 +61,7 @@ public class LobbyUI {
                 "sessionId", snapshot.sessionId(),
                 "playerId", context.playerId()
         );
-        context.sendCommand(CommandType.START_GAME, payload)
-                .thenAccept(result -> {
-                    if (result.accepted()) {
-                        javafx.application.Platform.runLater(SceneManager::showGame);
-                    }
-                });
+        context.sendCommand(CommandType.START_GAME, payload);
     }
 
     @FXML

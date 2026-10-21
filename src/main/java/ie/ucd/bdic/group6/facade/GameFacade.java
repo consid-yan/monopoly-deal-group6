@@ -1,69 +1,75 @@
 package ie.ucd.bdic.group6.facade;
 
 import ie.ucd.bdic.group6.command.Command;
+import ie.ucd.bdic.group6.command.action.RespondActionCommand;
+import ie.ucd.bdic.group6.command.card.DiscardCardCommand;
+import ie.ucd.bdic.group6.command.card.PlayCardCommand;
+import ie.ucd.bdic.group6.command.connection.PlayerDisconnectedCommand;
+import ie.ucd.bdic.group6.command.connection.ProcessDisconnectTimeoutsCommand;
+import ie.ucd.bdic.group6.command.debt.PayDebtCommand;
+import ie.ucd.bdic.group6.command.game.EndTurnCommand;
+import ie.ucd.bdic.group6.command.game.StartGameCommand;
+import ie.ucd.bdic.group6.command.session.CreateSessionCommand;
+import ie.ucd.bdic.group6.command.session.JoinSessionCommand;
+import ie.ucd.bdic.group6.command.session.RejoinSessionCommand;
+import ie.ucd.bdic.group6.command.trade.ProposeTradeCommand;
+import ie.ucd.bdic.group6.command.trade.RespondTradeCommand;
 import ie.ucd.bdic.group6.core.engine.ActionExecutor;
 import ie.ucd.bdic.group6.core.engine.GameEngine;
-import ie.ucd.bdic.group6.facade.handler.CommandHandler;
-import ie.ucd.bdic.group6.facade.handler.CreateSessionHandler;
-import ie.ucd.bdic.group6.facade.handler.DiscardCardsHandler;
-import ie.ucd.bdic.group6.facade.handler.EndTurnHandler;
-import ie.ucd.bdic.group6.facade.handler.JoinSessionHandler;
-import ie.ucd.bdic.group6.facade.handler.PayDebtHandler;
-import ie.ucd.bdic.group6.facade.handler.PlayCardHandler;
-import ie.ucd.bdic.group6.facade.handler.PlayerDisconnectedHandler;
-import ie.ucd.bdic.group6.facade.handler.ProcessDisconnectTimeoutsHandler;
-import ie.ucd.bdic.group6.facade.handler.ProposeTradeHandler;
-import ie.ucd.bdic.group6.facade.handler.RejoinSessionHandler;
-import ie.ucd.bdic.group6.facade.handler.RespondActionHandler;
-import ie.ucd.bdic.group6.facade.handler.RespondTradeHandler;
-import ie.ucd.bdic.group6.facade.handler.StartGameHandler;
+import ie.ucd.bdic.group6.exception.GameException;
 import ie.ucd.bdic.group6.facade.model.CommandResult;
 
-import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 public class GameFacade implements Facade {
-    private final Map<Class<? extends Command>, CommandHandler<? extends Command>> handlers;
+    private final Map<Class<? extends Command>, Function<Command, CommandResult>> handlers;
 
     public GameFacade() {
         this(new GameEngine());
     }
 
     public GameFacade(ActionExecutor actionExecutor) {
-        this(List.of(
-                new CreateSessionHandler(actionExecutor),
-                new JoinSessionHandler(actionExecutor),
-                new StartGameHandler(actionExecutor),
-                new PlayCardHandler(actionExecutor),
-                new PayDebtHandler(actionExecutor),
-                new ProposeTradeHandler(actionExecutor),
-                new RespondTradeHandler(actionExecutor),
-                new RespondActionHandler(actionExecutor),
-                new DiscardCardsHandler(actionExecutor),
-                new EndTurnHandler(actionExecutor),
-                new RejoinSessionHandler(actionExecutor),
-                new PlayerDisconnectedHandler(actionExecutor),
-                new ProcessDisconnectTimeoutsHandler(actionExecutor)
-        ));
+        handlers = Map.ofEntries(
+                handler(CreateSessionCommand.class,
+                        command -> CommandResult.success(actionExecutor.executeCreateSession(command))),
+                handler(JoinSessionCommand.class,
+                        command -> CommandResult.success(actionExecutor.executeJoinSession(command))),
+                handler(StartGameCommand.class,
+                        command -> CommandResult.success(actionExecutor.executeStartGame(command))),
+                handler(PlayCardCommand.class,
+                        command -> CommandResult.success(actionExecutor.executePlayCard(command))),
+                handler(PayDebtCommand.class,
+                        command -> CommandResult.success(actionExecutor.executePayDebt(command))),
+                handler(ProposeTradeCommand.class,
+                        command -> CommandResult.success(actionExecutor.executeProposeTrade(command))),
+                handler(RespondTradeCommand.class,
+                        command -> CommandResult.success(actionExecutor.executeRespondTrade(command))),
+                handler(RespondActionCommand.class,
+                        command -> CommandResult.success(actionExecutor.executeRespondAction(command))),
+                handler(DiscardCardCommand.class,
+                        command -> CommandResult.success(actionExecutor.executeDiscardCards(command))),
+                handler(EndTurnCommand.class,
+                        command -> CommandResult.success(actionExecutor.executeEndTurn(command))),
+                handler(RejoinSessionCommand.class,
+                        command -> CommandResult.success(actionExecutor.executeRejoinSession(command))),
+                handler(PlayerDisconnectedCommand.class,
+                        command -> CommandResult.success(actionExecutor.executePlayerDisconnected(command))),
+                handler(ProcessDisconnectTimeoutsCommand.class,
+                        command -> CommandResult.success(actionExecutor.executeProcessDisconnectTimeouts(command)))
+        );
     }
 
-    public GameFacade(List<CommandHandler<? extends Command>> handlers) {
-        this.handlers = handlers.stream()
-                .collect(Collectors.toUnmodifiableMap(
-                        CommandHandler::commandType,
-                        Function.identity()
-                ));
-    }
-
+    /**
+     * Dispatches registered command classes and translates execution failures into command results.
+     */
     @Override
     public CommandResult execute(Command command) {
         if (command == null) {
             return CommandResult.failure("COMMAND_REQUIRED", "Command must not be null");
         }
 
-        CommandHandler<? extends Command> handler = handlers.get(command.getClass());
+        Function<Command, CommandResult> handler = handlers.get(command.getClass());
         if (handler == null) {
             return CommandResult.failure(
                     "UNSUPPORTED_COMMAND",
@@ -71,11 +77,18 @@ public class GameFacade implements Facade {
             );
         }
 
-        return dispatch(handler, command);
+        try {
+            return handler.apply(command);
+        } catch (GameException e) {
+            return CommandResult.failure(e.getErrorCode(), e.getMessage());
+        } catch (Exception e) {
+            return CommandResult.failure("INTERNAL_ERROR",
+                    "Failed to execute " + command.getCommandType() + ": " + e.getMessage());
+        }
     }
 
-    @SuppressWarnings("unchecked")
-    private <C extends Command> CommandResult dispatch(CommandHandler<C> handler, Command command) {
-        return handler.handle((C) command);
+    private static <C extends Command> Map.Entry<Class<? extends Command>, Function<Command, CommandResult>> handler(
+            Class<C> commandType, Function<C, CommandResult> execute) {
+        return Map.entry(commandType, command -> execute.apply(commandType.cast(command)));
     }
 }

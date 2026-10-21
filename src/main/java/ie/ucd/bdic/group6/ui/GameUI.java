@@ -37,7 +37,6 @@ public class GameUI {
     private final GameSessionCoordinator context;
     private final GameUiState uiState = new GameUiState();
     private final Map<String, Node> cardNodes = new LinkedHashMap<>();
-    private final List<String> handCardIds = new ArrayList<>();
     private UiSnapshot snapshot = UiSnapshot.empty();
 
     @FXML
@@ -232,7 +231,7 @@ public class GameUI {
         if (!playerPhase().allowsNormalTurnActions() || uiState.commandInFlight()) {
             return;
         }
-        UiSnapshot.PlayerView currentPlayer = snapshot.currentPlayer(context.playerId()).orElse(null);
+        UiSnapshot.PlayerView currentPlayer = snapshot.player(context.playerId()).orElse(null);
         if (currentPlayer == null) {
             return;
         }
@@ -299,7 +298,6 @@ public class GameUI {
         }
         pruneSubmittedDebtIds();
         cardNodes.clear();
-        handCardIds.clear();
         clearTable();
 
         activePlayerField.setText(snapshot.playerName(snapshot.activePlayerId()));
@@ -314,14 +312,12 @@ public class GameUI {
         renderLog();
         preserveSelection();
         layoutHand(null);
-        updateSelectedCardSummary();
-        updateButtonStates();
         maybeShowDiscardPhasePrompt();
         maybeShowPendingPrompts();
     }
 
     private void renderOwnZones() {
-        UiSnapshot.PlayerView currentPlayer = snapshot.currentPlayer(context.playerId()).orElse(null);
+        UiSnapshot.PlayerView currentPlayer = snapshot.player(context.playerId()).orElse(null);
         if (currentPlayer == null) {
             return;
         }
@@ -337,13 +333,11 @@ public class GameUI {
         for (UiSnapshot.CardView card : snapshot.currentPlayerHand()) {
             Node node = createCardNode(card, false, true);
             cardNodes.put(card.id(), node);
-            handCardIds.add(card.id());
             handCardsHBox.getChildren().add(node);
         }
     }
 
     private void renderOpponents() {
-        opponentsRow.getChildren().clear();
         for (UiSnapshot.PlayerView opponent : snapshot.opponents(context.playerId()).stream().limit(4).toList()) {
             opponentsRow.getChildren().add(createOpponentSeat(opponent));
         }
@@ -483,22 +477,14 @@ public class GameUI {
                 return true;
             }).orElse(false);
             case "RENT_BROWN_OR_LIGHT_BLUE", "RENT_PINK_OR_ORANGE", "RENT_RED_OR_YELLOW",
-                    "RENT_DARK_BLUE_OR_GREEN", "RENT_RAILROAD_OR_UTILITY" -> {
+                    "RENT_DARK_BLUE_OR_GREEN", "RENT_RAILROAD_OR_UTILITY", "WILD_RENT" -> {
+                boolean requiresTarget = card.isAction("WILD_RENT");
+                Optional<UiSnapshot.PlayerView> target = requiresTarget ? chooseTargetPlayer() : Optional.empty();
                 Optional<String> color = chooseRentColor(card);
-                if (color.isEmpty()) {
+                if (color.isEmpty() || (requiresTarget && target.isEmpty())) {
                     yield false;
                 }
-                command.propertyColor(color.get());
-                chooseDoubleRent(card).ifPresent(doubleRent -> command.doubleRentCardId(doubleRent.id()));
-                yield true;
-            }
-            case "WILD_RENT" -> {
-                Optional<UiSnapshot.PlayerView> target = chooseTargetPlayer();
-                Optional<String> color = chooseRentColor(card);
-                if (target.isEmpty() || color.isEmpty()) {
-                    yield false;
-                }
-                command.targetPlayerId(target.get().playerId());
+                target.ifPresent(player -> command.targetPlayerId(player.playerId()));
                 command.propertyColor(color.get());
                 chooseDoubleRent(card).ifPresent(doubleRent -> command.doubleRentCardId(doubleRent.id()));
                 yield true;
@@ -527,7 +513,7 @@ public class GameUI {
     }
 
     private Optional<String> chooseRentColor(UiSnapshot.CardView card) {
-        List<String> colors = snapshot.currentPlayer(context.playerId())
+        List<String> colors = snapshot.player(context.playerId())
                 .map(player -> player.rentableColorsFor(card))
                 .orElse(List.of());
         if (colors.size() == 1) {
@@ -566,7 +552,7 @@ public class GameUI {
     }
 
     private boolean configureForcedDeal(PlayActionCardCommand.Builder command) {
-        List<UiSnapshot.CardView> ownProperties = snapshot.currentPlayer(context.playerId())
+        List<UiSnapshot.CardView> ownProperties = snapshot.player(context.playerId())
                 .map(UiSnapshot.PlayerView::stealablePropertyCards)
                 .orElse(List.of());
         Optional<UiSnapshot.CardView> offered = chooseOne("Offer Property", ownProperties, this::cardChoiceLabel);
@@ -621,7 +607,7 @@ public class GameUI {
     }
 
     private Optional<UiSnapshot.PropertyRowView> chooseOwnPropertyRow(String actionType) {
-        return chooseOne("Property Set", snapshot.currentPlayer(context.playerId())
+        return chooseOne("Property Set", snapshot.player(context.playerId())
                         .map(player -> player.improvableRows(actionType))
                         .orElse(List.of()),
                 value -> value.label() + " (" + value.rowId() + ")");
@@ -660,7 +646,7 @@ public class GameUI {
             promptDebtPayment(debt);
             return;
         }
-        if (snapshot.canRespondToTrade(context.playerId())) {
+        if (snapshot.isTurnFor(context.playerId())) {
             for (UiSnapshot.PendingTradeView trade : snapshot.pendingTradesForTarget(context.playerId())) {
                 showTradePrompt(trade);
                 return;
@@ -678,8 +664,7 @@ public class GameUI {
 
         ButtonType allow = UiDialogs.confirmButton("Allow");
         ButtonType justSayNo = UiDialogs.secondaryButton("Just Say No");
-        dialog.getDialogPane().getButtonTypes().setAll(allow, justSayNo);
-        UiDialogs.styleButtons(dialog, allow, justSayNo);
+        UiDialogs.setButtons(dialog, allow, justSayNo);
 
         boolean hasJustSayNo = snapshot.currentPlayerHand().stream()
                 .anyMatch(card -> card.isAction("JUST_SAY_NO"));
@@ -695,11 +680,7 @@ public class GameUI {
             maybeShowPendingPrompts();
             return;
         }
-        if (result.get() == allow) {
-            submitActionResponse(action, true);
-            return;
-        }
-        submitActionResponse(action, false);
+        submitActionResponse(action, result.get() == allow);
     }
 
     private void promptDebtPayment(UiSnapshot.PendingDebtView debt) {
@@ -711,7 +692,7 @@ public class GameUI {
                 if (!showDebtConfirmation(currentDebt)) {
                     continue;
                 }
-                List<UiSnapshot.CardView> paymentOptions = snapshot.currentPlayer(context.playerId())
+                List<UiSnapshot.CardView> paymentOptions = snapshot.player(context.playerId())
                         .map(UiSnapshot.PlayerView::paymentCards)
                         .orElse(List.of());
                 if (paymentOptions.isEmpty()) {
@@ -765,8 +746,7 @@ public class GameUI {
                         + " $" + debt.amountM() + "M",
                 buildDebtPromptDetails(debt)));
         ButtonType payNow = UiDialogs.confirmButton("Pay Now");
-        dialog.getDialogPane().getButtonTypes().setAll(payNow);
-        UiDialogs.styleButtons(dialog, payNow);
+        UiDialogs.setButtons(dialog, payNow);
         return dialog.showAndWait().filter(payNow::equals).isPresent();
     }
 
@@ -782,8 +762,7 @@ public class GameUI {
         UiDialogs.setDialogWidth(dialog, 500);
         ButtonType okButtonType = UiDialogs.confirmButton("OK");
         ButtonType cancelButtonType = UiDialogs.cancelButton("Cancel");
-        dialog.getDialogPane().getButtonTypes().setAll(okButtonType, cancelButtonType);
-        UiDialogs.styleButtons(dialog, okButtonType, cancelButtonType);
+        UiDialogs.setButtons(dialog, okButtonType, cancelButtonType);
 
         VBox content = new VBox(10);
         content.setPadding(new Insets(4, 0, 0, 0));
@@ -881,8 +860,7 @@ public class GameUI {
 
         ButtonType accept = UiDialogs.confirmButton("Accept");
         ButtonType reject = UiDialogs.secondaryButton("Reject");
-        dialog.getDialogPane().getButtonTypes().setAll(accept, reject);
-        UiDialogs.styleButtons(dialog, accept, reject);
+        UiDialogs.setButtons(dialog, accept, reject);
 
         Optional<ButtonType> result = dialog.showAndWait();
         uiState.setPendingPromptShowing(false);
@@ -1055,8 +1033,7 @@ public class GameUI {
         dialog.getDialogPane().setContent(content);
         ButtonType okButtonType = UiDialogs.confirmButton("OK");
         ButtonType cancelButtonType = UiDialogs.cancelButton("Cancel");
-        dialog.getDialogPane().getButtonTypes().setAll(okButtonType, cancelButtonType);
-        UiDialogs.styleButtons(dialog, okButtonType, cancelButtonType);
+        UiDialogs.setButtons(dialog, okButtonType, cancelButtonType);
         dialog.setResultConverter(button -> button == okButtonType
                 ? comboBox.getSelectionModel().getSelectedItem()
                 : null);
@@ -1128,13 +1105,12 @@ public class GameUI {
                 event.consume();
             });
             cardBox.setOnMouseEntered(_ -> {
-                int index = handCardIds.indexOf(card.id());
-                if (index >= 0) {
-                    layoutHand(index);
+                if (cardNodes.containsKey(card.id())) {
+                    layoutHand(cardBox);
                 }
             });
             cardBox.setOnMouseExited(_ -> {
-                if (handCardIds.contains(card.id())) {
+                if (cardNodes.containsKey(card.id())) {
                     layoutHand(null);
                 }
             });
@@ -1152,12 +1128,8 @@ public class GameUI {
     private void clearTable() {
         clearZone(bankZone);
         clearZone(propertyRowsZone);
-        if (handCardsHBox != null) {
-            handCardsHBox.getChildren().clear();
-        }
-        if (opponentsRow != null) {
-            opponentsRow.getChildren().clear();
-        }
+        clearZone(handCardsHBox);
+        clearZone(opponentsRow);
         setLabelText(deckSummaryLabel, "0 cards");
         setLabelText(discardPileSummaryLabel, "0 cards");
     }
@@ -1197,13 +1169,13 @@ public class GameUI {
         PlayerPhase phase = playerPhase();
         Optional<UiSnapshot.CardView> selected = selectedHandCard();
         if (phase == PlayerPhase.DISCARDING) {
+            String remaining = snapshot.cardsToDiscard() + " discard"
+                    + (snapshot.cardsToDiscard() == 1 ? "" : "s") + " remaining.";
             selectedCardSummaryLabel.setText(selected
                     .map(card -> "Selected: " + card.title() + " - click it again to discard. "
-                            + snapshot.cardsToDiscard() + " discard"
-                            + (snapshot.cardsToDiscard() == 1 ? "" : "s") + " remaining.")
+                            + remaining)
                     .orElse("Discard phase: select a hand card, then click it again to discard. "
-                            + snapshot.cardsToDiscard() + " discard"
-                            + (snapshot.cardsToDiscard() == 1 ? "" : "s") + " remaining."));
+                            + remaining));
             return;
         }
         if (phase == PlayerPhase.RESPONDING) {
@@ -1272,7 +1244,8 @@ public class GameUI {
         setButtonDisabled(endTurnButton, uiState.commandInFlight() || !phase.allowsNormalTurnActions());
         setButtonDisabled(
                 proposeTradeButton,
-                uiState.commandInFlight() || !phase.allowsNormalTurnActions() || !canProposeTrade());
+                uiState.commandInFlight() || !phase.allowsNormalTurnActions()
+                        || !snapshot.canProposeTrade(context.playerId()));
     }
 
     private String pendingResponseHint() {
@@ -1286,8 +1259,10 @@ public class GameUI {
         if (!snapshot.pendingDebtsForDebtor(context.playerId()).isEmpty()) {
             hints.add("debt payment");
         }
-        if (hasPendingTradeForCurrentPlayer()) {
-            hints.add("trade response");
+        if (!snapshot.pendingTradesForTarget(context.playerId()).isEmpty()) {
+            hints.add(snapshot.canRespondToTrade(context.playerId())
+                    ? "trade response"
+                    : "trade response on your turn");
         }
         if (hints.isEmpty()) {
             return "";
@@ -1297,14 +1272,6 @@ public class GameUI {
 
     private PlayerPhase playerPhase() {
         return snapshot.playerPhase(context.playerId());
-    }
-
-    private boolean canProposeTrade() {
-        return snapshot.canProposeTrade(context.playerId());
-    }
-
-    private boolean hasPendingTradeForCurrentPlayer() {
-        return !snapshot.pendingTradesForTarget(context.playerId()).isEmpty();
     }
 
     private void setButtonDisabled(Button button, boolean disabled) {
@@ -1325,25 +1292,19 @@ public class GameUI {
         }
     }
 
-    private void layoutHand(Integer hoveredIndex) {
+    private void layoutHand(Node hoveredCard) {
         // HBox handles horizontal layout automatically.
         // Only manage card ordering and hover styling here.
         if (handCardsHBox == null) {
             return;
         }
-        List<Node> orderedNodes = handCardIds.stream()
-                .map(cardNodes::get)
-                .filter(java.util.Objects::nonNull)
-                .toList();
+        List<Node> orderedNodes = List.copyOf(cardNodes.values());
         if (!handCardsHBox.getChildren().equals(orderedNodes)) {
             handCardsHBox.getChildren().setAll(orderedNodes);
         }
 
-        for (int i = 0; i < orderedNodes.size(); i++) {
-            Node node = orderedNodes.get(i);
-            boolean hovered = hoveredIndex != null && i == hoveredIndex;
-            applyCardSize(node, false);
-            toggleStyle(node, "hand-card-hovered", hovered);
+        for (Node node : orderedNodes) {
+            toggleStyle(node, "hand-card-hovered", node == hoveredCard);
         }
     }
 

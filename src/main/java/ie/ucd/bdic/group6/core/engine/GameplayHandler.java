@@ -91,10 +91,24 @@ public final class GameplayHandler {
         }
     }
 
+    /**
+     * [Gameplay Step 2a-BANK: Bank a Money Card]
+     * Moves a money card from the player's hand into their bank.
+     * Banked cards can later be used to pay rent, debts, or as trade currency.
+     * Costs 1 action point.
+     */
     public void playBankCard(Player player, Card card) {
         host.requireSuccess(player.tryBankFromHand(card));
     }
 
+    /**
+     * [Gameplay Step 2a-PROPERTY: Play a Property Card]
+     * Places a property or wild card from hand onto the player's property board.
+     * Can add to an existing row of the same color, or start a new row.
+     * Wild cards must specify which color they are being played as.
+     * Does NOT cost an action when played as the first card of a new row via wild card.
+     * Costs 1 action point.
+     */
     public void playPropertyCard(PlayCardCommand command, Player player, Card card) {
         if (!(card instanceof PropertyCard) && !(card instanceof PropertyWildCard)) {
             throw new InvalidCommandException("INVALID_PLAY_MODE", "Only property cards can be played as properties");
@@ -115,16 +129,23 @@ public final class GameplayHandler {
             return;
         }
 
-        Optional<PropertySet> existingRow = player.propertyBoard().rowsView().stream()
-                .filter(row -> row.anchorColor() == anchorColor && row.canAdd(card, wildChoice))
-                .findFirst();
-
-        OperationResult<Void> result = existingRow
-                .map(row -> player.tryPlayPropertyFromHand(row, card, wildChoice))
-                .orElseGet(() -> player.tryStartNewPropertyRowFromHand(anchorColor, card, wildChoice));
-        host.requireSuccess(result);
+        host.requireSuccess(player.tryStartNewPropertyRowFromHand(anchorColor, card, wildChoice));
     }
 
+    /**
+     * [Gameplay Step 2a-ACTION: Play an Action Card]
+     * Uses an action card from the player's hand. Dispatches to the specific handler:
+     *   PASS_GO       → draw 2 extra cards (card goes to discard)
+     *   DEBT_COLLECTOR → target one player to pay 5M
+     *   ITS_MY_BIRTHDAY → every other player pays 2M
+     *   RENT (6 dual + WILD) → charge rent based on owned property sets
+     *   HOUSE / HOTEL → improve a complete set to increase rent value
+     *   SLY_DEAL      → steal one property card from an incomplete set
+     *   FORCED_DEAL    → swap one of your properties for one of theirs
+     *   DEAL_BREAKER   → steal an entire complete property set
+     * Costs 1 action point (2 if paired with Double The Rent on a rent card).
+     * Most actions create a PendingAction so targets can respond with Just Say No.
+     */
     public void playActionCard(
             PlayCardCommand command,
             GameSession session,
@@ -135,7 +156,6 @@ public final class GameplayHandler {
             throw new InvalidCommandException("INVALID_PLAY_MODE", "Only action cards can be played as actions");
         }
 
-        actionRule.validatePlayableAsAction(actionCard.actionType());
         switch (actionCard.actionType()) {
             case PASS_GO -> {
                 removeActionFromHand(player, actionCard);
@@ -155,10 +175,15 @@ public final class GameplayHandler {
             case FORCED_DEAL -> executeForcedDeal(command, session, player, actionCard, activeGame);
             case DEAL_BREAKER -> executeDealBreaker(command, session, player, actionCard, activeGame);
             case JUST_SAY_NO, DOUBLE_THE_RENT ->
-                    throw new IllegalStateException("validatePlayableAsAction should have rejected " + actionCard.actionType());
+                    actionRule.validatePlayableAsAction(actionCard.actionType());
         }
     }
 
+    /**
+     * [Gameplay Step 3-JSN: Spend Just Say No]
+     * A player uses a Just Say No card from their hand to reject a pending action targeting them.
+     * The Just Say No card is discarded. If all targets have responded, the action is resolved.
+     */
     public void spendJustSayNo(
             GameSession session,
             ActiveGameState activeGame,
@@ -172,6 +197,15 @@ public final class GameplayHandler {
         discardActionFromHand(responder, actionCard, activeGame);
     }
 
+    /**
+     * [Gameplay Step 3-APPLY: Apply Resolved Action]
+     * After all targets have responded to a pending action (accepted or rejected via Just Say No),
+     * this method applies the actual effect:
+     *   Money actions → create PendingDebt entries for each accepting target
+     *   SLY_DEAL      → transfer the stolen property card
+     *   FORCED_DEAL   → swap the two property cards atomically
+     *   DEAL_BREAKER  → transfer the entire complete set
+     */
     public void applyResolvedPendingAction(
             GameSession session,
             ActiveGameState activeGame,
@@ -206,18 +240,6 @@ public final class GameplayHandler {
             Card card,
             PropertySet sourceRow) {
         PropertyPlacement placement = placementForTransferredProperty(card, sourceRow);
-        Optional<PropertySet> receiverRow = receiver.propertyBoard().rowsView().stream()
-                .filter(row -> row.anchorColor() == placement.anchorColor())
-                .filter(row -> row.canAdd(card, placement.wildChoice()))
-                .findFirst();
-        if (receiverRow.isPresent()) {
-            return PropertyTransferService.transferPropertyCardToRow(
-                    sender,
-                    receiver,
-                    card,
-                    receiverRow.get(),
-                    placement.wildChoice());
-        }
         OperationResult<PropertySet> moved = PropertyTransferService.transferPropertyCardToNewRow(
                 sender,
                 receiver,
@@ -255,10 +277,7 @@ public final class GameplayHandler {
         host.requirePlayer(session, targetPlayerId);
         host.requireNotDefeated(session, targetPlayerId);
         discardActionFromHand(player, actionCard, activeGame);
-        activeGame.addPendingAction(PendingAction.builder()
-                .actorPlayerId(player.id())
-                .actionType(actionCard.actionType())
-                .actionCardId(actionCard.id())
+        activeGame.addPendingAction(pendingActionFor(player, actionCard)
                 .amountM(5)
                 .targetPlayerIds(List.of(targetPlayerId))
                 .build());
@@ -276,10 +295,7 @@ public final class GameplayHandler {
         debtorIds.forEach(playerId -> host.requirePlayer(session, playerId));
         actionRule.validateItsMyBirthday(debtorIds);
         discardActionFromHand(player, actionCard, activeGame);
-        activeGame.addPendingAction(PendingAction.builder()
-                .actorPlayerId(player.id())
-                .actionType(actionCard.actionType())
-                .actionCardId(actionCard.id())
+        activeGame.addPendingAction(pendingActionFor(player, actionCard)
                 .amountM(2)
                 .targetPlayerIds(debtorIds)
                 .build());
@@ -304,10 +320,7 @@ public final class GameplayHandler {
         if (doubleRent != null) {
             discardActionFromHand(player, doubleRent, activeGame);
         }
-        activeGame.addPendingAction(PendingAction.builder()
-                .actorPlayerId(player.id())
-                .actionType(actionCard.actionType())
-                .actionCardId(actionCard.id())
+        activeGame.addPendingAction(pendingActionFor(player, actionCard)
                 .doubleRentCardId(doubleRent == null ? null : doubleRent.id())
                 .propertyColor(rentColor)
                 .amountM(rentM)
@@ -330,10 +343,7 @@ public final class GameplayHandler {
                 .card();
         actionRule.validateSlyDeal(player, target, targetCard);
         discardActionFromHand(player, actionCard, activeGame);
-        activeGame.addPendingAction(PendingAction.builder()
-                .actorPlayerId(player.id())
-                .actionType(actionCard.actionType())
-                .actionCardId(actionCard.id())
+        activeGame.addPendingAction(pendingActionFor(player, actionCard)
                 .targetCardId(targetCardId)
                 .targetPlayerIds(List.of(targetPlayerId))
                 .build());
@@ -358,10 +368,7 @@ public final class GameplayHandler {
                 .card();
         actionRule.validateForcedDeal(player, target, offered, requested);
         discardActionFromHand(player, actionCard, activeGame);
-        activeGame.addPendingAction(PendingAction.builder()
-                .actorPlayerId(player.id())
-                .actionType(actionCard.actionType())
-                .actionCardId(actionCard.id())
+        activeGame.addPendingAction(pendingActionFor(player, actionCard)
                 .offeredCardId(offeredCardId)
                 .requestedCardId(requestedCardId)
                 .targetPlayerIds(List.of(targetPlayerId))
@@ -382,13 +389,17 @@ public final class GameplayHandler {
                 .orElseThrow(() -> new GameException("PROPERTY_ROW_NOT_FOUND", "Target property row not found"));
         actionRule.validateDealBreaker(player, target, row);
         discardActionFromHand(player, actionCard, activeGame);
-        activeGame.addPendingAction(PendingAction.builder()
-                .actorPlayerId(player.id())
-                .actionType(actionCard.actionType())
-                .actionCardId(actionCard.id())
+        activeGame.addPendingAction(pendingActionFor(player, actionCard)
                 .targetPropertyRowId(rowId)
                 .targetPlayerIds(List.of(targetPlayerId))
                 .build());
+    }
+
+    private PendingAction.Builder pendingActionFor(Player player, ActionCard actionCard) {
+        return PendingAction.builder()
+                .actorPlayerId(player.id())
+                .actionType(actionCard.actionType())
+                .actionCardId(actionCard.id());
     }
 
     private void executeImprovementCard(
@@ -426,7 +437,7 @@ public final class GameplayHandler {
         String cardId = pendingAction.targetCardId().orElseThrow();
         PropertyCardLocation targetCard = findPropertyCardLocation(target, cardId)
                 .orElseThrow(() -> new GameException("CARD_NOT_TRADEABLE", "Target property card not found"));
-        if (!target.propertyBoard().canRemoveCardForSteal(targetCard.card())) {
+        if (targetCard.row().isComplete()) {
             throw new GameException("CANNOT_STEAL_FROM_COMPLETE_SET", "Sly Deal cannot steal from a complete set");
         }
         host.requireSuccess(movePropertyCardToBestRow(target, actor, targetCard.card(), targetCard.row()));
@@ -441,8 +452,7 @@ public final class GameplayHandler {
                 .orElseThrow(() -> new GameException("CARD_NOT_TRADEABLE", "Offered property card not found"));
         PropertyCardLocation requested = findPropertyCardLocation(target, requestedCardId)
                 .orElseThrow(() -> new GameException("CARD_NOT_TRADEABLE", "Requested property card not found"));
-        if (!actor.propertyBoard().canRemoveCardForSteal(offered.card())
-                || !target.propertyBoard().canRemoveCardForSteal(requested.card())) {
+        if (offered.row().isComplete() || requested.row().isComplete()) {
             throw new GameException("CANNOT_STEAL_FROM_COMPLETE_SET", "Forced Deal cannot swap cards from complete sets");
         }
 

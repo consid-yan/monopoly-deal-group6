@@ -19,11 +19,7 @@ public record PropertyRowSnapshot(
     public PropertyRowSnapshot {
         rowId = text(rowId);
         anchorColor = text(anchorColor);
-        cards = copy(cards);
-    }
-
-    private static List<CardSnapshot> copy(List<CardSnapshot> values) {
-        return values == null ? List.of() : List.copyOf(values);
+        cards = cards == null ? List.of() : List.copyOf(cards);
     }
 
     private static String text(String value) {

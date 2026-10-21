@@ -19,7 +19,7 @@ public sealed interface OperationResult<T> permits OperationResult.Success, Oper
     }
 
     static <T> OperationResult<T> fail(OperationError code, String message) {
-        return new Failure<>(Objects.requireNonNull(code, "code"), message == null ? "" : message);
+        return new Failure<>(code, message);
     }
 
     boolean isSuccess();

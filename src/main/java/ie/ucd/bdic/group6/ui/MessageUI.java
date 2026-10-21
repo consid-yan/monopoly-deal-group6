@@ -23,10 +23,4 @@ public final class MessageUI {
                 .toList());
         show(target, message);
     }
-
-    static void clear(TextInputControl target) {
-        if (target != null) {
-            target.clear();
-        }
-    }
 }

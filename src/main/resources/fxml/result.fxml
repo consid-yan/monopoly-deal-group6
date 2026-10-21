@@ -82,7 +82,7 @@
                     <FontIcon iconLiteral="bx-home" styleClass="menu-icon-outline"/>
                 </graphic>
             </Button>
-            <Button graphicTextGap="9.0" mnemonicParsing="false" onAction="#playAgain"
+            <Button graphicTextGap="9.0" mnemonicParsing="false" onAction="#backToMenu"
                     prefHeight="42.0" prefWidth="154.0" styleClass="menu-primary-button" text="Play Again">
                 <graphic>
                     <FontIcon iconLiteral="bx-reset" styleClass="menu-icon-primary"/>

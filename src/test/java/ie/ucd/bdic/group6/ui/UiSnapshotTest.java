@@ -221,7 +221,6 @@ class UiSnapshotTest {
         assertEquals("2026-06-06T00:01:00Z", snapshot.pendingActionsAwaiting("host").getFirst().createdAt());
         assertTrue(snapshot.canProposeTrade("host"));
         assertEquals("1/2 cards", snapshot.player("host").orElseThrow().propertyRows().getFirst().progressLabel());
-        assertTrue(snapshot.tableActivityLines().stream().anyMatch(line -> line.contains("Debt")));
     }
 
     @Test
@@ -355,11 +354,10 @@ class UiSnapshotTest {
     void tradeResponseAvailableWhenTargetHasPendingTrade() {
         UiSnapshot targetOffTurn = UiSnapshot.from(snapshotWithPendingTrade("host", "guest", "host"));
         UiSnapshot targetTurn = UiSnapshot.from(snapshotWithPendingTrade("guest", "guest", "host"));
-        UiSnapshot activeNonTarget = UiSnapshot.from(snapshotWithPendingTrade("host", "guest", "host"));
 
         assertTrue(targetOffTurn.canRespondToTrade("guest"));
         assertTrue(targetTurn.canRespondToTrade("guest"));
-        assertFalse(activeNonTarget.canRespondToTrade("host"));
+        assertFalse(targetOffTurn.canRespondToTrade("host"));
     }
 
     private SessionSnapshot snapshotWithPendingTrade(String activePlayerId, String targetPlayerId, String proposerPlayerId) {

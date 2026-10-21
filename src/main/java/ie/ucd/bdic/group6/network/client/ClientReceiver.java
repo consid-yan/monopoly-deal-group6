@@ -3,7 +3,6 @@ package ie.ucd.bdic.group6.network.client;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.net.SocketException;
 import java.util.Objects;
 
 public final class ClientReceiver implements Runnable{
@@ -25,11 +24,8 @@ public final class ClientReceiver implements Runnable{
         } catch (EOFException ignored) {
             // Server closed the stream normally.
             client.handleDisconnect(null);
-        } catch (SocketException e) {
-            // Socket may be closed by client.close(), or reset by network/server.
-            client.handleDisconnect(e);
         } catch (IOException | ClassNotFoundException e) {
-            // Unexpected read failure or incompatible message class.
+            // Socket/read failure or incompatible message class.
             client.handleDisconnect(e);
         }
     }

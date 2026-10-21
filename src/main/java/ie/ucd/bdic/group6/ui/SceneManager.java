@@ -104,6 +104,17 @@ public final class SceneManager {
         UiDialogs.showError("Connection Lost", message);
     }
 
+    /**
+     * [Deep Dive: UI Navigation & Controller Injection — How does the UI switch screens?]
+     * 1. Loads FXML from src/main/resources/fxml/{name} via FXMLLoader.
+     * 2. Sets a custom controllerFactory that uses reflection to find a constructor
+     *    accepting GameSessionCoordinator, and injects the shared sessionContext.
+     *    Screens without such a constructor get a default no-arg constructor.
+     * 3. Old screen's listeners are detached before loading the new screen
+     *    (setSnapshotListener(null)) to prevent stale callbacks.
+     * 4. The game screen gets an extra outer ScrollPane for responsive sizing.
+     * 5. Root is swapped in-place on the existing Stage (no new window).
+     */
     private static void show(String fxmlName) {
         if (stage == null) {
             throw new IllegalStateException("SceneManager has not been initialized.");
@@ -134,15 +145,13 @@ public final class SceneManager {
             Scene scene = stage.getScene();
             if (scene == null) {
                 scene = new Scene(root, DEFAULT_WIDTH, DEFAULT_HEIGHT);
-                scene.setFill(Color.web("#0e3b24"));
-                scene.getStylesheets().setAll(UiTheme.appStylesheet());
                 stage.setScene(scene);
             } else {
                 scene.setRoot(root);
-                scene.setFill(Color.web("#0e3b24"));
-                if (!scene.getStylesheets().contains(UiTheme.appStylesheet())) {
-                    scene.getStylesheets().setAll(UiTheme.appStylesheet());
-                }
+            }
+            scene.setFill(Color.web("#0e3b24"));
+            if (!scene.getStylesheets().contains(UiTheme.appStylesheet())) {
+                scene.getStylesheets().setAll(UiTheme.appStylesheet());
             }
             currentScreen = fxmlName;
             stage.show();

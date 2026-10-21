@@ -33,10 +33,7 @@ public final class Deck {
      */
     public Deck(List<Card> bottomToTop) {
         Objects.requireNonNull(bottomToTop, "bottomToTop");
-        this.cards = new ArrayDeque<>();
-        for (Card c : bottomToTop) {
-            this.cards.addLast(c);
-        }
+        this.cards = new ArrayDeque<>(bottomToTop);
     }
 
     public static Deck shuffled(List<Card> cards, Random random) {
@@ -68,15 +65,7 @@ public final class Deck {
      * Same as {@link #draw()} but returns empty when the pile is empty (late-game special draws may use this).
      */
     public Optional<Card> tryDraw() {
-        if (cards.isEmpty()) {
-            return Optional.empty();
-        }
-        return Optional.of(cards.removeLast());
-    }
-
-    public void discardToBottom(Card card) {
-        Objects.requireNonNull(card, "card");
-        cards.addFirst(card);
+        return Optional.ofNullable(cards.pollLast());
     }
 
     /**
@@ -91,8 +80,6 @@ public final class Deck {
         }
         List<Card> copy = new ArrayList<>(source);
         Collections.shuffle(copy, random);
-        for (Card c : copy) {
-            cards.addLast(c);
-        }
+        cards.addAll(copy);
     }
 }

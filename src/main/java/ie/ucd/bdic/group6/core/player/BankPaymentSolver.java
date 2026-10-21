@@ -21,7 +21,12 @@ public final class BankPaymentSolver {
     }
 
     /**
-     * Finds a subset of {@code bankCards} with minimal sum {@code >= dueM}. Fails if impossible.
+     * [Deep Dive: Optimal Payment Algorithm — How does the game choose which cards to pay with?]
+     * Brute-force subset-sum search over all bank cards (N is small, max ~10-15 cards in bank).
+     * Enumerates all 2^N subsets, finds the one with total >= dueM and minimal overpayment.
+     * This implements the "no change" rule from the real Monopoly Deal: the payer may overpay
+     * but never receives change. The result is sorted small-to-large for deterministic output.
+     * If the bank doesn't have enough value, the caller falls back to using property cards as payment.
      */
     public static OperationResult<List<Card>> suggestMinimalOverpaySubset(List<Card> bankCards, int dueM) {
         Objects.requireNonNull(bankCards, "bankCards");
@@ -29,10 +34,11 @@ public final class BankPaymentSolver {
             return OperationResult.ok(List.of());
         }
         List<Card> usable = bankCards.stream().filter(c -> c.bankValueM().isPresent()).toList();
-        if (totalBankPaymentValue(usable) < dueM) {
+        int total = totalBankPaymentValue(usable);
+        if (total < dueM) {
             return OperationResult.fail(
                     OperationError.INSUFFICIENT_BANK_VALUE,
-                    "bank total " + totalBankPaymentValue(usable) + "M is less than due " + dueM + "M");
+                    "bank total " + total + "M is less than due " + dueM + "M");
         }
         int n = usable.size();
         int bestSum = Integer.MAX_VALUE;

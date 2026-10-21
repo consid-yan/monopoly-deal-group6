@@ -40,10 +40,6 @@ public class CommandResult {
         );
     }
 
-    public static CommandResult success() {
-        return success(Map.of());
-    }
-
     public static CommandResult failure(String code, String message) {
         return new CommandResult(false, code, message, Map.of(), null);
     }

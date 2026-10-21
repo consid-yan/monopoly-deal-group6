@@ -74,25 +74,13 @@ public final class PropertyBoard {
     }
 
     public Optional<PropertySet> findRowContaining(Card card) {
-        String id = card.id();
+        Objects.requireNonNull(card, "card");
         for (PropertySet row : rows) {
-            if (row.cardsView().stream().anyMatch(c -> c.id().equals(id))) {
+            if (row.contains(card)) {
                 return Optional.of(row);
             }
         }
         return Optional.empty();
-    }
-
-    /**
-     * Removes a property/wild card from whichever row contains it.
-     */
-    public boolean removeCardFromRows(Card card) {
-        for (PropertySet row : rows) {
-            if (row.remove(card)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     public boolean removeRow(PropertySet row) {
@@ -100,9 +88,7 @@ public final class PropertyBoard {
     }
 
     public boolean canPayWithPropertyCard(Card card) {
-        return findRowContaining(card)
-                .filter(row -> PropertyPaymentRule.canUseAsPropertyPayment(card, row))
-                .isPresent();
+        return findRowContaining(card).isPresent() && PropertyPaymentRule.canUseAsPropertyPayment(card);
     }
 
     /**

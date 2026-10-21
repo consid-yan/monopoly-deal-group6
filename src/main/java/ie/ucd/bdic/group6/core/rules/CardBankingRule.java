@@ -1,6 +1,6 @@
 package ie.ucd.bdic.group6.core.rules;
 
-import ie.ucd.bdic.group6.core.card.*;
+import ie.ucd.bdic.group6.core.card.Card;
 
 /**
  * Helpers for official Monopoly Deal banking rules.
@@ -14,12 +14,7 @@ public final class CardBankingRule {
      * Whether this card may be placed into a bank pile as money (Operation A).
      */
     public static boolean canBankAsMoney(Card card) {
-        return switch (card) {
-            case MoneyCard _ -> true;
-            case ActionCard action -> action.bankValueM().isPresent();
-            case PropertyWildCard wild -> wild.bankValueM().isPresent();
-            case PropertyCard _ -> false;
-        };
+        return card.bankValueM().isPresent();
     }
 
     /**

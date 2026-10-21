@@ -28,7 +28,6 @@ import ie.ucd.bdic.group6.core.rules.PropertyPaymentRule;
 import ie.ucd.bdic.group6.core.property.PropertySet;
 import ie.ucd.bdic.group6.core.rules.ActionRule;
 import ie.ucd.bdic.group6.core.rules.CardBankingRule;
-import ie.ucd.bdic.group6.core.rules.PaymentRule;
 import ie.ucd.bdic.group6.core.rules.WinRule;
 import ie.ucd.bdic.group6.core.snapshot.*;
 import ie.ucd.bdic.group6.exception.GameException;
@@ -43,6 +42,15 @@ import java.time.Instant;
 import java.util.*;
 import java.util.function.Supplier;
 
+/**
+ * [Deep Dive: Thread Safety — How does the server handle concurrent requests?]
+ * ALL public executeXxx() methods are synchronized on the GameEngine instance.
+ * Since the server processes one command per GameEngine at a time, this prevents
+ * race conditions between concurrent client requests on the same session.
+ * The server's ClientConnection threads call these methods, and Java's intrinsic
+ * lock (synchronized) serializes access: only one thread can be inside any
+ * execute method at a time, guaranteeing consistent game state.
+ */
 public class GameEngine implements ActionExecutor, GameplayHandler.Host {
     private static final int DEFAULT_MAX_PLAYERS = 5;
     private static final int INITIAL_HAND_SIZE = 5;
@@ -56,7 +64,6 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
     private final Clock clock;
     private final ActionRule actionRule = new ActionRule();
     private final WinRule winRule = new WinRule();
-    private final PaymentRule paymentRule = new PaymentRule();
     private final GameplayHandler gameplayHandler;
     private final SessionSnapshotBuilder snapshotBuilder;
 
@@ -79,6 +86,11 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         this.snapshotBuilder = new SessionSnapshotBuilder();
     }
 
+    /**
+     * [Gameplay Step 0a: Create Game Room]
+     * The host creates a new lobby. A 6-character room code is generated for others to join.
+     * Called when the host clicks "New Game" on the main menu.
+     */
     @Override
     public synchronized SessionSnapshot executeCreateSession(CreateSessionCommand command) {
         String hostPlayerId = requireText(command.getHostPlayerId(), "hostPlayerId");
@@ -94,6 +106,11 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         return snapshot(session, hostPlayerId);
     }
 
+    /**
+     * [Gameplay Step 0b: Join Game Room]
+     * A player joins an existing lobby using the host's room code.
+     * Called when a non-host player clicks "Join Game" and enters the room code.
+     */
     @Override
     public synchronized SessionSnapshot executeJoinSession(JoinSessionCommand command) {
         String roomCode = requireText(command.roomCode(), "roomCode");
@@ -111,6 +128,12 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         return snapshot(session, playerId);
     }
 
+    /**
+     * [Gameplay Step 0c: Start Game]
+     * The host starts the game. Shuffles a fresh 106-card deck, deals 5 cards to each player,
+     * sets up the turn order (same as join order), and draws the first player's opening hand.
+     * Only the host can call this; requires 2-5 players in the lobby.
+     */
     @Override
     public synchronized SessionSnapshot executeStartGame(StartGameCommand command) {
         GameSession session = requireSessionById(requireText(command.getSessionId(), "sessionId"));
@@ -123,16 +146,24 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
             throw new GameException("INVALID_PLAYER_COUNT", "A game requires 2 to 5 players");
         }
 
-        Deck deck = deckSupplier.get();
+        ActiveGameState activeGame = new ActiveGameState(deckSupplier.get(), new TurnManager(session.playerJoinOrder()));
         for (String joinedPlayerId : session.playerJoinOrder()) {
-            drawCardsFromDeck(requirePlayer(session, joinedPlayerId), deck, INITIAL_HAND_SIZE);
+            drawCards(requirePlayer(session, joinedPlayerId), activeGame, INITIAL_HAND_SIZE);
         }
-        ActiveGameState activeGame = new ActiveGameState(deck, new TurnManager(session.playerJoinOrder()));
         session.start(activeGame);
         drawForTurnStart(session, activeGame.turnManager().activePlayerId());
         return snapshot(session, playerId);
     }
 
+    /**
+     * [Gameplay Step 2a: Play a Card] — Core turn action (costs 1 action point).
+     * Dispatches to one of three play modes based on card type:
+     *   BANK   — put a money card into your bank
+     *   PROPERTY — place a property/wild card onto your property board
+     *   ACTION  — use an action card (rent, deal breaker, sly deal, house, etc.)
+     * Each play consumes 1 action (or 2 if combining a rent card with Double The Rent).
+     * After playing, the turn is progressed (may auto-end or trigger discard phase).
+     */
     @Override
     public synchronized SessionSnapshot executePlayCard(PlayCardCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
@@ -148,9 +179,9 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         Player player = requirePlayer(session, playerId);
         requireNotDefeated(session, playerId);
         Card card = requireCardInHand(player, cardId);
-        int actionCost = actionCost(command, card);
-        actionRule.requireActionsAvailable(turnManager, actionCost);
         GameplayHandler.PlayMode playMode = gameplayHandler.resolvePlayMode(command, card);
+        int actionCost = actionCost(command, card, playMode);
+        actionRule.requireActionsAvailable(turnManager, actionCost);
         switch (playMode) {
             case BANK -> gameplayHandler.playBankCard(player, card);
             case PROPERTY -> gameplayHandler.playPropertyCard(command, player, card);
@@ -164,6 +195,13 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         return snapshot(session, playerId);
     }
 
+    /**
+     * [Gameplay Step 2b: Pay a Debt] — Required response to rent, Debt Collector, or Birthday.
+     * The debtor selects cards from their bank (and property board if needed) to pay the creditor.
+     * If the selected cards total less than the debt and the debtor still has available funds,
+     * the payment is rejected (must pay as much as possible).
+     * After payment, the turn progresses.
+     */
     @Override
     public synchronized SessionSnapshot executePayDebt(PayDebtCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
@@ -178,17 +216,24 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         DebtPaymentSelection payment = resolveDebtPayment(debtor, paymentCardIds);
         int availableValueM = availableDebtPaymentValueM(debtor);
         if (payment.totalValueM() < debt.amountM() && payment.totalValueM() < availableValueM) {
-        throw new GameException(
+            throw new GameException(
                     "INSUFFICIENT_PAYMENT",
                     "Selected cards total " + payment.totalValueM()
                             + "M but debtor can still pay up to " + availableValueM + "M");
         }
 
-        settleDebtWithSelectedCards(activeGame, debt, debtor, creditor, paymentCardIds);
+        settleDebtWithSelectedCards(activeGame, debt, debtor, creditor, payment);
         progressTurn(session);
         return snapshot(session, debtor.id());
     }
 
+    /**
+     * [Gameplay Step 2c: Propose a Trade] — Initiate a card trade with another player.
+     * Trades exchange exactly 1 card from each side. Supported trade types:
+     * property-for-money, money-for-property, or property-for-property.
+     * The target player must respond (accept/reject) before the turn can continue.
+     * Costs 0 action points but blocks further actions until resolved.
+     */
     @Override
     public synchronized SessionSnapshot executeProposeTrade(ProposeTradeCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
@@ -228,6 +273,11 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         return snapshot(session, proposerId);
     }
 
+    /**
+     * [Gameplay Step 2d: Respond to Trade] — Accept or reject a pending trade proposal.
+     * If accepted, cards are swapped atomically (both sides succeed or both roll back).
+     * Only the trade target player can respond, and only on their own turn.
+     */
     @Override
     public synchronized SessionSnapshot executeRespondTrade(RespondTradeCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
@@ -258,6 +308,12 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         return snapshot(session, responderId);
     }
 
+    /**
+     * [Gameplay Step 3: Respond to an Action Card] — Accept an action's effect or block it with Just Say No.
+     * When another player plays an action targeting you (rent, Debt Collector, Sly Deal, etc.),
+     * you enter RESPONDING phase. You can either accept (pay/let it happen) or use a Just Say No
+     * card to reject it. If all targets have responded, the action is applied and debts are created.
+     */
     @Override
     public synchronized SessionSnapshot executeRespondAction(RespondActionCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
@@ -278,15 +334,17 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
             pendingAction.reject(responderId);
         }
 
-        if (pendingAction.isComplete()) {
-            gameplayHandler.applyResolvedPendingAction(session, activeGame, pendingAction);
-            clearUnpayableDebts(session, activeGame);
-            activeGame.removePendingAction(pendingAction);
-        }
+        resolvePendingActionIfComplete(session, activeGame, pendingAction);
         progressTurn(session);
         return snapshot(session, responderId);
     }
 
+    /**
+     * [Gameplay Step 4: Discard Excess Cards] — Mandatory when hand exceeds 7 cards at turn end.
+     * The player must select enough cards to bring their hand down to exactly 7.
+     * Only occurs during DISCARDING phase (after actions are used up and end turn is requested).
+     * Discarded cards go to the discard pile (which is reshuffled if the draw pile runs out).
+     */
     @Override
     public synchronized SessionSnapshot executeDiscardCards(DiscardCardCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
@@ -306,6 +364,11 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         return snapshot(session, playerId);
     }
 
+    /**
+     * [Gameplay Step 5: End Turn] — The active player voluntarily ends their turn.
+     * After ending, if the player has >7 cards they enter DISCARDING phase first.
+     * Otherwise: scan for winners, advance to next non-defeated player, draw their 2 cards.
+     */
     @Override
     public synchronized SessionSnapshot executeEndTurn(EndTurnCommand command) {
         GameSession session = requireActiveSession(command.getSessionId());
@@ -324,6 +387,11 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         return snapshot(session, playerId);
     }
 
+    /**
+     * [Gameplay Step S1: Rejoin After Disconnect] — A disconnected player reconnects to an active session.
+     * If the reconnection window has expired (90s of disconnection), the player is forfeited instead.
+     * On successful rejoin, the player is marked CONNECTED and receives the latest game snapshot.
+     */
     @Override
     public synchronized SessionSnapshot executeRejoinSession(RejoinSessionCommand command) {
         String sessionIdentity = requireText(command.getSessionIdentity(), "sessionIdentity");
@@ -373,8 +441,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         return Map.of("sessionIds", changedSessionIds);
     }
 
-    private int actionCost(PlayCardCommand command, Card card) {
-        GameplayHandler.PlayMode playMode = gameplayHandler.resolvePlayMode(command, card);
+    private int actionCost(PlayCardCommand command, Card card, GameplayHandler.PlayMode playMode) {
         if (playMode == GameplayHandler.PlayMode.ACTION
                 && card instanceof ActionCard actionCard
                 && GameplayHandler.isRentAction(actionCard.actionType())
@@ -414,6 +481,13 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         }
     }
 
+    /**
+     * [Gameplay Step T: Turn Progression] — Called after every action to check if the turn should advance.
+     * Logic: if there are unresolved pending actions/debts/trades → wait.
+     * If actions are exhausted or end-turn was requested AND the player's hand is ≤7:
+     *   → scan for winners → advance to next player → draw their 2 opening cards.
+     * If the player has >7 cards, they enter DISCARDING phase first.
+     */
     private void progressTurn(GameSession session) {
         if (session.status() != SessionStatus.ACTIVE || session.activeGame().isEmpty()) {
             return;
@@ -434,7 +508,6 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         if (scanWinnersInJoinOrder(session)) {
             return;
         }
-        activeGame.clearEndTurnRequest();
         String nextPlayerId = advanceToNextAvailableTurn(session);
         drawForTurnStart(session, nextPlayerId);
     }
@@ -470,9 +543,6 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
     }
 
     private boolean processDisconnectTimeouts(GameSession session) {
-        if (session.status() == SessionStatus.FINISHED) {
-            return false;
-        }
         if (session.status() != SessionStatus.ACTIVE || session.activeGame().isEmpty()) {
             return false;
         }
@@ -564,11 +634,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
                 pendingAction.reject(playerId);
             }
             changed = true;
-            if (pendingAction.isComplete()) {
-                gameplayHandler.applyResolvedPendingAction(session, activeGame, pendingAction);
-                clearUnpayableDebts(session, activeGame);
-                activeGame.removePendingAction(pendingAction);
-            }
+            resolvePendingActionIfComplete(session, activeGame, pendingAction);
         }
         changed |= autoPayDebtsForDebtor(session, activeGame, playerId);
         return changed;
@@ -589,14 +655,21 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
                     pendingAction.reject(targetPlayerId);
                 }
             }
-            if (pendingAction.isComplete()) {
-                gameplayHandler.applyResolvedPendingAction(session, activeGame, pendingAction);
-                clearUnpayableDebts(session, activeGame);
-            }
-            activeGame.removePendingAction(pendingAction);
+            resolvePendingActionIfComplete(session, activeGame, pendingAction);
         }
         autoPayDebtsForDebtor(session, activeGame, playerId);
         autoPayDebtsForCreditor(session, activeGame, playerId);
+    }
+
+    private void resolvePendingActionIfComplete(
+            GameSession session,
+            ActiveGameState activeGame,
+            PendingAction pendingAction) {
+        if (pendingAction.isComplete()) {
+            gameplayHandler.applyResolvedPendingAction(session, activeGame, pendingAction);
+            clearUnpayableDebts(session, activeGame);
+            activeGame.removePendingAction(pendingAction);
+        }
     }
 
     private void clearUnpayableDebts(GameSession session, ActiveGameState activeGame) {
@@ -649,7 +722,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
             return true;
         }
 
-        settleDebtWithSelectedCards(activeGame, debt, debtor, creditor, paymentCardIds);
+        settleDebtWithSelectedCards(activeGame, debt, debtor, creditor, resolveDebtPayment(debtor, paymentCardIds));
         return true;
     }
 
@@ -664,22 +737,16 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         List<String> paymentCardIds = new ArrayList<>(cardIds(bankCards));
 
         int remainingM = amountM - bankTotalM;
-        List<PropertyPaymentCard> incompleteProperties = propertyPaymentCandidates(debtor, false);
-        int incompleteTotalM = propertyPaymentTotalM(incompleteProperties);
-        if (incompleteTotalM >= remainingM) {
-            paymentCardIds.addAll(propertyPaymentCardIds(minimalPropertyOverpaySubset(incompleteProperties, remainingM)));
-            return List.copyOf(paymentCardIds);
+        for (boolean completeRows : List.of(false, true)) {
+            List<PropertyPaymentCard> properties = propertyPaymentCandidates(debtor, completeRows);
+            int totalM = propertyPaymentTotalM(properties);
+            if (totalM >= remainingM) {
+                paymentCardIds.addAll(propertyPaymentCardIds(minimalPropertyOverpaySubset(properties, remainingM)));
+                return List.copyOf(paymentCardIds);
+            }
+            paymentCardIds.addAll(propertyPaymentCardIds(properties));
+            remainingM -= totalM;
         }
-        paymentCardIds.addAll(propertyPaymentCardIds(incompleteProperties));
-
-        remainingM -= incompleteTotalM;
-        List<PropertyPaymentCard> completeProperties = propertyPaymentCandidates(debtor, true);
-        int completeTotalM = propertyPaymentTotalM(completeProperties);
-        if (completeTotalM >= remainingM) {
-            paymentCardIds.addAll(propertyPaymentCardIds(minimalPropertyOverpaySubset(completeProperties, remainingM)));
-            return List.copyOf(paymentCardIds);
-        }
-        paymentCardIds.addAll(propertyPaymentCardIds(completeProperties));
         return List.copyOf(paymentCardIds);
     }
 
@@ -748,16 +815,9 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
     }
 
     private boolean isMoneyAction(ActionType actionType) {
-        return switch (actionType) {
-            case DEBT_COLLECTOR, ITS_MY_BIRTHDAY,
-                    RENT_BROWN_OR_LIGHT_BLUE,
-                    RENT_PINK_OR_ORANGE,
-                    RENT_RED_OR_YELLOW,
-                    RENT_DARK_BLUE_OR_GREEN,
-                    RENT_RAILROAD_OR_UTILITY,
-                    WILD_RENT -> true;
-            default -> false;
-        };
+        return actionType == ActionType.DEBT_COLLECTOR
+                || actionType == ActionType.ITS_MY_BIRTHDAY
+                || GameplayHandler.isRentAction(actionType);
     }
 
     private void forfeitPlayer(GameSession session, String playerId) {
@@ -781,10 +841,10 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
     }
 
     private void discardAllPlayerCards(Player player, ActiveGameState activeGame) {
-        for (Card card : player.hand().copyCards()) {
+        for (Card card : player.handView()) {
             activeGame.discard(card);
         }
-        for (Card card : player.bank().copyCards()) {
+        for (Card card : player.bankView()) {
             activeGame.discard(card);
         }
         for (PropertySet row : player.propertyBoard().rowsView()) {
@@ -842,11 +902,20 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
             PendingDebt debt,
             Player debtor,
             Player creditor,
-            List<String> paymentCardIds) {
+            DebtPaymentSelection payment) {
         PlayerRollbackSnapshot debtorSnapshot = debtor.snapshot();
         PlayerRollbackSnapshot creditorSnapshot = creditor.snapshot();
         try {
-            applyDebtPayment(debtor, creditor, paymentCardIds);
+            if (!payment.bankCards().isEmpty()) {
+                requireSuccess(debtor.tryPayBankCardsTo(creditor, payment.bankCards()));
+            }
+            for (PropertyPaymentCard propertyCard : payment.propertyCards()) {
+                requireSuccess(gameplayHandler.movePropertyCardToBestRow(
+                        debtor,
+                        creditor,
+                        propertyCard.card(),
+                        propertyCard.sourceRow()));
+            }
         } catch (RuntimeException e) {
             debtor.restore(debtorSnapshot);
             creditor.restore(creditorSnapshot);
@@ -855,23 +924,6 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
 
         debt.markAsPaid();
         activeGame.removePendingDebt(debt);
-    }
-
-    private void applyDebtPayment(Player debtor, Player creditor, List<String> paymentCardIds) {
-        DebtPaymentSelection payment = resolveDebtPayment(debtor, paymentCardIds);
-        if (!payment.bankCards().isEmpty() && payment.propertyCards().isEmpty()) {
-            requireSuccess(paymentRule.validateSelectedBankPayment(debtor.bank(), payment.bankCards(), payment.totalValueM()));
-        }
-        if (!payment.bankCards().isEmpty()) {
-            requireSuccess(debtor.tryPayBankCardsTo(creditor, payment.bankCards()));
-        }
-        for (PropertyPaymentCard propertyCard : payment.propertyCards()) {
-            requireSuccess(gameplayHandler.movePropertyCardToBestRow(
-                    debtor,
-                    creditor,
-                    propertyCard.card(),
-                    propertyCard.sourceRow()));
-        }
     }
 
     private DebtPaymentSelection resolveDebtPayment(Player debtor, List<String> paymentCardIds) {
@@ -921,11 +973,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
     }
 
     private int availableDebtPaymentValueM(Player debtor) {
-        int bankTotalM = debtor.bankView().stream()
-                .filter(card -> card.bankValueM().isPresent())
-                .mapToInt(CardBankingRule::bankPaymentValueM)
-                .filter(value -> value > 0)
-                .sum();
+        int bankTotalM = debtor.bankTotalValueM();
         int propertyTotalM = propertyPaymentTotalM(propertyPaymentCandidates(debtor, false))
                 + propertyPaymentTotalM(propertyPaymentCandidates(debtor, true));
         return bankTotalM + propertyTotalM;
@@ -950,17 +998,11 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
     }
 
     private void transferTradeCards(Player sender, Player receiver, List<TradeCardSelection> selections) {
-        List<Card> bankCards = selections.stream()
-                .filter(selection -> selection.kind() == TradeCardKind.MONEY)
-                .map(TradeCardSelection::card)
-                .toList();
-        if (!bankCards.isEmpty()) {
-            requireSuccess(sender.tryPayBankCardsTo(receiver, bankCards));
-        }
-        for (TradeCardSelection selection : selections) {
-            if (selection.kind() == TradeCardKind.PROPERTY) {
-                requireSuccess(gameplayHandler.movePropertyCardToBestRow(sender, receiver, selection.card(), selection.sourceRow()));
-            }
+        TradeCardSelection selection = selections.getFirst();
+        if (selection.card() instanceof MoneyCard) {
+            requireSuccess(sender.tryPayBankCardsTo(receiver, List.of(selection.card())));
+        } else {
+            requireSuccess(gameplayHandler.movePropertyCardToBestRow(sender, receiver, selection.card(), selection.sourceRow()));
         }
     }
 
@@ -982,7 +1024,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
                             "CARD_NOT_TRADEABLE",
                             "Simplified trades can only use actual money cards from the bank: " + cardId);
                 }
-                selections.add(new TradeCardSelection(card, TradeCardKind.MONEY, null));
+                selections.add(new TradeCardSelection(card, null));
                 continue;
             }
             GameplayHandler.PropertyCardLocation propertyCard = gameplayHandler.findPropertyCardLocation(player, cardId)
@@ -991,7 +1033,6 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
                             "Trade card must be in the player's bank or property board: " + cardId));
             selections.add(new TradeCardSelection(
                     propertyCard.card(),
-                    TradeCardKind.PROPERTY,
                     propertyCard.row()));
         }
         return List.copyOf(selections);
@@ -1005,26 +1046,12 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
                     "UNSUPPORTED_TRADE_CARD_COUNT",
                     "Simplified trades must exchange exactly one card from each player");
         }
-        Set<TradeCardKind> offeredKinds = tradeKinds(offeredCards);
-        Set<TradeCardKind> requestedKinds = tradeKinds(requestedCards);
-        if (offeredKinds.size() != 1 || requestedKinds.size() != 1) {
-            throw new GameException("UNSUPPORTED_TRADE_TYPE", "Each trade side must use one card category");
-        }
-        TradeCardKind offeredKind = offeredKinds.iterator().next();
-        TradeCardKind requestedKind = requestedKinds.iterator().next();
-        if (offeredKind == TradeCardKind.MONEY && requestedKind == TradeCardKind.MONEY) {
+        if (offeredCards.getFirst().card() instanceof MoneyCard
+                && requestedCards.getFirst().card() instanceof MoneyCard) {
             throw new GameException(
                     "UNSUPPORTED_TRADE_TYPE",
                     "Supported trades are property-money, money-property, or property-property");
         }
-    }
-
-    private Set<TradeCardKind> tradeKinds(List<TradeCardSelection> selections) {
-        EnumSet<TradeCardKind> kinds = EnumSet.noneOf(TradeCardKind.class);
-        for (TradeCardSelection selection : selections) {
-            kinds.add(selection.kind());
-        }
-        return kinds;
     }
 
     private void validateTradeCardCounts(List<String> offeredCardIds, List<String> requestedCardIds) {
@@ -1117,8 +1144,7 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
 
     private void autoDiscardHandDownToSeven(Player player, ActiveGameState activeGame) {
         while (player.hand().size() > 7) {
-            List<Card> cards = player.hand().copyCards();
-            Card card = cards.getLast();
+            Card card = player.handView().getLast();
             if (!player.hand().remove(card)) {
                 throw new GameException("CARD_NOT_IN_HAND", "Card is not in hand: " + card.id());
             }
@@ -1126,17 +1152,15 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         }
     }
 
+    /**
+     * [Gameplay Step 1: Draw Cards at Turn Start] — Automatic at the beginning of each player's turn.
+     * Normally draws 2 cards. If the player's hand is empty, draws 5 cards instead (catch-up mechanic).
+     */
     private void drawForTurnStart(GameSession session, String playerId) {
         ActiveGameState activeGame = requireActiveGame(session);
         Player player = requirePlayer(session, playerId);
         int drawCount = player.hand().size() == 0 ? INITIAL_HAND_SIZE : NORMAL_TURN_DRAW;
         drawCards(player, activeGame, drawCount);
-    }
-
-    private void drawCardsFromDeck(Player player, Deck deck, int count) {
-        for (int i = 0; i < count; i++) {
-            deck.tryDraw().ifPresent(player::addToHand);
-        }
     }
 
     @Override
@@ -1154,6 +1178,11 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         }
     }
 
+    /**
+     * [Gameplay Step 6: Win Check] — Scans all players in join order for 3+ complete property sets.
+     * The first player found with >=3 complete sets of different colors wins immediately.
+     * Returns true if a winner was found (session moves to FINISHED state).
+     */
     private boolean scanWinnersInJoinOrder(GameSession session) {
         if (session.status() != SessionStatus.ACTIVE) {
             return false;
@@ -1276,11 +1305,6 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
             int totalValueM) {
     }
 
-    private enum TradeCardKind {
-        MONEY,
-        PROPERTY
-    }
-
-    private record TradeCardSelection(Card card, TradeCardKind kind, PropertySet sourceRow) {
+    private record TradeCardSelection(Card card, PropertySet sourceRow) {
     }
 }

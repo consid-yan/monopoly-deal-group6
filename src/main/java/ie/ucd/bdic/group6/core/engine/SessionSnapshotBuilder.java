@@ -2,7 +2,6 @@ package ie.ucd.bdic.group6.core.engine;
 
 import ie.ucd.bdic.group6.core.card.ActionCard;
 import ie.ucd.bdic.group6.core.card.Card;
-import ie.ucd.bdic.group6.core.card.MoneyCard;
 import ie.ucd.bdic.group6.core.card.PropertyCard;
 import ie.ucd.bdic.group6.core.card.PropertyWildCard;
 import ie.ucd.bdic.group6.core.engine.pending.PendingAction;
@@ -31,6 +30,15 @@ public final class SessionSnapshotBuilder {
     public SessionSnapshotBuilder() {
     }
 
+    /**
+     * [Deep Dive: Snapshot Pattern — How does the server sync state to all clients?]
+     * Converts the live GameSession (mutable, server-only) into a SessionSnapshot (immutable, serializable).
+     * This is the bridge between the game engine and the network layer:
+     *   Engine mutates Player/Hand/Bank/PropertyBoard → build() takes a read-only picture →
+     *   snapshot is serialized over TCP → each client's UI reconstructs the view.
+     * Only the requesting player's hand cards are included (other players only see hand count).
+     * Called after every state-changing operation (play card, pay debt, end turn, etc.).
+     */
     public SessionSnapshot build(GameSession session, String requesterPlayerId) {
         Optional<ActiveGameState> activeGame = session.activeGame();
 
@@ -147,9 +155,6 @@ public final class SessionSnapshotBuilder {
         String actionType = "";
         List<String> rentColorOptions = List.of();
 
-        if (card instanceof MoneyCard moneyCard) {
-            valueM = moneyCard.valueM();
-        }
         if (card instanceof PropertyCard propertyCard) {
             propertyColor = propertyCard.color().name();
             requiredToComplete = propertyCard.requiredToComplete();

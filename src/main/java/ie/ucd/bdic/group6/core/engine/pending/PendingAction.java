@@ -12,7 +12,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * A played action card waiting for target players to accept it or cancel their part with Just Say No.
+ * [Deep Dive: Async Action Resolution — How does the game wait for multiple players to respond?]
+ * When an action card is played (rent, Debt Collector, Sly Deal, etc.), it doesn't resolve immediately.
+ * Instead, a PendingAction is created with a list of targetPlayerIds, each in PENDING state.
+ * The turn is BLOCKED until every target has either ACCEPTED or REJECTED (via Just Say No).
+ * Once isComplete() returns true (no more PENDING responses), the engine calls
+ * GameplayHandler.applyResolvedPendingAction() to create debts or transfer cards.
+ * This is a simple state-machine callback pattern:
+ *   PLAY → all PENDING → (respond loop) → all resolved → APPLY → remove.
  */
 public final class PendingAction {
 
@@ -48,7 +55,7 @@ public final class PendingAction {
         this.targetPropertyRowId = blankToNull(builder.targetPropertyRowId);
         this.offeredCardId = blankToNull(builder.offeredCardId);
         this.requestedCardId = blankToNull(builder.requestedCardId);
-        this.createdAt = builder.createdAt == null ? Instant.now() : builder.createdAt;
+        this.createdAt = Instant.now();
         List<String> targetIds = List.copyOf(Objects.requireNonNull(builder.targetPlayerIds, "targetPlayerIds"));
         if (targetIds.isEmpty()) {
             throw new IllegalArgumentException("targetPlayerIds must not be empty");
@@ -131,7 +138,7 @@ public final class PendingAction {
     }
 
     public boolean isComplete() {
-        return responsesByTarget.values().stream().noneMatch(response -> response == Response.PENDING);
+        return !responsesByTarget.containsValue(Response.PENDING);
     }
 
     public List<String> acceptedTargetIds() {
@@ -176,7 +183,6 @@ public final class PendingAction {
         private String offeredCardId;
         private String requestedCardId;
         private List<String> targetPlayerIds = List.of();
-        private Instant createdAt;
 
         private Builder() {
         }
