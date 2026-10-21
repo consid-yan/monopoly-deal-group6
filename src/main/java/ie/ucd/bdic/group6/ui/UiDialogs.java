@@ -1,6 +1,7 @@
 package ie.ucd.bdic.group6.ui;
 
 import java.util.Optional;
+import java.util.function.Supplier;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -35,57 +36,33 @@ final class UiDialogs {
         TextField playerNameField = field("Player name");
         TextField maxPlayersField = field("Number from 2 to 5");
         maxPlayersField.setText("3");
-        Optional<ButtonType> result = showForm("New Game", "Host a new multiplayer game",
+        return promptForm("New Game", "Host a new multiplayer game", "Invalid New Game Settings",
+                () -> new NewGameRequest(
+                        requireText(playerNameField.getText(), "Player name"),
+                        parseMaxPlayers(maxPlayersField.getText())),
                 row("Player Name", playerNameField),
                 row("Maximum Players", maxPlayersField, "Choose between 2 and 5 players"));
-        if (result.isEmpty() || result.get() != CONFIRM_BUTTON) {
-            return Optional.empty();
-        }
-        try {
-            String playerName = requireText(playerNameField.getText(), "Player name");
-            return Optional.of(new NewGameRequest(playerName, parseMaxPlayers(maxPlayersField.getText())));
-        } catch (IllegalArgumentException e) {
-            showError("Invalid New Game Settings", e.getMessage());
-            return Optional.empty();
-        }
     }
 
     static Optional<JoinRequest> promptJoinGame() {
         TextField roomCodeField = field("Room code");
         TextField hostField = field("Server host");
         TextField playerNameField = field("Player name");
-        Optional<ButtonType> result = showForm("Join Game", "Connect to an existing room",
+        return promptForm("Join Game", "Connect to an existing room", "Invalid Join Settings",
+                () -> new JoinRequest(
+                        requireText(roomCodeField.getText(), "Room code"),
+                        requireText(hostField.getText(), "Host"),
+                        requireText(playerNameField.getText(), "Player name")),
                 row("Room Code", roomCodeField),
                 row("Host IP", hostField),
                 row("Player Name", playerNameField));
-        if (result.isEmpty() || result.get() != CONFIRM_BUTTON) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(new JoinRequest(
-                    requireText(roomCodeField.getText(), "Room code"),
-                    requireText(hostField.getText(), "Host"),
-                    requireText(playerNameField.getText(), "Player name")));
-        } catch (IllegalArgumentException e) {
-            showError("Invalid Join Settings", e.getMessage());
-            return Optional.empty();
-        }
     }
 
     static Optional<RejoinRequest> promptRejoinGame() {
         TextField roomCodeField = field("Room code");
-        Optional<ButtonType> result = showForm("Rejoin Session", "Reconnect with the same player id",
+        return promptForm("Rejoin Session", "Reconnect with the same player id", "Invalid Rejoin Settings",
+                () -> new RejoinRequest(requireText(roomCodeField.getText(), "Room code")),
                 row("Room Code", roomCodeField));
-        if (result.isEmpty() || result.get() != CONFIRM_BUTTON) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(new RejoinRequest(
-                    requireText(roomCodeField.getText(), "Room code")));
-        } catch (IllegalArgumentException e) {
-            showError("Invalid Rejoin Settings", e.getMessage());
-            return Optional.empty();
-        }
     }
 
     static void showError(String title, String message) {
@@ -123,7 +100,8 @@ final class UiDialogs {
         dialog.getDialogPane().setMaxWidth(width);
     }
 
-    static void styleButtons(Dialog<?> dialog, ButtonType... buttonTypes) {
+    static void setButtons(Dialog<?> dialog, ButtonType... buttonTypes) {
+        dialog.getDialogPane().getButtonTypes().setAll(buttonTypes);
         for (ButtonType buttonType : buttonTypes) {
             Node buttonNode = dialog.getDialogPane().lookupButton(buttonType);
             if (buttonNode instanceof Button button) {
@@ -161,8 +139,7 @@ final class UiDialogs {
     private static Dialog<ButtonType> messageDialog(String title, String message) {
         Dialog<ButtonType> dialog = createDialog(title);
         setDialogWidth(dialog, 520);
-        dialog.getDialogPane().getButtonTypes().setAll(ERROR_OK_BUTTON);
-        styleButtons(dialog, ERROR_OK_BUTTON);
+        setButtons(dialog, ERROR_OK_BUTTON);
 
         Label body = bodyLabel(message == null || message.isBlank() ? "The operation failed." : message);
         HBox content = new HBox(18, errorGraphic(), body);
@@ -199,9 +176,8 @@ final class UiDialogs {
         Dialog<ButtonType> dialog = createDialog(title);
         dialog.setTitle(title);
         dialog.setHeaderText(null);
-        dialog.getDialogPane().getButtonTypes().setAll(CONFIRM_BUTTON, CANCEL_BUTTON);
         setDialogWidth(dialog, FORM_DIALOG_WIDTH);
-        styleButtons(dialog, CONFIRM_BUTTON, CANCEL_BUTTON);
+        setButtons(dialog, CONFIRM_BUTTON, CANCEL_BUTTON);
 
         var heading = new Label(header);
         heading.getStyleClass().add("app-dialog-heading");
@@ -215,6 +191,20 @@ final class UiDialogs {
         VBox content = new VBox(20, heading, form);
         dialog.getDialogPane().setContent(content);
         return dialog.showAndWait();
+    }
+
+    private static <T> Optional<T> promptForm(
+            String title, String header, String errorTitle, Supplier<T> resultFactory, FormRow... rows) {
+        Optional<ButtonType> result = showForm(title, header, rows);
+        if (result.isEmpty() || result.get() != CONFIRM_BUTTON) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(resultFactory.get());
+        } catch (IllegalArgumentException exception) {
+            showError(errorTitle, exception.getMessage());
+            return Optional.empty();
+        }
     }
 
     private static VBox fieldBlock(FormRow row) {
@@ -234,12 +224,8 @@ final class UiDialogs {
         return block;
     }
 
-    private static void makeUndecorated(Dialog<?> dialog) {
-        dialog.initStyle(StageStyle.TRANSPARENT);
-    }
-
     private static void prepareDialog(Dialog<?> dialog, String title) {
-        makeUndecorated(dialog);
+        dialog.initStyle(StageStyle.TRANSPARENT);
         decorateDialog(dialog, title);
         applyTransparentScene(dialog);
         applyDialogIcon(dialog);

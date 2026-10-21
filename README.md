@@ -83,7 +83,7 @@ src/main/java/ie/ucd/bdic/group6/
 +-- controller/   Request intake, DTOs, and request-to-command mapping
 +-- core/         Cards, common results, engine, players, properties, and rules
 +-- exception/    Project-specific exception types
-+-- facade/       Command dispatch facade, handlers, and result model
++-- facade/       Command dispatch facade and result model
 +-- network/      Client and server communication packages
 +-- ui/           JavaFX UI packages
 
@@ -106,8 +106,8 @@ The application is organized around a command-driven flow:
 
 1. `GameController` receives a `ControllerRequest`.
 2. `RequestMapper` converts request data into command records such as `CreateSessionCommand`, `JoinSessionCommand`, `StartGameCommand`, `PlayCardCommand`, `PayDebtCommand`, `ProposeTradeCommand`, `RespondTradeCommand`, `DiscardCardsCommand`, `EndTurnCommand`, and `RejoinSessionCommand`.
-3. `GameFacade` routes each command to a matching `CommandHandler`.
-4. Handlers return a `CommandResult`.
+3. `GameFacade` routes each registered command class to the corresponding engine operation.
+4. The facade wraps results and execution failures in a `CommandResult`.
 
 This flow allows UI and networking layers to submit player actions through the same application boundary while keeping game execution centralized.
 

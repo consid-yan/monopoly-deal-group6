@@ -5,11 +5,13 @@ import ie.ucd.bdic.group6.core.card.deck.Deck;
 import ie.ucd.bdic.group6.core.engine.pending.PendingAction;
 import ie.ucd.bdic.group6.core.engine.pending.PendingDebt;
 import ie.ucd.bdic.group6.core.engine.pending.PendingTrade;
+import ie.ucd.bdic.group6.core.rules.DrawPileRule;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 public final class ActiveGameState {
     private final Deck drawPile;
@@ -42,15 +44,16 @@ public final class ActiveGameState {
         return discardPile.size();
     }
 
+    /**
+     * [Deep Dive: Deck Recycling — What happens when the draw pile runs out?]
+     * When the draw pile is empty and someone needs to draw, the discard pile is shuffled
+     * and becomes the new draw pile. This is standard Monopoly Deal rules:
+     * the discard pile is recycled as a fresh shuffled deck.
+     * DrawPileRule refills the draw pile and clears the discard pile.
+     * If both piles are empty, draws simply return no cards.
+     */
     public void reshuffleDiscardIntoDraw() {
-        if (!drawPile.isEmpty() || discardPile.isEmpty()) {
-            return;
-        }
-        java.util.Collections.shuffle(discardPile);
-        for (int i = discardPile.size() - 1; i >= 0; i--) {
-            drawPile.discardToBottom(discardPile.get(i));
-        }
-        discardPile.clear();
+        DrawPileRule.reshuffleDiscardIntoDrawPile(drawPile, discardPile, ThreadLocalRandom.current());
     }
 
     public Optional<String> winnerPlayerId() {

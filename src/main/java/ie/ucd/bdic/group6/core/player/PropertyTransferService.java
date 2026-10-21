@@ -23,6 +23,15 @@ public final class PropertyTransferService {
         return transferPropertyCardToRow(sender, receiver, card, receiverRow, null);
     }
 
+    /**
+     * [Deep Dive: Atomic Property Transfer — How is a card safely moved between players?]
+     * Step 1: Find the card on the sender's board, capture its wild assignment if applicable.
+     * Step 2: Validate the receiver's row can accept the card.
+     * Step 3: Remove from sender. Step 4: Add to receiver.
+     * CRITICAL: If step 4 fails, the card is rolled back to the sender's original row
+     * with its original wild assignment. This prevents card loss due to mid-transfer errors.
+     * Used by Sly Deal, Forced Deal, Deal Breaker, and property-based debt payments.
+     */
     public static OperationResult<Void> transferPropertyCardToRow(
             Player sender,
             Player receiver,
@@ -51,7 +60,7 @@ public final class PropertyTransferService {
             return OperationResult.fail(
                     OperationError.RECEIVER_ROW_REJECTS_CARD, "receiver row rejects card with given wild choice");
         }
-        if (!sender.propertyBoard().removeCardFromRows(card)) {
+        if (!origin.get().remove(card)) {
             return OperationResult.fail(OperationError.CARD_NOT_ON_PROPERTY_BOARD, "remove failed");
         }
         if (!receiverRow.tryAdd(card, wildChoice)) {
@@ -87,7 +96,6 @@ public final class PropertyTransferService {
         OperationResult<Void> moved = transferPropertyCardToRow(sender, receiver, card, receiverRow, wildChoice);
         if (!moved.isSuccess()) {
             if (receiverRow.size() == 0) {
-                receiver.propertyBoard().removeRow(receiverRow);
                 receiver.propertyBoard().compactEmptyRows();
             }
             return OperationResult.fail(
@@ -105,50 +113,11 @@ public final class PropertyTransferService {
         if (!sender.propertyBoard().ownsRow(sourceRow)) {
             return OperationResult.fail(OperationError.ROW_NOT_OWNED_BY_PLAYER, "source row not on sender board");
         }
-        PlayerRollbackSnapshot.PropertyRowSnapshot snap = PlayerRollbackSnapshot.PropertyRowSnapshot.from(sourceRow);
         if (!sender.propertyBoard().removeRow(sourceRow)) {
             return OperationResult.fail(OperationError.CARD_NOT_ON_PROPERTY_BOARD, "could not remove source row");
         }
-        PropertySet target = new PropertySet(snap.anchorColor(), snap.rowId());
-        for (Card c : snap.cardsInOrder()) {
-            PropertyColor wild = null;
-            if (c instanceof PropertyWildCard wc) {
-                PropertyColor choice = snap.wildAssignments().get(wc.id());
-                if (choice == null) {
-                    rollbackEntireRowRestore(sender, receiver, snap, target);
-                    return OperationResult.fail(
-                            OperationError.WILD_COLOR_INVALID, "missing wild assignment for " + wc.id());
-                }
-                wild = choice;
-            }
-            if (!target.tryAdd(c, wild)) {
-                rollbackEntireRowRestore(sender, receiver, snap, target);
-                return OperationResult.fail(
-                        OperationError.RECEIVER_ROW_REJECTS_CARD, "cannot rebuild row on receiver for card " + c.id());
-            }
-        }
-        target.applyImprovementFlagsForSnapshot(snap.house(), snap.hotel());
-        receiver.propertyBoard().addRow(target);
+        receiver.propertyBoard().addRow(sourceRow);
         sender.propertyBoard().compactEmptyRows();
-        return OperationResult.ok(target);
-    }
-
-    private static void rollbackEntireRowRestore(
-            Player sender,
-            Player receiver,
-            PlayerRollbackSnapshot.PropertyRowSnapshot snap,
-            PropertySet partialTarget) {
-        receiver.propertyBoard().removeRow(partialTarget);
-        receiver.propertyBoard().compactEmptyRows();
-        PropertySet restored = new PropertySet(snap.anchorColor(), snap.rowId());
-        for (Card c : snap.cardsInOrder()) {
-            PropertyColor wild = null;
-            if (c instanceof PropertyWildCard wc) {
-                wild = snap.wildAssignments().get(wc.id());
-            }
-            restored.tryAdd(c, wild);
-        }
-        restored.applyImprovementFlagsForSnapshot(snap.house(), snap.hotel());
-        sender.propertyBoard().addRow(restored);
+        return OperationResult.ok(sourceRow);
     }
 }

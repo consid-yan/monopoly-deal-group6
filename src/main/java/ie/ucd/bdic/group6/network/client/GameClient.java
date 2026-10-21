@@ -30,7 +30,6 @@ public class GameClient implements AutoCloseable {
     private final CopyOnWriteArrayList<Consumer<Throwable>> disconnectListeners = new CopyOnWriteArrayList<>();
 
     private ObjectOutputStream output;
-    private ObjectInputStream input;
 
     private Socket socket;
     private final AtomicBoolean connected = new AtomicBoolean(false);
@@ -55,7 +54,6 @@ public class GameClient implements AutoCloseable {
 
             socket = candidateSocket;
             output = out;
-            input = in;
             connected.set(true);
 
             Thread receiverThread = new Thread(new ClientReceiver(in, this), "client-receiver");
@@ -85,14 +83,21 @@ public class GameClient implements AutoCloseable {
         output.reset();
     }
 
+    /**
+     * [Deep Dive: Async Request-Response Matching — How does the client match responses to requests?]
+     * Each request gets a random UUID (requestId). A CompletableFuture is stored in a
+     * ConcurrentHashMap keyed by that UUID. The request is serialized and sent over TCP.
+     * Later, when ClientReceiver reads a ServerResponse from the socket, it looks up the
+     * matching future by response.requestId() and completes it. If the response never arrives
+     * (disconnect), all pending futures are completed exceptionally with a CancellationException.
+     * This is a simple but effective async RPC pattern over raw TCP sockets.
+     */
     public CompletableFuture<ServerResponse> sendCommand(CommandType commandType,
                                                          Map<String, Object> payload) {
         Objects.requireNonNull(commandType, "commandType");
 
         if (!connected.get()) {
-            CompletableFuture<ServerResponse> failed = new CompletableFuture<>();
-            failed.completeExceptionally(new IllegalStateException("Client is not connected"));
-            return failed;
+            return CompletableFuture.failedFuture(new IllegalStateException("Client is not connected"));
         }
 
         // Creates the content of the request
@@ -209,7 +214,6 @@ public class GameClient implements AutoCloseable {
         closeSocket(socket);
         socket = null;
         output = null;
-        input = null;
     }
 
     private void closeSocket(Socket socket) {

@@ -23,7 +23,6 @@ import javafx.application.Platform;
 
 import static ie.ucd.bdic.group6.network.NetworkAddressResolver.resolveShareableHost;
 import static ie.ucd.bdic.group6.network.NetworkConfig.DEFAULT_PORT;
-import static ie.ucd.bdic.group6.network.NetworkConfig.requireValidPort;
 
 public final class GameSessionCoordinator implements AutoCloseable {
     private static final Logger LOGGER = Logger.getLogger(GameSessionCoordinator.class.getName());
@@ -38,7 +37,6 @@ public final class GameSessionCoordinator implements AutoCloseable {
 
     private volatile String host = "";
     private volatile String playerId = "";
-    private volatile String playerName = "";
     private volatile String playerToken = "";
     private volatile String sessionId = "";
     private volatile String roomCode = "";
@@ -57,21 +55,12 @@ public final class GameSessionCoordinator implements AutoCloseable {
         return playerId;
     }
 
-    public String playerName() {
-        return playerName;
-    }
-
     public String sessionId() {
         return sessionId;
     }
 
     public String roomCode() {
         return roomCode;
-    }
-
-    public boolean isConnected() {
-        GameClient currentClient = client;
-        return connected && currentClient != null && currentClient.isConnected();
     }
 
     public String joinHost() {
@@ -81,10 +70,6 @@ public final class GameSessionCoordinator implements AutoCloseable {
     public void setSnapshotListener(Consumer<UiSnapshot> listener) {
         snapshotListener = listener == null ? _ -> {
         } : listener;
-        UiSnapshot snapshot = latestSnapshot;
-        if (!snapshot.isEmpty()) {
-            runOnFx(() -> snapshotListener.accept(snapshot));
-        }
     }
 
     public void setMessageListener(Consumer<String> listener) {
@@ -131,40 +116,23 @@ public final class GameSessionCoordinator implements AutoCloseable {
                 client = newClient;
                 host = shareableHost;
                 playerId = newPlayerId;
-                playerName = newPlayerName;
                 connected = true;
 
                 LOGGER.info("Local session status initialized.");
 
                 return null;
-            } catch (IOException e) {
-                LOGGER.log(
-                        Level.SEVERE,
-                        "Failed to start server: I/O exception. Possible reasons: port "
-                                + DEFAULT_PORT
-                                + " occupied, insufficient permissions, or firewall block.",
-                        e);
-
-                try {
-                    server.stop();
-                    LOGGER.info("Attempted to shut down leftover server process.");
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Failed to close leftover server.", ex);
-                }
-
-                throw new CompletionException("Failed to start server: " + e.getMessage(), e);
-            } catch (RuntimeException runtimeException) {
-                LOGGER.log(Level.SEVERE, "Failed to start server: runtime exception.", runtimeException);
+            } catch (IOException | RuntimeException exception) {
+                LOGGER.log(Level.SEVERE, "Failed to start server.", exception);
 
                 if (server != null) {
                     try {
                         server.stop();
-                    } catch (Exception exception) {
-                        LOGGER.log(Level.WARNING, "Failed to close leftover server after runtime exception.", exception);
+                    } catch (Exception cleanupException) {
+                        LOGGER.log(Level.WARNING, "Failed to close leftover server.", cleanupException);
                     }
                 }
 
-                throw new CompletionException("Failed to start server: " + runtimeException.getMessage(), runtimeException);
+                throw new CompletionException("Failed to start server: " + exception.getMessage(), exception);
             }
         }).thenCompose(ignored -> {
             LOGGER.info("[5/5] Sending create session command to server...");
@@ -201,7 +169,7 @@ public final class GameSessionCoordinator implements AutoCloseable {
         String newRoomCode = requireText(requestedRoomCode, "room code");
         String newPlayerName = requireText(requestedPlayerName, "player name");
         String newPlayerId = generatePlayerId(newPlayerName);
-        return connectAs(newHost, newPlayerId, newPlayerName, "")
+        return connectAs(newHost, newPlayerId, "")
                 .thenCompose(ignored -> sendCommand(CommandType.JOIN_SESSION, Map.of(
                         "roomCode", newRoomCode,
                         "playerId", newPlayerId,
@@ -218,7 +186,6 @@ public final class GameSessionCoordinator implements AutoCloseable {
         return connectAs(
                 credentials.host(),
                 credentials.playerId(),
-                credentials.playerId(),
                 credentials.playerToken())
                 .thenCompose(ignored -> sendCommand(CommandType.REJOIN_SESSION, Map.of(
                         "sessionIdentity", credentials.roomCode(),
@@ -230,8 +197,8 @@ public final class GameSessionCoordinator implements AutoCloseable {
     public CompletableFuture<ServerResponse> sendCommand(CommandType commandType, Map<String, Object> payload) {
         GameClient currentClient = client;
         if (currentClient == null || !currentClient.isConnected()) {
-            CompletableFuture<ServerResponse> failed = new CompletableFuture<>();
-            failed.completeExceptionally(new IllegalStateException("Not connected to a game server"));
+            CompletableFuture<ServerResponse> failed = CompletableFuture.failedFuture(
+                    new IllegalStateException("Not connected to a game server"));
             failed.whenComplete((_, error) -> notifyError(error));
             return failed;
         }
@@ -259,7 +226,6 @@ public final class GameSessionCoordinator implements AutoCloseable {
         sessionId = "";
         roomCode = "";
         playerId = "";
-        playerName = "";
         playerToken = "";
         notifySnapshot(latestSnapshot);
     }
@@ -267,16 +233,13 @@ public final class GameSessionCoordinator implements AutoCloseable {
     private CompletableFuture<Void> connectAs(
             String requestedHost,
             String newPlayerId,
-            String newPlayerName,
             String newPlayerToken) {
         return CompletableFuture.runAsync(() -> {
             try {
                 resetNetwork();
                 client = openClient(requestedHost, DEFAULT_PORT);
-                hostedServer = null;
                 host = requestedHost;
                 playerId = newPlayerId;
-                playerName = newPlayerName;
                 playerToken = newPlayerToken == null ? "" : newPlayerToken;
                 connected = true;
             } catch (IOException | RuntimeException e) {
@@ -286,7 +249,6 @@ public final class GameSessionCoordinator implements AutoCloseable {
     }
 
     private GameClient openClient(String requestedHost, int requestedPort) throws IOException {
-        requireValidPort(requestedPort);
         GameClient newClient = new GameClient();
         newClient.addUpdateListener(this::handleStateUpdate);
         newClient.addNoticeListener(this::handleNotice);
@@ -314,9 +276,7 @@ public final class GameSessionCoordinator implements AutoCloseable {
         }
         if (response.accepted()) {
             rememberPlayerToken(response.payload());
-            if (response.snapshot() != null) {
-                updateSnapshot(response.snapshot());
-            }
+            updateSnapshot(response.snapshot());
             return;
         }
         notifyMessage(response.message());
@@ -348,17 +308,8 @@ public final class GameSessionCoordinator implements AutoCloseable {
             return false;
         }
 
-        connected = false;
-        latestSnapshot = UiSnapshot.empty();
         host = "";
-        playerId = "";
-        playerName = "";
-        playerToken = "";
-        sessionId = "";
-        roomCode = "";
-        closeAndClearNetworkResources();
-
-        notifySnapshot(latestSnapshot);
+        leaveSession();
         return true;
     }
 
@@ -414,7 +365,6 @@ public final class GameSessionCoordinator implements AutoCloseable {
     }
 
     private void rememberRejoinCredentials(Map<String, Object> data, String token) {
-        String rememberedSessionId = firstNonBlank(text(data.get("sessionId")), sessionId);
         String rememberedRoomCode = firstNonBlank(text(data.get("roomCode")), roomCode);
         String rememberedPlayerId = firstNonBlank(playerId, text(data.get("playerId")));
 
@@ -424,7 +374,6 @@ public final class GameSessionCoordinator implements AutoCloseable {
 
         RejoinCredentials credentials = new RejoinCredentials(
                 host,
-                blankToEmpty(rememberedSessionId),
                 rememberedRoomCode,
                 rememberedPlayerId,
                 token);
@@ -497,10 +446,6 @@ public final class GameSessionCoordinator implements AutoCloseable {
         return null;
     }
 
-    private String blankToEmpty(String value) {
-        return value == null ? "" : value;
-    }
-
     private String normalizeRoomCode(String value) {
         return value.trim().toUpperCase(Locale.ROOT);
     }
@@ -514,7 +459,6 @@ public final class GameSessionCoordinator implements AutoCloseable {
 
     private record RejoinCredentials(
             String host,
-            String sessionId,
             String roomCode,
             String playerId,
             String playerToken) {}

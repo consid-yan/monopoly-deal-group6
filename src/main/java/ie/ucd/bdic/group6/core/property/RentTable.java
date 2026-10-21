@@ -29,12 +29,7 @@ public final class RentTable {
             case YELLOW -> n == 1 ? 2 : (n == 2 ? 4 : 6);
             case GREEN -> n == 1 ? 2 : (n == 2 ? 4 : 7);
             case DARK_BLUE -> n == 1 ? 3 : 8;
-            case RAILROAD -> switch (n) {
-                case 1 -> 1;
-                case 2 -> 2;
-                case 3 -> 3;
-                default -> 4;
-            };
+            case RAILROAD -> n;
         };
     }
 
@@ -43,19 +38,10 @@ public final class RentTable {
      * Railroads/utilities cannot be improved; {@code house} / {@code hotel} are ignored for them.
      */
     public static int completeSetRent(PropertyColor color, boolean house, boolean hotel) {
-        if (PropertyColor.isRailOrUtility(color)) {
+        if (PropertyColor.isRailOrUtility(color) || !house) {
             return baseRent(color, PropertyColor.fullSetSize(color));
         }
-        if (hotel && !house) {
-            return baseRent(color, PropertyColor.fullSetSize(color));
-        }
-        if (hotel) {
-            return HOTEL_RENT.get(color);
-        }
-        if (house) {
-            return HOUSE_RENT.get(color);
-        }
-        return baseRent(color, PropertyColor.fullSetSize(color));
+        return hotel ? HOTEL_RENT.get(color) : HOUSE_RENT.get(color);
     }
 
     private static final Map<PropertyColor, Integer> HOUSE_RENT = houseRentMap();

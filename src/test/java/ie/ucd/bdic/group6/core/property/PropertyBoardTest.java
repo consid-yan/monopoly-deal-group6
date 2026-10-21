@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PropertyBoardTest {
 
     @Test
-    void autoPlayDirectsCardToExistingIncompleteRowOfSameColor() {
+    void addingCardToSelectedRowKeepsExistingRow() {
         PropertyBoard board = new PropertyBoard();
         PropertyCard brown1 = new PropertyCard("b1", "B1", PropertyColor.BROWN, 2);
         PropertyCard brown2 = new PropertyCard("b2", "B2", PropertyColor.BROWN, 2);

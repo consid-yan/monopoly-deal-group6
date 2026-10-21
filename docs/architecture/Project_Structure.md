@@ -89,7 +89,6 @@ monopoly-deal-group6/
 │   │   │                   │   ├── player/
 │   │   │                   │   │   ├── Bank.java
 │   │   │                   │   │   ├── BankPaymentSolver.java
-│   │   │                   │   │   ├── CardDiscardSink.java
 │   │   │                   │   │   ├── Hand.java
 │   │   │                   │   │   ├── Player.java
 │   │   │                   │   │   ├── PlayerPropertyTransfers.java
@@ -105,7 +104,6 @@ monopoly-deal-group6/
 │   │   │                   │   │   ├── ActionRule.java
 │   │   │                   │   │   ├── CardBankingRule.java
 │   │   │                   │   │   ├── DrawPileRule.java
-│   │   │                   │   │   ├── PaymentRule.java
 │   │   │                   │   │   └── WinRule.java
 │   │   │                   │   ├── snapshot/
 │   │   │                   │       ├── CardSnapshot.java
@@ -122,27 +120,10 @@ monopoly-deal-group6/
 │   │   │                   │   ├── PlayerNotFoundException.java
 │   │   │                   │   └── SessionNotFoundException.java
 │   │   │                   ├── facade/
-│   │   │                   │   ├── handler/
-│   │   │                   │   │   ├── AbstractCommandHandler.java
-│   │   │                   │   │   ├── CommandHandler.java
-│   │   │                   │   │   ├── CreateSessionHandler.java
-│   │   │                   │   │   ├── DiscardCardsHandler.java
-│   │   │                   │   │   ├── EndTurnHandler.java
-│   │   │                   │   │   ├── JoinSessionHandler.java
-│   │   │                   │   │   ├── PayDebtHandler.java
-│   │   │                   │   │   ├── PlayCardHandler.java
-│   │   │                   │   │   ├── PlayerDisconnectedHandler.java
-│   │   │                   │   │   ├── ProcessDisconnectTimeoutsHandler.java
-│   │   │                   │   │   ├── ProposeTradeHandler.java
-│   │   │                   │   │   ├── RejoinSessionHandler.java
-│   │   │                   │   │   ├── RespondActionHandler.java
-│   │   │                   │   │   ├── RespondTradeHandler.java
-│   │   │                   │   │   └── StartGameHandler.java
 │   │   │                   │   ├── model/
 │   │   │                   │   │   └── CommandResult.java
 │   │   │                   │   ├── Facade.java
-│   │   │                   │   ├── GameFacade.java
-│   │   │                   │   └── PlayerTableFacade.java
+│   │   │                   │   └── GameFacade.java
 │   │   │                   ├── network/
 │   │   │                   │   ├── client/
 │   │   │                   │   │   ├── ClientReceiver.java
@@ -197,7 +178,6 @@ monopoly-deal-group6/
 │                           │   │   └── TurnManagerTest.java
 │                           │   ├── player/
 │                           │   │   ├── BankPaymentSolverTest.java
-│                           │   │   ├── HandDiscardTest.java
 │                           │   │   ├── PlayerHouseSpendTest.java
 │                           │   │   ├── PlayerPropertyTransfersTest.java
 │                           │   │   └── PlayerSnapshotTest.java
@@ -238,7 +218,7 @@ monopoly-deal-group6/
 | `core/property/` | Property colors, property rows, rent tables, rent support, and payment support. |
 | `core/rules/` | Validation rules for actions, payments, and winning. |
 | `exception/` | Project-specific exception hierarchy. |
-| `facade/` | Application facade, command handlers, and `CommandResult` response model. |
+| `facade/` | Command dispatch, error handling, and `CommandResult` response model. |
 | `network/` | TCP client, server, and per-client game thread classes. |
 | `ui/` | JavaFX screens, scene navigation, theme helpers, and message UI support. |
 

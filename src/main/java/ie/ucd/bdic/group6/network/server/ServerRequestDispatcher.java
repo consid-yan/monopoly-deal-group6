@@ -108,6 +108,15 @@ final class ServerRequestDispatcher {
                 .toList();
     }
 
+    /**
+     * [Deep Dive: Player Authentication — How does the server know who you are?]
+     * On CREATE_SESSION or JOIN_SESSION: no auth needed (first contact).
+     * On all other commands: the client must send a playerToken in the payload.
+     * The token was issued by the server during create/join (a random UUID per session+player).
+     * It is stored in a ConcurrentHashMap keyed by (sessionId, playerId).
+     * If the token doesn't match → UNAUTHORIZED_PLAYER response is returned and the command is rejected.
+     * This prevents spoofing: you can't pretend to be another player without knowing their token.
+     */
     private ServerResponse authenticate(ClientRequest request) {
         CommandType commandType = request.commandType();
 

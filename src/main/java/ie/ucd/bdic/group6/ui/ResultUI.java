@@ -44,16 +44,9 @@ public class ResultUI {
     @FXML
     private void initialize() {
         standingsList.setCellFactory(ignored -> standingCell());
-        showUnavailableResult("");
         context.setSnapshotListener(this::render);
         context.setMessageListener(message -> victoryReasonLabel.setText(message == null ? "" : message));
         render(context.latestSnapshot());
-    }
-
-    @FXML
-    private void playAgain() {
-        context.leaveSession();
-        SceneManager.showMenu();
     }
 
     @FXML

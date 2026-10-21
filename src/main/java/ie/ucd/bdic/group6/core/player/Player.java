@@ -19,7 +19,6 @@ import java.util.function.Supplier;
 /**
  * Aggregates {@link Hand}, {@link Bank}, and {@link PropertyBoard}. Multistep transactions should be composed
  * by the engine using {@link PlayerRollbackSnapshot} plus atomic helpers such as {@link PropertyTransferService}.
- * For a stable integration surface, prefer {@link ie.ucd.bdic.group6.facade.PlayerTableFacade}.
  */
 public final class Player {
 
@@ -84,9 +83,8 @@ public final class Player {
         OperationResult<Void> deposited = bank.depositAsMoney(card);
         if (!deposited.isSuccess()) {
             hand.add(card);
-            return deposited;
         }
-        return OperationResult.ok();
+        return deposited;
     }
 
     public void tryPlayPropertyFromHand(PropertySet row, Card card) {
@@ -99,18 +97,14 @@ public final class Player {
         if (!propertyBoard.ownsRow(row)) {
             return OperationResult.fail(OperationError.ROW_NOT_OWNED_BY_PLAYER, "row not owned by player");
         }
-        if (!hand.contains(card)) {
-            return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "card not in hand: " + card.id());
-        }
         if (!hand.remove(card)) {
             return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "card not in hand: " + card.id());
         }
         OperationResult<Void> placed = propertyBoard.tryAddCardToRow(row, card, wildChoice);
         if (!placed.isSuccess()) {
             hand.add(card);
-            return placed;
         }
-        return OperationResult.ok();
+        return placed;
     }
 
     public void tryStartNewPropertyRowFromHand(PropertyColor anchorColor, Card card) {
@@ -126,12 +120,10 @@ public final class Player {
         if (!placed.isSuccess()) {
             hand.add(card);
             if (row.size() == 0) {
-                propertyBoard.removeRow(row);
                 propertyBoard.compactEmptyRows();
             }
-            return placed;
         }
-        return OperationResult.ok();
+        return placed;
     }
 
     private boolean tryRemoveFromHand(Card card) {
@@ -159,9 +151,6 @@ public final class Player {
         }
         if (!propertyBoard.ownsRow(row)) {
             return OperationResult.fail(OperationError.ROW_NOT_OWNED_BY_PLAYER, "row not owned by player");
-        }
-        if (!hand.contains(actionFromHand)) {
-            return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "action card not in hand");
         }
         if (!hand.remove(actionFromHand)) {
             return OperationResult.fail(OperationError.CARD_NOT_IN_HAND, "action card not in hand");

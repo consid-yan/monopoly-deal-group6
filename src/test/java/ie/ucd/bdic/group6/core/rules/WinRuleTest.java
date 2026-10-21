@@ -13,13 +13,7 @@ class WinRuleTest {
     private final WinRule winRule = new WinRule();
 
     @Test
-    void playerWithThreeCompleteSetsOnTheirTurnWins() {
-        Player player = playerWithCompleteSets(PropertyColor.BROWN, PropertyColor.DARK_BLUE, PropertyColor.UTILITY);
-        assertTrue(winRule.hasWon(player));
-    }
-
-    @Test
-    void playerWithThreeCompleteSetsOffTurnSatisfiesWinRule() {
+    void playerWithThreeCompleteSetsWins() {
         Player player = playerWithCompleteSets(PropertyColor.BROWN, PropertyColor.DARK_BLUE, PropertyColor.UTILITY);
         assertTrue(winRule.hasWon(player));
     }

@@ -42,6 +42,12 @@ public final class TurnManager {
         return actionsUsed < MAX_ACTIONS_PER_TURN;
     }
 
+    /**
+     * [Gameplay Step A: Record an Action]
+     * Called after each card play to consume one of the 3 available actions for the current turn.
+     * When actionsUsed reaches MAX_ACTIONS_PER_TURN (3), the player can no longer play cards
+     * and should end their turn (or will be forced into end-turn flow).
+     */
     public void recordAction() {
         if (!canRecordAction()) {
             throw new IllegalStateException("turn action limit has already been reached");
@@ -49,6 +55,13 @@ public final class TurnManager {
         actionsUsed++;
     }
 
+    /**
+     * [Gameplay Step E: Advance to Next Turn]
+     * Moves the turn to the next player in join order using round-robin rotation:
+     * currentIndex = (currentIndex + 1) % turnOrder.size()
+     * Resets actionsUsed back to 0 for the new player's turn.
+     * Returns the playerId of the new active player.
+     */
     public String advanceToNextTurn() {
         currentIndex = (currentIndex + 1) % turnOrder.size();
         actionsUsed = 0;

@@ -5,7 +5,6 @@ import ie.ucd.bdic.group6.core.card.deck.Deck;
 import ie.ucd.bdic.group6.core.common.OperationError;
 import ie.ucd.bdic.group6.core.common.OperationResult;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
@@ -33,9 +32,9 @@ public final class DrawPileRule {
         if (discardPile.isEmpty()) {
             return OperationResult.fail(OperationError.EMPTY_DISCARD_PILE, "discard pile is empty");
         }
-        List<Card> taken = new ArrayList<>(discardPile);
+        int movedCount = discardPile.size();
+        drawPile.refillFromShuffled(discardPile, random);
         discardPile.clear();
-        drawPile.refillFromShuffled(taken, random);
-        return OperationResult.ok(taken.size());
+        return OperationResult.ok(movedCount);
     }
 }

@@ -3,7 +3,6 @@ package ie.ucd.bdic.group6.core.engine;
 import ie.ucd.bdic.group6.core.player.Player;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -18,7 +17,6 @@ public final class GameSession {
     private final String hostPlayerId;
     private final int maxPlayers;
     private final Map<String, Player> playersById = new LinkedHashMap<>();
-    private final List<String> playerJoinOrder = new ArrayList<>();
     private final Map<String, Boolean> connectedByPlayerId = new HashMap<>();
     private final Map<String, Instant> disconnectedAtByPlayerId = new HashMap<>();
     private final Map<String, Boolean> defeatedByPlayerId = new HashMap<>();
@@ -76,7 +74,7 @@ public final class GameSession {
     }
 
     public List<String> playerJoinOrder() {
-        return List.copyOf(playerJoinOrder);
+        return List.copyOf(playersById.keySet());
     }
 
     public int playerCount() {
@@ -96,7 +94,6 @@ public final class GameSession {
             throw new IllegalStateException("session is full");
         }
         playersById.put(player.id(), player);
-        playerJoinOrder.add(player.id());
         connectedByPlayerId.put(player.id(), true);
         defeatedByPlayerId.put(player.id(), false);
     }
@@ -118,7 +115,6 @@ public final class GameSession {
     }
 
     public void markConnected(String playerId) {
-        requireKnownPlayer(playerId);
         if (isDefeated(playerId)) {
             return;
         }
@@ -127,7 +123,6 @@ public final class GameSession {
     }
 
     public void markDisconnected(String playerId, Instant disconnectedAt) {
-        requireKnownPlayer(playerId);
         if (isDefeated(playerId)) {
             return;
         }
@@ -165,13 +160,13 @@ public final class GameSession {
     }
 
     public List<String> forfeitedPlayerIds() {
-        return playerJoinOrder.stream()
+        return playersById.keySet().stream()
                 .filter(this::isDefeated)
                 .toList();
     }
 
     public List<String> activePlayerIds() {
-        return playerJoinOrder.stream()
+        return playersById.keySet().stream()
                 .filter(playerId -> !isDefeated(playerId))
                 .toList();
     }

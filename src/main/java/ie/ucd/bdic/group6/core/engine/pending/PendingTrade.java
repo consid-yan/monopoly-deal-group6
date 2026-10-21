@@ -38,7 +38,7 @@ public final class PendingTrade {
         if (offeredCardIds.isEmpty() && requestedCardIds.isEmpty()) {
             throw new IllegalArgumentException("trade must contain offered or requested cards");
         }
-        this.createdAt = builder.createdAt == null ? Instant.now() : builder.createdAt;
+        this.createdAt = Instant.now();
         this.status = TradeStatus.PENDING;
     }
 
@@ -120,7 +120,6 @@ public final class PendingTrade {
         private String targetPlayerId;
         private List<String> offeredCardIds = List.of();
         private List<String> requestedCardIds = List.of();
-        private Instant createdAt;
 
         private Builder() {
         }

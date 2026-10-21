@@ -50,10 +50,4 @@ public class PlayCardCommand extends AbstractCommand {
     public String getPropertyColor() {
         return (String) payload().get("propertyColor");
     }
-
-    @Deprecated
-    public String getPropertyRowIndex() {
-        Object legacyIndex = payload().get("propertyRowIndex");
-        return legacyIndex == null ? null : legacyIndex.toString();
-    }
 }

@@ -55,9 +55,7 @@ public class MenuUI {
                 UiDialogs.showError("Command Failed", result.message());
                 return;
             }
-            UiSnapshot snapshot = result.snapshot() == null
-                    ? UiSnapshot.empty()
-                    : UiSnapshot.from(result.snapshot());
+            UiSnapshot snapshot = UiSnapshot.from(result.snapshot());
             if ("ACTIVE".equals(snapshot.status())) {
                 SceneManager.showGame();
             } else if ("FINISHED".equals(snapshot.status())) {

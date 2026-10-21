@@ -100,10 +100,7 @@ public final class PropertySet {
             return wildChoice == null && pc.color() == anchorColor;
         }
         if (card instanceof PropertyWildCard wc) {
-            if (wildChoice == null) {
-                return false;
-            }
-            return wc.allows(wildChoice) && wildChoice == anchorColor;
+            return wildChoice == anchorColor && wc.allows(wildChoice);
         }
         return false;
     }
@@ -116,16 +113,11 @@ public final class PropertySet {
         if (!canAdd(card, wildChoice)) {
             return false;
         }
-        if (card instanceof PropertyCard pc) {
-            cards.add(pc);
-            return true;
-        }
+        cards.add(card);
         if (card instanceof PropertyWildCard wc) {
-            cards.add(wc);
             wildAssignments.put(wc.id(), wildChoice);
-            return true;
         }
-        return false;
+        return true;
     }
 
     public boolean remove(Card card) {
@@ -156,34 +148,27 @@ public final class PropertySet {
     }
 
     public OperationResult<Void> validateHouseStructure() {
-        if (!isComplete()) {
-            return OperationResult.fail(OperationError.NOT_COMPLETE_SET, "row is not a complete property set");
-        }
-        if (PropertyColor.isRailOrUtility(anchorColor)) {
-            return OperationResult.fail(
-                    OperationError.RAIL_OR_UTILITY_CANNOT_BUILD,
-                    "railroad and utility sets cannot receive houses");
-        }
-        if (house) {
-            return OperationResult.fail(OperationError.HOUSE_ALREADY_BUILT, "row already has a house");
-        }
-        if (hotel) {
-            return OperationResult.fail(OperationError.HOTEL_ALREADY_BUILT, "row already has a hotel");
-        }
-        return OperationResult.ok();
+        return validateImprovementStructure(false);
     }
 
     public OperationResult<Void> validateHotelStructure() {
+        return validateImprovementStructure(true);
+    }
+
+    private OperationResult<Void> validateImprovementStructure(boolean forHotel) {
         if (!isComplete()) {
             return OperationResult.fail(OperationError.NOT_COMPLETE_SET, "row is not a complete property set");
         }
         if (PropertyColor.isRailOrUtility(anchorColor)) {
             return OperationResult.fail(
                     OperationError.RAIL_OR_UTILITY_CANNOT_BUILD,
-                    "railroad and utility sets cannot receive hotels");
+                    "railroad and utility sets cannot receive " + (forHotel ? "hotels" : "houses"));
         }
-        if (!house) {
+        if (forHotel && !house) {
             return OperationResult.fail(OperationError.HOUSE_REQUIRED_BEFORE_HOTEL, "a house is required before a hotel");
+        }
+        if (!forHotel && house) {
+            return OperationResult.fail(OperationError.HOUSE_ALREADY_BUILT, "row already has a house");
         }
         if (hotel) {
             return OperationResult.fail(OperationError.HOTEL_ALREADY_BUILT, "row already has a hotel");
@@ -197,11 +182,10 @@ public final class PropertySet {
      */
     public OperationResult<Void> tryPlaceHouseStructuralOnly() {
         OperationResult<Void> validation = validateHouseStructure();
-        if (!validation.isSuccess()) {
-            return validation;
+        if (validation.isSuccess()) {
+            house = true;
         }
-        house = true;
-        return OperationResult.ok();
+        return validation;
     }
 
     /**
@@ -209,11 +193,10 @@ public final class PropertySet {
      */
     public OperationResult<Void> tryPlaceHotelStructuralOnly() {
         OperationResult<Void> validation = validateHotelStructure();
-        if (!validation.isSuccess()) {
-            return validation;
+        if (validation.isSuccess()) {
+            hotel = true;
         }
-        hotel = true;
-        return OperationResult.ok();
+        return validation;
     }
 
     /**
@@ -239,8 +222,14 @@ public final class PropertySet {
     }
 
     /**
-     * Chargeable rent for this row using {@link RentTable}. Incomplete sets use {@link RentTable#baseRent};
-     * complete sets include house/hotel tiers when built.
+     * [Deep Dive: Rent Calculation — How is the rent amount determined?]
+     * Two-tier calculation:
+     *   1. Incomplete set → RentTable.baseRent(color, cardCount)
+     *      e.g., 2 red cards = $3M, 1 red card = $1M
+     *   2. Complete set → RentTable.completeSetRent(color, hasHouse, hasHotel)
+     *      e.g., full red set = $4M, +House = $5M, +Hotel = $7M (values from official rules)
+     * The PropertyRentRule.maxRentForAnchor() picks the best (highest) row for a given color
+     * when a player owns multiple rows of the same color.
      */
     public int rentValue() {
         if (!isComplete()) {

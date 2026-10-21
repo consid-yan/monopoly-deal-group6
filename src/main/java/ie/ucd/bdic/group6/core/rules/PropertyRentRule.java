@@ -14,7 +14,10 @@ import java.util.Objects;
 public final class PropertyRentRule {
 
     public static int maxRentForAnchor(PropertyBoard board, PropertyColor anchor) {
-        return rowsWithAnchor(board, anchor).stream()
+        Objects.requireNonNull(board, "board");
+        Objects.requireNonNull(anchor, "anchor");
+        return board.rowsView().stream()
+                .filter(row -> row.anchorColor() == anchor)
                 .mapToInt(PropertySet::rentValue)
                 .max()
                 .orElse(0);
@@ -26,15 +29,6 @@ public final class PropertyRentRule {
                 .filter(row -> row.rentValue() > 0)
                 .map(PropertySet::anchorColor)
                 .distinct()
-                .toList();
-    }
-
-    private static List<PropertySet> rowsWithAnchor(PropertyBoard board, PropertyColor anchor) {
-        Objects.requireNonNull(board, "board");
-        Objects.requireNonNull(anchor, "anchor");
-        return board.rowsView().stream()
-                .filter(row -> row.anchorColor() == anchor)
-                .filter(row -> row.rentValue() > 0)
                 .toList();
     }
 }

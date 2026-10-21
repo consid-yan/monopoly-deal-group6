@@ -7,7 +7,6 @@ import java.util.OptionalInt;
 public final class PropertyCard extends Card {
 
     private final PropertyColor color;
-    private final int requiredToComplete;
 
     public PropertyCard(String id, String displayName, PropertyColor color, int requiredToComplete) {
         super(id, CardType.PROPERTY, displayName);
@@ -17,7 +16,6 @@ public final class PropertyCard extends Card {
             throw new IllegalArgumentException(
                     "requiredToComplete " + requiredToComplete + " must match fullSetSize(" + color + ")=" + expected);
         }
-        this.requiredToComplete = requiredToComplete;
     }
 
     public PropertyColor color() {
@@ -25,7 +23,7 @@ public final class PropertyCard extends Card {
     }
 
     public int requiredToComplete() {
-        return requiredToComplete;
+        return PropertyColor.fullSetSize(color);
     }
 
     @Override

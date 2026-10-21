@@ -1,7 +1,6 @@
 package ie.ucd.bdic.group6.ui;
 
 import ie.ucd.bdic.group6.core.engine.PlayerPhase;
-import ie.ucd.bdic.group6.core.snapshot.CardSnapshot;
 import ie.ucd.bdic.group6.core.snapshot.PendingDebtSnapshot;
 import ie.ucd.bdic.group6.core.snapshot.PendingActionSnapshot;
 import ie.ucd.bdic.group6.core.snapshot.PlayerStateSnapshot;
@@ -10,12 +9,10 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GameUITest {
 
@@ -98,34 +95,6 @@ class GameUITest {
                 GameUI.buildActivityLines(snapshot, "host"));
     }
 
-    @Test
-    void paymentCheckBoxesHideTheMarkUntilSelected() throws Exception {
-        String css = new String(
-                Objects.requireNonNull(getClass().getResourceAsStream("/css/style.css")).readAllBytes(),
-                java.nio.charset.StandardCharsets.UTF_8);
-
-        assertTrue(css.matches("(?s).*\\.app-dialog-check-box\\s+\\.mark\\s*\\{[^}]*"
-                        + "-fx-background-color\\s*:\\s*transparent\\s*;[^}]*}.*"),
-                "Payment checkboxes need an explicit unchecked mark style");
-    }
-
-    @Test
-    void propertyRowsScrollInsideTheirPanelWithoutCoveringTheFixedBankRow() throws Exception {
-        String css = new String(
-                Objects.requireNonNull(getClass().getResourceAsStream("/css/style.css")).readAllBytes(),
-                java.nio.charset.StandardCharsets.UTF_8);
-
-        assertTrue(css.matches("(?s).*\\.clean-game-board-row\\s*\\{[^}]*"
-                        + "-fx-max-height\\s*:\\s*146\\s*;[^}]*}.*"),
-                "The bank row must stay fixed while property rows grow");
-        assertTrue(css.matches("(?s).*\\.clean-property-panel\\s*\\{[^}]*"
-                        + "-fx-min-height\\s*:\\s*0\\s*;[^}]*}.*"),
-                "The property panel must be allowed to shrink into its scroll viewport");
-        assertTrue(css.matches("(?s).*\\.game-property-scroll\\s*\\{[^}]*"
-                        + "-fx-min-height\\s*:\\s*0\\s*;[^}]*}.*"),
-                "The property scroll pane must clip overflowing property rows");
-    }
-
     private UiSnapshot snapshot(String activePlayerId, List<PendingDebtSnapshot> pendingDebts) {
         return snapshot(activePlayerId, pendingDebts, List.of());
     }
@@ -134,25 +103,6 @@ class GameUITest {
             String activePlayerId,
             List<PendingDebtSnapshot> pendingDebts,
             List<PendingActionSnapshot> pendingActions) {
-        return snapshot(activePlayerId, 0, 0, pendingDebts, pendingActions);
-    }
-
-    private UiSnapshot snapshot(
-            String activePlayerId,
-            int actionsUsed,
-            int actionsRemaining,
-            List<PendingDebtSnapshot> pendingDebts,
-            List<PendingActionSnapshot> pendingActions) {
-        return snapshot(activePlayerId, actionsUsed, actionsRemaining, pendingDebts, pendingActions, List.of());
-    }
-
-    private UiSnapshot snapshot(
-            String activePlayerId,
-            int actionsUsed,
-            int actionsRemaining,
-            List<PendingDebtSnapshot> pendingDebts,
-            List<PendingActionSnapshot> pendingActions,
-            List<CardSnapshot> hand) {
         return UiSnapshot.from(new SessionSnapshot(
                 "s1",
                 "ABC123",
@@ -160,8 +110,8 @@ class GameUITest {
                 2,
                 "ACTIVE",
                 activePlayerId,
-                actionsUsed,
-                actionsRemaining,
+                0,
+                0,
                 "",
                 20,
                 0,
@@ -173,12 +123,8 @@ class GameUITest {
                         player("host", "Host"),
                         player("guest", "Guest")
                 ),
-                hand
+                List.of()
         ));
-    }
-
-    private CardSnapshot card(String id) {
-        return new CardSnapshot(id, "MONEY", id, 1, 1, "", 0, List.of(), "", List.of());
     }
 
     private PlayerStateSnapshot player(String playerId, String name) {

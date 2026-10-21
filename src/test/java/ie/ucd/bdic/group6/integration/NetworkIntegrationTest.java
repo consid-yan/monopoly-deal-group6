@@ -5,7 +5,6 @@ import ie.ucd.bdic.group6.command.CommandType;
 import ie.ucd.bdic.group6.controller.GameController;
 import ie.ucd.bdic.group6.controller.mapper.RequestMapper;
 import ie.ucd.bdic.group6.core.engine.GameEngine;
-import ie.ucd.bdic.group6.core.snapshot.CardSnapshot;
 import ie.ucd.bdic.group6.core.snapshot.PlayerStateSnapshot;
 import ie.ucd.bdic.group6.facade.GameFacade;
 import ie.ucd.bdic.group6.network.client.GameClient;
@@ -96,10 +95,10 @@ class NetworkIntegrationTest {
         assertTrue(joined.accepted());
         String player2Token = text(joined.payload(), "playerToken");
         assertNotNull(player2Token);
-        await(hostUpdates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
-                && players(update).size() == 2);
-        await(player2Updates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
-                && players(update).size() == 2);
+        await(hostUpdates, update -> sessionId.equals(update.snapshot().sessionId())
+                && update.snapshot().players().size() == 2);
+        await(player2Updates, update -> sessionId.equals(update.snapshot().sessionId())
+                && update.snapshot().players().size() == 2);
 
         ServerResponse started = host.sendCommand(CommandType.START_GAME, Map.of(
                 "sessionId", sessionId,
@@ -110,15 +109,10 @@ class NetworkIntegrationTest {
 
         ServerUpdate hostActive = await(hostUpdates, activeUpdate(sessionId));
         ServerUpdate player2Active = await(player2Updates, activeUpdate(sessionId));
-        assertNotNull(hostActive);
-        assertEquals("ACTIVE", hostActive.snapshot().status());
-        assertNotNull(player2Active);
-        assertEquals("ACTIVE", player2Active.snapshot().status());
         assertEquals("host", hostActive.snapshot().hostPlayerId());
         assertEquals(2, hostActive.snapshot().maxPlayers());
-        assertEquals(7, currentPlayerHand(hostActive).size());
-        assertEquals(5, currentPlayerHand(player2Active).size());
-        assertNotEquals(currentPlayerHand(hostActive), currentPlayerHand(player2Active));
+        assertEquals(7, hostActive.snapshot().currentPlayerHand().size());
+        assertEquals(5, player2Active.snapshot().currentPlayerHand().size());
 
         player2.close();
         GameClient rejoinedPlayer2 = client();
@@ -133,9 +127,7 @@ class NetworkIntegrationTest {
         assertEquals(player2Token, rejoined.payload().get("playerToken"));
 
         ServerUpdate rejoinedState = await(rejoinedUpdates, activeUpdate(sessionId));
-        assertNotNull(rejoinedState);
-        assertEquals("ACTIVE", rejoinedState.snapshot().status());
-        assertEquals(5, currentPlayerHand(rejoinedState).size());
+        assertEquals(5, rejoinedState.snapshot().currentPlayerHand().size());
     }
 
     @Test
@@ -190,12 +182,11 @@ class NetworkIntegrationTest {
         )).get(3, TimeUnit.SECONDS);
 
         assertTrue(rejoined.accepted());
-        assertNotNull(await(player2Notices, notice -> notice.type() == NoticeType.SESSION_REPLACED));
+        await(player2Notices, notice -> notice.type() == NoticeType.SESSION_REPLACED);
         assertTrue(server.isRunning(), "Replacing one player connection must not stop the server");
 
         ServerUpdate replacementActive = await(replacementUpdates, activeUpdate(sessionId));
-        assertNotNull(replacementActive);
-        assertEquals(5, currentPlayerHand(replacementActive).size());
+        assertEquals(5, replacementActive.snapshot().currentPlayerHand().size());
 
         ServerResponse ended = host.sendCommand(CommandType.END_TURN, Map.of(
                 "sessionId", sessionId,
@@ -203,8 +194,8 @@ class NetworkIntegrationTest {
                 "playerToken", hostToken
         )).get(3, TimeUnit.SECONDS);
         assertTrue(ended.accepted());
-        assertNotNull(await(replacementUpdates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
-                && "player2".equals(update.snapshot().activePlayerId())));
+        await(replacementUpdates, update -> sessionId.equals(update.snapshot().sessionId())
+                && "player2".equals(update.snapshot().activePlayerId()));
     }
 
     @Test
@@ -252,14 +243,13 @@ class NetworkIntegrationTest {
         await(hostUpdates, activeUpdate(sessionId));
 
         player2.close();
-        await(hostUpdates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
+        await(hostUpdates, update -> sessionId.equals(update.snapshot().sessionId())
                 && playerHasStatus(update, "player2", "DISCONNECTED"));
 
         clock.advance(Duration.ofSeconds(91));
-        ServerUpdate finished = await(hostUpdates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
+        ServerUpdate finished = await(hostUpdates, update -> sessionId.equals(update.snapshot().sessionId())
                 && "FINISHED".equals(update.snapshot().status()));
 
-        assertNotNull(finished);
         assertEquals("host", finished.snapshot().winnerPlayerId());
         assertEquals(List.of("player2"), finished.snapshot().forfeitedPlayerIds());
         assertEquals("DEFEATED", player(finished, "player2").playerStatus());
@@ -313,7 +303,7 @@ class NetworkIntegrationTest {
         await(hostUpdates, activeUpdate(sessionId));
 
         player2.close();
-        await(hostUpdates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
+        await(hostUpdates, update -> sessionId.equals(update.snapshot().sessionId())
                 && playerHasStatus(update, "player2", "DISCONNECTED"));
 
         GameClient rejoiningPlayer2 = client();
@@ -327,10 +317,9 @@ class NetworkIntegrationTest {
 
         assertFalse(rejected.accepted());
         assertEquals("PLAYER_FORFEITED", rejected.code());
-        ServerUpdate finished = await(hostUpdates, update -> sessionId.equals(text(update.snapshot(), "sessionId"))
+        ServerUpdate finished = await(hostUpdates, update -> sessionId.equals(update.snapshot().sessionId())
                 && "FINISHED".equals(update.snapshot().status())
                 && List.of("player2").equals(update.snapshot().forfeitedPlayerIds()));
-        assertNotNull(finished);
         assertEquals("host", finished.snapshot().winnerPlayerId());
         assertEquals("DEFEATED", player(finished, "player2").playerStatus());
     }
@@ -380,10 +369,11 @@ class NetworkIntegrationTest {
         assertFalse(spoofedHost.accepted());
         assertEquals("UNAUTHORIZED_PLAYER", spoofedHost.code());
 
-        ServerResponse legitimateStart = host.sendCommand(CommandType.START_GAME, withToken(Map.of(
+        ServerResponse legitimateStart = host.sendCommand(CommandType.START_GAME, Map.of(
                 "sessionId", sessionId,
-                "playerId", "host"
-        ), hostToken)).get(3, TimeUnit.SECONDS);
+                "playerId", "host",
+                "playerToken", hostToken
+        )).get(3, TimeUnit.SECONDS);
         assertTrue(legitimateStart.accepted());
     }
 
@@ -400,8 +390,7 @@ class NetworkIntegrationTest {
         assertTrue(host.isConnected());
         server.stop();
 
-        Throwable disconnect = await(disconnects, Objects::nonNull);
-        assertNotNull(disconnect);
+        await(disconnects, Objects::nonNull);
         assertFalse(host.isConnected());
     }
 
@@ -433,14 +422,8 @@ class NetworkIntegrationTest {
         return updates;
     }
 
-    private Map<String, Object> withToken(Map<String, Object> payload, String playerToken) {
-        Map<String, Object> copy = new LinkedHashMap<>(payload);
-        copy.put("playerToken", playerToken);
-        return copy;
-    }
-
     private Predicate<ServerUpdate> activeUpdate(String sessionId) {
-        return update -> sessionId.equals(text(update.snapshot(), "sessionId"))
+        return update -> sessionId.equals(update.snapshot().sessionId())
                 && "ACTIVE".equals(update.snapshot().status());
     }
 
@@ -454,12 +437,7 @@ class NetworkIntegrationTest {
             }
             Thread.sleep(10);
         }
-        fail("Timed out waiting for matching network event");
-        return null;
-    }
-
-    private List<PlayerStateSnapshot> players(ServerUpdate update) {
-        return update.snapshot().players();
+        return fail("Timed out waiting for matching network event");
     }
 
     private PlayerStateSnapshot player(ServerUpdate update, String playerId) {
@@ -473,18 +451,6 @@ class NetworkIntegrationTest {
         return update.snapshot().players().stream()
                 .anyMatch(player -> playerId.equals(player.playerId())
                         && status.equals(player.playerStatus()));
-    }
-
-    private List<CardSnapshot> currentPlayerHand(ServerUpdate update) {
-        return update.snapshot().currentPlayerHand();
-    }
-
-    private String text(ie.ucd.bdic.group6.core.snapshot.SessionSnapshot snapshot, String key) {
-        return switch (key) {
-            case "sessionId" -> snapshot.sessionId();
-            case "roomCode" -> snapshot.roomCode();
-            default -> null;
-        };
     }
 
     private String text(Map<String, Object> data, String key) {

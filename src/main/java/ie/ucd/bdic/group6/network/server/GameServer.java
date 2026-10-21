@@ -8,6 +8,7 @@ import ie.ucd.bdic.group6.network.message.NoticeType;
 import ie.ucd.bdic.group6.network.message.ServerNotice;
 import ie.ucd.bdic.group6.network.message.ServerUpdate;
 
+import java.io.Closeable;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -162,6 +163,14 @@ public class GameServer implements AutoCloseable {
         }
     }
 
+    /**
+     * [Deep Dive: State Broadcasting — How do all clients stay in sync?]
+     * After any command changes the game state, this method pushes the latest SessionSnapshot
+     * to every client bound to the given session. Each client gets their own "view" of the game
+     * (only their own hand cards are visible). This is a PUSH model: the server proactively sends
+     * state updates via ServerUpdate messages, the client never polls.
+     * Broadcasting is triggered when dispatch() returns broadcastSessionState=true.
+     */
     private void broadcastSessionState(String sessionId) {
         for (ClientConnection connection : clients) {
             if (!connection.isBoundToSession(sessionId)) {
@@ -211,17 +220,7 @@ public class GameServer implements AutoCloseable {
         serverSocket = null;
     }
 
-    private static void closeQuietly(ServerSocket socket) {
-        if (socket == null) {
-            return;
-        }
-
-        try {
-            socket.close();
-        } catch (IOException ignored) {}
-    }
-
-    private static void closeQuietly(Socket socket) {
+    private static void closeQuietly(Closeable socket) {
         if (socket == null) {
             return;
         }
@@ -324,11 +323,7 @@ public class GameServer implements AutoCloseable {
             close();
             clients.remove(this);
 
-            if (shouldMarkDisconnected && hasBoundConnection(closedSessionId, closedPlayerId)) {
-                shouldMarkDisconnected = false;
-            }
-
-            if (shouldMarkDisconnected) {
+            if (shouldMarkDisconnected && !hasBoundConnection(closedSessionId, closedPlayerId)) {
                 handlePlayerDisconnected(closedSessionId, closedPlayerId);
             }
 
