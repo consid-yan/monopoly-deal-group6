@@ -285,7 +285,6 @@ public class GameEngine implements ActionExecutor, GameplayHandler.Host {
         String responderId = requireText(command.getPlayerId(), "playerId");
         requireNoPendingActionResponses(activeGame);
         requireNoPendingDebts(activeGame);
-        actionRule.requireActivePlayer(activeGame.turnManager(), responderId);
         requireNotDefeated(session, responderId);
 
         PendingTrade trade = activeGame.findPendingTrade(requireText(command.getTradeId(), "tradeId"))

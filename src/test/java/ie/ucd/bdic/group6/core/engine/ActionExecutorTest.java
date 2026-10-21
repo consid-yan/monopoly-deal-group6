@@ -647,8 +647,10 @@ class ActionExecutorTest {
         )));
         String tradeId = proposed.pendingTrades().getFirst().tradeId();
         assertEquals(2, proposed.actionsUsed());
+        assertEquals("host", proposed.activePlayerId());
+        assertEquals("RESPONDING", playerSummary(proposed, "player2").playerPhase());
+        assertEquals("ACTING", playerSummary(proposed, "host").playerPhase());
 
-        endTurn(engine, sessionId, "host");
         SessionSnapshot accepted = engine.executeRespondTrade(new RespondTradeCommand(Map.of(
                 "sessionId", sessionId,
                 "playerId", "player2",

@@ -79,7 +79,7 @@ mvn javafx:run
 ```text
 src/main/java/ie/ucd/bdic/group6/
 +-- app/          Application entry point and dependency wiring
-+-- command/      Session, gameplay, payment, trade, discard, and rejoin commands
++-- command/      Session, card, debt, trade, action, game, and connection command records
 +-- controller/   Request intake, DTOs, and request-to-command mapping
 +-- core/         Cards, common results, engine, players, properties, and rules
 +-- exception/    Project-specific exception types
